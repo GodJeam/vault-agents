@@ -69,9 +69,23 @@ npm run build
 - The interface is in **English** by default; switch to Italian in Settings → Language (reload Obsidian to apply everywhere).
 - Save reusable **prompt templates** in Settings → Prompt templates and insert them in the chat with `/prompt`.
 
-## Structure
+## Project Structure
 
-- `src/` — TypeScript source
+```text
+src/
+├── core/                        # Provider contracts, registry, and execution types
+├── providers/
+│   ├── antigravity/             # Antigravity CLI runner & stream parser
+│   ├── opencode/                # OpenCode CLI runner & stream parser
+│   └── base.ts                  # Shared process execution and CLI utilities
+├── features/
+│   ├── chat/                    # Chat view, streaming bubbles, step widgets
+│   └── settings/                # Settings tab and engine configuration
+├── shared/                      # Reusable UI modals (file suggest, stats)
+├── i18n/                        # Internationalization (English, Italian)
+└── main.ts                      # Plugin lifecycle and command palette registration
+```
+
 - `build/` — build tooling (esbuild config, tsconfig)
 - `main.js` / `manifest.json` / `styles.css` — built plugin files (copy into the vault)
 
