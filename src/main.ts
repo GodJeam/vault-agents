@@ -1,10 +1,12 @@
 import { Notice, Plugin, WorkspaceLeaf } from "obsidian";
-import { CHAT_VIEW_TYPE, ChatView } from "./chatView";
-import { OpencodeRunner } from "./opencodeRunner";
-import { AntigravityRunner } from "./antigravityRunner";
-import { DEFAULT_SETTINGS, OpencodeSettingTab, OpencodeSettings } from "./settings";
+import { CHAT_VIEW_TYPE, ChatView } from "./features/chat";
+import { OpencodeRunner, AntigravityRunner } from "./providers";
+import { ProviderRegistry } from "./core/registry";
+import type { AgentProvider } from "./core/provider";
+import { DEFAULT_SETTINGS } from "./core/types";
+import { OpencodeSettingTab } from "./features/settings/settingsTab";
+import type { OpencodeSettings } from "./core/types";
 import { translate } from "./i18n";
-import type { AgentRunner } from "./types";
 
 export interface HistoryUser {
   role: "user";
@@ -26,21 +28,21 @@ export type HistoryMap = Record<string, HistoryMessage[]>;
 export default class OpencodePlugin extends Plugin {
   settings!: OpencodeSettings;
   histories: HistoryMap = {};
+  registry!: ProviderRegistry;
   opencodeRunner!: OpencodeRunner;
   antigravityRunner!: AntigravityRunner;
   private saveTimer: number | null = null;
 
-  get runner(): AgentRunner {
-    return this.settings.engine === "antigravity" ? this.antigravityRunner : this.opencodeRunner;
+  get runner(): AgentProvider {
+    return this.registry.resolveProvider(this.settings.engine);
   }
 
-  getRunnerForSession(sessionId?: string): AgentRunner {
-    if (sessionId && this.settings.sessionEngines?.[sessionId]) {
-      return this.settings.sessionEngines[sessionId] === "antigravity"
-        ? this.antigravityRunner
-        : this.opencodeRunner;
-    }
-    return this.runner;
+  getRunnerForSession(sessionId?: string): AgentProvider {
+    return this.registry.resolveProvider(
+      this.settings.engine,
+      sessionId,
+      this.settings.sessionEngines
+    );
   }
 
   async onload(): Promise<void> {
@@ -48,8 +50,13 @@ export default class OpencodePlugin extends Plugin {
     const { histories, ...rest } = data as { histories?: HistoryMap } & Record<string, unknown>;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, rest);
     this.histories = histories ?? {};
+
     this.opencodeRunner = new OpencodeRunner(this);
     this.antigravityRunner = new AntigravityRunner(this);
+    this.registry = new ProviderRegistry();
+    this.registry.register(this.opencodeRunner);
+    this.registry.register(this.antigravityRunner);
+
     if (this.settings.engine === "opencode") {
       void this.opencodeRunner.pruneOversizedParts();
     }
@@ -180,8 +187,11 @@ export default class OpencodePlugin extends Plugin {
   onunload(): void {
     // Persist any debounced history write before tearing down.
     void this.flushSave();
-    this.opencodeRunner?.killAll();
-    this.antigravityRunner?.killAll();
+    if (this.registry) {
+      for (const provider of this.registry.getAll()) {
+        provider.killAll();
+      }
+    }
   }
 
   // Debounce history writes: appendHistory is called on every message and

@@ -1,54 +1,45 @@
-import { spawn, type ChildProcess, type SpawnOptions } from "child_process";
-import { createHash } from "crypto";
 import { existsSync, readFileSync } from "fs";
-import { copyFile, mkdir, readdir, stat, unlink } from "fs/promises";
-import { basename, dirname, extname, join } from "path";
-import { homedir, tmpdir } from "os";
+import { basename, isAbsolute, join } from "path";
+import { homedir } from "os";
 import { FileSystemAdapter } from "obsidian";
-import type OpencodePlugin from "./main";
+import type OpencodePlugin from "../../main";
+import type { AgentProvider } from "../../core/provider";
 import type {
-  AgentRunner,
   EngineType,
-  FinishInfo,
   RunHandle,
   SessionInfo,
-  StepInfo,
   StreamCallbacks,
   UsageStats,
-} from "./types";
+} from "../../core/types";
+import { BaseCliRunner } from "../base";
+import type { AntigravityEvent } from "./types";
 
-export class AntigravityRunner implements AgentRunner {
+export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
+  readonly id: EngineType = "antigravity";
+  readonly displayName = "Antigravity CLI";
   readonly engine: EngineType = "antigravity";
-  private plugin: OpencodePlugin;
-  private resolvedBinaries = new Map<string, string | null>();
-  private activeProcs = new Set<ChildProcess>();
+
+  private cachedModels: string[] | null = null;
 
   constructor(plugin: OpencodePlugin) {
-    this.plugin = plugin;
-  }
-
-  killAll(): void {
-    for (const child of [...this.activeProcs]) {
-      this.killNow(child);
-    }
-    this.activeProcs.clear();
+    super(plugin);
   }
 
   async getVersion(): Promise<string> {
-    const out = await this.execCli(["--version"]);
+    const bin = this.resolveBinaryPath(this.plugin.settings.antigravityBinary || "agy");
+    const out = await this.execCli(bin, ["--version"]);
     const first = out.trim().split("\n")[0];
     if (!first) throw new Error("Empty output from agy --version");
     return first;
   }
 
-  private cachedModels: string[] | null = null;
-
   async listModels(forceRefresh = false): Promise<string[]> {
     if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
       return this.cachedModels;
     }
+    const bin = this.resolveBinaryPath(this.plugin.settings.antigravityBinary || "agy");
     try {
-      const out = await this.execCli(["models"]);
+      const out = await this.execCli(bin, ["models"]);
       const models: string[] = [];
       for (const line of out.split("\n")) {
         const trimmed = line.trim();
@@ -116,7 +107,7 @@ export class AntigravityRunner implements AgentRunner {
           });
           seenIds.add(id);
         }
-      } catch (e) {
+      } catch {
         // Sqlite query not available or error, fall through to history
       }
     }
@@ -176,7 +167,7 @@ export class AntigravityRunner implements AgentRunner {
   async getModelContextLimit(model: string): Promise<number> {
     const m = model.toLowerCase();
     if (m.includes("gemini")) return 1_048_576; // 1M tokens
-    if (m.includes("claude")) return 200_000;   // 200K tokens
+    if (m.includes("claude")) return 200_000; // 200K tokens
     return 128_000;
   }
 
@@ -218,16 +209,28 @@ export class AntigravityRunner implements AgentRunner {
 
   runStream(prompt: string, fileAttachments: string[], cb: StreamCallbacks): RunHandle {
     const s = this.plugin.settings;
+    const adapter = this.plugin.app.vault.adapter;
+    const cwd = adapter instanceof FileSystemAdapter ? adapter.getBasePath() : undefined;
+
     let finalPrompt = prompt;
 
-    // Attach contents of text/markdown files directly so Antigravity can reason over them
+    // Attach contents of text/markdown files directly so Antigravity can reason over them.
+    // Avoid reading binary files (images, PDFs, archives) as raw UTF-8 strings to prevent token explosion.
+    const BINARY_EXT_REGEX =
+      /\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|7z|rar|bin|exe|dmg|iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$/i;
+
     for (const p of fileAttachments) {
-      try {
-        const content = readFileSync(p, "utf-8");
-        const filename = basename(p);
-        finalPrompt = `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
-      } catch {
-        finalPrompt = `[ATTACHMENT PATH: ${p}]\n\n---\n\n` + finalPrompt;
+      const fullPath = !isAbsolute(p) && cwd ? join(cwd, p) : p;
+      if (BINARY_EXT_REGEX.test(fullPath)) {
+        finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+      } else {
+        try {
+          const content = readFileSync(fullPath, "utf-8");
+          const filename = basename(fullPath);
+          finalPrompt = `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
+        } catch {
+          finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+        }
       }
     }
 
@@ -250,8 +253,6 @@ export class AntigravityRunner implements AgentRunner {
       args.push("--effort", s.antigravityEffort);
     }
 
-    const adapter = this.plugin.app.vault.adapter;
-    const cwd = adapter instanceof FileSystemAdapter ? adapter.getBasePath() : undefined;
     const bin = this.resolveBinaryPath(s.antigravityBinary || "agy");
     const child = this.spawnBinary(bin, args, cwd);
 
@@ -300,7 +301,7 @@ export class AntigravityRunner implements AgentRunner {
       cb.onRaw?.(`[omitted event of ${line.length} bytes]\n`);
       return;
     }
-    let ev: any;
+    let ev: AntigravityEvent;
     try {
       ev = JSON.parse(line);
     } catch {
@@ -408,148 +409,11 @@ export class AntigravityRunner implements AgentRunner {
     }
   }
 
-  // Document conversion using anydoc
-  async convertDocument(absPath: string): Promise<string> {
-    const hash = createHash("sha256").update(absPath).digest("hex").slice(0, 16);
-    const dir = join(tmpdir(), "vault-agents-anydoc");
-    await mkdir(dir, { recursive: true });
-    const outPath = join(dir, hash + ".md");
-    try {
-      const [src, out] = await Promise.all([stat(absPath), stat(outPath)]);
-      if (out.mtimeMs >= src.mtimeMs) return outPath;
-    } catch {
-      // not yet cached
-    }
-    const ext = extname(absPath) || ".pdf";
-    const cleanInput = join(dir, "in-" + hash + ext);
-    await copyFile(absPath, cleanInput);
-    const bin = this.plugin.settings.anydocBinary || "anydoc";
-    await new Promise<void>((resolve, reject) => {
-      const child = this.spawnBinary(bin, [cleanInput, "-o", outPath]);
-      let err = "";
-      child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
-      child.on("error", (e) => reject(e));
-      child.on("close", (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`anydoc exited with code ${code}: ${err.trim().slice(0, 200)}`));
-      });
-    });
-    return outPath;
-  }
-
-  private execCli(args: string[]): Promise<string> {
-    const bin = this.resolveBinaryPath(this.plugin.settings.antigravityBinary || "agy");
-    return new Promise((resolve, reject) => {
-      const child = this.spawnBinary(bin, args);
-      let out = "";
-      let err = "";
-      child.stdout?.on("data", (d: Buffer) => (out += d.toString()));
-      child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
-      child.on("error", (e) => reject(e));
-      child.on("close", (code) => {
-        if (code === 0) resolve(out);
-        else reject(new Error(err.trim() || out.trim() || `exit code ${code}`));
-      });
-    });
-  }
-
   private execSqlite(dbPath: string, query: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const child = spawn("sqlite3", [dbPath, query], {
-        windowsHide: true,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      let out = "";
-      let err = "";
-      child.stdout?.on("data", (d: Buffer) => (out += d.toString()));
-      child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
-      child.on("error", (e) => reject(e));
-      child.on("close", (code) => {
-        if (code === 0) resolve(out);
-        else reject(new Error(err.trim() || `sqlite3 exit code ${code}`));
-      });
-    });
+    return this.execCli("sqlite3", [dbPath, query]);
   }
 
   private getDbPath(): string {
     return join(homedir(), ".gemini", "antigravity-cli", "conversation_summaries.db");
-  }
-
-  private resolveBinaryPath(bin: string): string {
-    const cached = this.resolvedBinaries.get(bin);
-    if (cached !== undefined && cached !== null) return cached;
-
-    // Check direct path or ~/.local/bin/agy
-    if (existsSync(bin)) {
-      this.resolvedBinaries.set(bin, bin);
-      return bin;
-    }
-    const localBin = join(homedir(), ".local", "bin", bin);
-    if (existsSync(localBin)) {
-      this.resolvedBinaries.set(bin, localBin);
-      return localBin;
-    }
-    const geminiBin = join(homedir(), ".gemini", "antigravity-cli", "bin", bin);
-    if (existsSync(geminiBin)) {
-      this.resolvedBinaries.set(bin, geminiBin);
-      return geminiBin;
-    }
-
-    this.resolvedBinaries.set(bin, bin);
-    return bin;
-  }
-
-  private spawnBinary(bin: string, args: string[], cwd?: string): ChildProcess {
-    const isWin = process.platform === "win32";
-    const options: SpawnOptions = {
-      cwd,
-      shell: isWin && (bin.endsWith(".cmd") || bin.endsWith(".bat")),
-      windowsHide: true,
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    };
-    const child = spawn(bin, args, options);
-    this.trackProc(child);
-    return child;
-  }
-
-  private trackProc(child: ChildProcess): void {
-    this.activeProcs.add(child);
-    child.once("close", () => this.activeProcs.delete(child));
-    child.once("error", () => this.activeProcs.delete(child));
-  }
-
-  killProc(child: ChildProcess, watch = false): void {
-    this.killNow(child);
-    if (!watch) return;
-    const deadline = Date.now() + 6000;
-    const timer = setInterval(() => {
-      if (child.exitCode !== null || child.signalCode !== null || Date.now() > deadline) {
-        clearInterval(timer);
-        return;
-      }
-      this.killNow(child);
-    }, 1000);
-  }
-
-  private killNow(child: ChildProcess): void {
-    if (!child || child.pid === undefined) return;
-    try {
-      if (process.platform === "win32") {
-        spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
-          windowsHide: true,
-          stdio: "ignore",
-        });
-      } else {
-        child.kill("SIGKILL");
-      }
-    } catch {
-      // ignore
-    }
-    try {
-      child.kill();
-    } catch {
-      // ignore
-    }
   }
 }
