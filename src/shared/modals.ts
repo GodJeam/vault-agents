@@ -2,6 +2,7 @@ import { App, Modal, Notice, Setting, SuggestModal } from "obsidian";
 import type { TFile } from "obsidian";
 import type OpencodePlugin from "../main";
 import type { UsageWindow, EngineType } from "../core/types";
+import { substitute } from "../i18n";
 
 export class RenameModal extends Modal {
   constructor(
@@ -48,7 +49,11 @@ export class RenameModal extends Modal {
 }
 
 export class StatsModal extends Modal {
-  constructor(app: App, private plugin: OpencodePlugin) {
+  constructor(
+    app: App,
+    private plugin: OpencodePlugin,
+    private engine: EngineType
+  ) {
     super(app);
   }
 
@@ -59,7 +64,8 @@ export class StatsModal extends Modal {
     contentEl.createEl("h3", { text: t("Token usage and costs") });
     const status = contentEl.createDiv({ cls: "opencode-stats-loading", text: t("Loading...") });
 
-    this.plugin.runner
+    this.plugin.registry
+      .resolveProvider(this.engine)
       .getUsageStats()
       .then((s) => {
         status.remove();
@@ -81,8 +87,13 @@ export class StatsModal extends Modal {
     new Setting(container)
       .setName(t("Total tokens"))
       .setDesc((w.input + w.output).toLocaleString(locale));
-    const isAgy = this.plugin.settings.engine === "antigravity";
-    const costDesc = isAgy ? t("Included with Google AI Pro ($0.00)") : `${w.cost.toFixed(4)} $`;
+    const provider = this.plugin.registry.resolveProvider(this.engine);
+    const costDesc = provider.included
+      ? substitute(
+          provider.costNote ? t("Included with $1 ($0.00)") : t("Included ($0.00)"),
+          provider.costNote ?? ""
+        )
+      : `${w.cost.toFixed(4)} $`;
     new Setting(container).setName(t("Cost")).setDesc(costDesc);
   }
 

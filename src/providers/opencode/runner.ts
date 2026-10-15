@@ -7,15 +7,20 @@ import type {
   SessionInfo,
   StreamCallbacks,
   UsageStats,
+  UsageWindow,
 } from "../../core/types";
 import { DEFAULT_SETTINGS } from "../../core/types";
 import { BaseCliRunner } from "../base";
-import type { OpencodeEvent } from "./types";
+import type { OpencodeEvent, OpencodeModelInfo, OpencodeMessageInfo } from "./types";
+
+/** Used when the model catalogue cannot be queried. */
+const DEFAULT_CONTEXT_LIMIT = 128_000;
 
 export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   readonly id: EngineType = "opencode";
   readonly displayName = "OpenCode CLI";
   readonly engine: EngineType = "opencode";
+  readonly included = false;
 
   private contextLimitCache = new Map<string, number>();
   private cachedModels: string[] | null = null;
@@ -58,8 +63,14 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async renameSession(sessionId: string, title: string): Promise<void> {
-    const query = `UPDATE session SET title=${this.sqlString(title)} WHERE id=${this.sqlString(sessionId)}`;
-    await this.runDbQuery(query);
+    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
+    await this.execCli(bin, [
+      "api",
+      "PATCH",
+      `/api/session/${sessionId}`,
+      "-d",
+      JSON.stringify({ title }),
+    ]);
   }
 
   async deleteSession(sessionId: string): Promise<void> {
@@ -70,125 +81,151 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   async getModelContextLimit(model: string): Promise<number> {
     const cached = this.contextLimitCache.get(model);
     if (cached !== undefined) return cached;
-    const slash = model.indexOf("/");
-    const provider = slash >= 0 ? model.slice(0, slash) : model;
-    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
+    let limit = 0;
     try {
-      const out = await this.execCli(bin, ["models", provider, "--verbose"]);
-      const limit = this.parseContextLimit(out, model);
-      if (limit > 0) this.contextLimitCache.set(model, limit);
-      return limit;
+      limit = await this.fetchModelContextLimit(model);
     } catch {
-      return 128_000;
+      limit = 0;
     }
+    if (limit > 0) {
+      this.contextLimitCache.set(model, limit);
+      return limit;
+    }
+    return DEFAULT_CONTEXT_LIMIT;
   }
 
-  private parseContextLimit(out: string, model: string): number {
-    const lines = out.split(/\r?\n/);
-    let i = 0;
-    while (i < lines.length) {
-      const line = lines[i].trim();
-      if (/^[a-zA-Z0-9_.:/+-]+$/.test(line) && line.includes("/")) {
-        let json = "";
-        let depth = 0;
-        let started = false;
-        let j = i + 1;
-        for (; j < lines.length; j++) {
-          const l = lines[j];
-          if (!started) {
-            if (!l.trim()) continue;
-            started = true;
-          }
-          json += l + "\n";
-          for (const ch of l) {
-            if (ch === "{") depth++;
-            else if (ch === "}") depth--;
-          }
-          if (depth === 0) break;
-        }
-        if (line === model) {
-          try {
-            const obj = JSON.parse(json);
-            const ctx = (obj as { limit?: { context?: unknown } })?.limit?.context;
-            if (typeof ctx === "number") return ctx;
-          } catch {
-            // Try next model
-          }
-        }
-        i = j;
-      } else {
-        i++;
-      }
-    }
-    return 0;
+  /**
+   * Query the local OpenCode API for the model catalogue and read `limit.context`.
+   * The previous approach (`opencode models <provider> --verbose`) is not
+   * supported by the CLI (v2.x) and always failed.
+   */
+  private async fetchModelContextLimit(model: string): Promise<number> {
+    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
+    const out = await this.execCli(bin, ["api", "GET", "/api/model"]);
+    const parsed = JSON.parse(out) as { data?: OpencodeModelInfo[] };
+    const models = Array.isArray(parsed.data) ? parsed.data : [];
+    const target = model.split("#")[0];
+    const slash = target.indexOf("/");
+    const wantProvider = slash >= 0 ? target.slice(0, slash) : "";
+    const wantModel = slash >= 0 ? target.slice(slash + 1) : target;
+    const match = models.find(
+      (m) =>
+        (m.providerID === wantProvider && m.modelID === wantModel) ||
+        m.modelID === target ||
+        m.id === target
+    );
+    const ctx = match?.limit?.context;
+    return typeof ctx === "number" && ctx > 0 ? ctx : 0;
   }
 
   async getSessionTokens(sessionId: string): Promise<{ input: number; output: number }> {
-    const query = `SELECT COALESCE(tokens_input,0) AS ti, COALESCE(tokens_output,0) AS tout FROM session WHERE id=${this.sqlString(sessionId)}`;
-    const rows = (await this.runDbQuery(query)) as { ti?: number; tout?: number }[];
-    const r = rows[0] ?? {};
-    return { input: Number(r.ti ?? 0), output: Number(r.tout ?? 0) };
+    // The context size is the prompt of the last turn: uncached input plus the
+    // prompt-cache reads/writes. Using the session totals would overstate it.
+    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
+    try {
+      const out = await this.execCli(bin, ["api", "GET", `/api/session/${sessionId}/message`]);
+      const parsed = JSON.parse(out) as { data?: OpencodeMessageInfo[] };
+      const messages = Array.isArray(parsed.data) ? parsed.data : [];
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const tk = messages[i]?.tokens;
+        if (tk) {
+          const input =
+            Number(tk.input ?? 0) +
+            Number(tk.cache?.read ?? 0) +
+            Number(tk.cache?.write ?? 0);
+          return { input, output: Number(tk.output ?? 0) };
+        }
+      }
+      return { input: 0, output: 0 };
+    } catch {
+      return { input: 0, output: 0 };
+    }
   }
 
   async pruneOversizedParts(force = false, ignoreAge = false): Promise<void> {
     const s = this.plugin.settings;
     if (!s.dbAutoCleanup && !force) return;
+    const dbPath = await this.getDbPath();
+    if (!dbPath) return;
     const maxBytes = Math.max(1, s.dbCleanupMaxMB || 5) * 1024 * 1024;
     const ageDays = Math.max(0, s.dbCleanupAgeDays ?? 7);
-    const cutoff = Math.floor(Date.now() / 1000) - ageDays * 86400;
+    // `part.time_created` is stored in milliseconds in the v2 schema.
+    const cutoffMs = Date.now() - ageDays * 86400 * 1000;
     const q =
-      `DELETE FROM part WHERE data LIKE '%"type":"file%' AND length(data) > ${maxBytes}` +
-      (ignoreAge ? "" : ` AND time_created < ${cutoff}`);
+      `DELETE FROM part WHERE data LIKE '%"type":"file%' AND length(CAST(data AS BLOB)) > ${maxBytes}` +
+      (ignoreAge ? "" : ` AND time_created < ${cutoffMs}`);
     try {
-      await this.runDbQuery(q);
+      await this.execSqlite(dbPath, q);
     } catch {
       // Best effort
     }
   }
 
+  private async getDbPath(): Promise<string | null> {
+    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
+    try {
+      const out = await this.execCli(bin, ["debug", "paths"]);
+      for (const line of out.split(/\r?\n/)) {
+        const m = line.match(/^\s*db\s+(.+\.db)\s*$/);
+        if (m) return m[1].trim();
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }
+
+  private execSqlite(dbPath: string, sql: string): Promise<string> {
+    return this.execCli("sqlite3", [dbPath, sql]);
+  }
+
   async getUsageStats(): Promise<UsageStats> {
     const now = Date.now();
-    const t5h = now - 5 * 3600 * 1000;
-    const t7d = now - 7 * 24 * 3600 * 1000;
-    const t30d = now - 30 * 24 * 3600 * 1000;
-    const query = `
-      SELECT
-        COALESCE(SUM(CASE WHEN time_updated >= ${t5h} THEN tokens_input END),0) AS h5_input,
-        COALESCE(SUM(CASE WHEN time_updated >= ${t5h} THEN tokens_output END),0) AS h5_output,
-        COALESCE(SUM(CASE WHEN time_updated >= ${t5h} THEN cost END),0) AS h5_cost,
-        COALESCE(SUM(CASE WHEN time_updated >= ${t7d} THEN tokens_input END),0) AS w_input,
-        COALESCE(SUM(CASE WHEN time_updated >= ${t7d} THEN tokens_output END),0) AS w_output,
-        COALESCE(SUM(CASE WHEN time_updated >= ${t7d} THEN cost END),0) AS w_cost,
-        COALESCE(SUM(CASE WHEN time_updated >= ${t30d} THEN tokens_input END),0) AS m_input,
-        COALESCE(SUM(CASE WHEN time_updated >= ${t30d} THEN tokens_output END),0) AS m_output,
-        COALESCE(SUM(CASE WHEN time_updated >= ${t30d} THEN cost END),0) AS m_cost
-      FROM session
-    `;
-    const rows = (await this.runDbQuery(query)) as Record<string, unknown>[];
-    const r = (rows[0] ?? {}) as Record<string, unknown>;
-    const num = (v: unknown): number => Number(v ?? 0);
+    const [h5, week, month] = await Promise.all([
+      this.fetchUsageWindow(now - 5 * 3600 * 1000, now),
+      this.fetchUsageWindow(now - 7 * 24 * 3600 * 1000, now),
+      this.fetchUsageWindow(now - 30 * 24 * 3600 * 1000, now),
+    ]);
+    const zero = (): UsageWindow => ({ input: 0, output: 0, cost: 0 });
     return {
-      h5: { input: num(r.h5_input), output: num(r.h5_output), cost: num(r.h5_cost) },
-      week: { input: num(r.w_input), output: num(r.w_output), cost: num(r.w_cost) },
-      month: { input: num(r.m_input), output: num(r.m_output), cost: num(r.m_cost) },
+      h5: h5 ?? zero(),
+      week: week ?? zero(),
+      month: month ?? zero(),
     };
   }
 
-  async runDbQuery(query: string): Promise<unknown[]> {
+  private async fetchUsageWindow(from: number, to: number): Promise<UsageWindow | null> {
     const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
     try {
-      const out = await this.execCli(bin, ["db", query, "--format", "json"]);
-      const arr = JSON.parse(out);
-      return Array.isArray(arr) ? arr : [];
+      const out = await this.execCli(bin, [
+        "api",
+        "GET",
+        "/api/experimental/session/stats",
+        "--param",
+        `from=${from}`,
+        "--param",
+        `to=${to}`,
+      ]);
+      const parsed = JSON.parse(out) as {
+        data?: { tokens?: { input?: number; output?: number }; cost?: number };
+      };
+      const d = parsed.data ?? {};
+      return {
+        input: Number(d.tokens?.input ?? 0),
+        output: Number(d.tokens?.output ?? 0),
+        cost: Number(d.cost ?? 0),
+      };
     } catch {
-      return [];
+      return null;
     }
   }
 
   runStream(prompt: string, fileAttachments: string[], cb: StreamCallbacks): RunHandle {
     const s = this.plugin.settings;
     const args = ["run", "--format", "json"];
-    if (s.sessionId) args.push("--session", s.sessionId);
+    // Only reuse ids that belong to opencode ("ses..."); a session id inherited
+    // from another engine would make the CLI fail.
+    if (s.sessionId && /^ses/.test(s.sessionId)) args.push("--session", s.sessionId);
     // Model must always be explicit: running without --model hangs opencode run
     args.push("--model", s.model || DEFAULT_SETTINGS.model);
     if (s.agent) args.push("--agent", s.agent);
@@ -303,9 +340,5 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     const e = err as { data?: { message?: string }; message?: string };
     const msg = e.data?.message || e.message || JSON.stringify(err);
     return String(msg);
-  }
-
-  private sqlString(value: string): string {
-    return "'" + value.replace(/'/g, "''") + "'";
   }
 }

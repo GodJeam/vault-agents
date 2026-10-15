@@ -14,10 +14,17 @@ import type {
 import { BaseCliRunner } from "../base";
 import type { AntigravityEvent } from "./types";
 
+// Legacy Antigravity conversation ids are UUID-style (they contain "-"), while
+// opencode session ids use the "ses_..." form. Used to attribute untagged
+// history entries that pre-date `sessionEngines`.
+const ANTIGRAVITY_ID_HINT = /-/;
+
 export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
   readonly id: EngineType = "antigravity";
   readonly displayName = "Antigravity CLI";
   readonly engine: EngineType = "antigravity";
+  readonly included = true;
+  readonly costNote = "Google AI Pro";
 
   private cachedModels: string[] | null = null;
 
@@ -69,12 +76,12 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       "gemini-3.8-flash-high",
       "gemini-3.8-flash-medium",
       "gemini-3.8-flash-low",
-      "gemini-3.7-flash-high",
-      "gemini-3.7-flash-medium",
-      "gemini-3.1-pro-high",
-      "gemini-3.1-pro-low",
-      "claude-sonnet-4-6",
-      "claude-opus-4-6-thinking",
+      "claude-opus-5-5-high",
+      "claude-opus-5-5-medium",
+      "claude-opus-5-5-low",
+      "claude-sonnet-5-5-high",
+      "claude-sonnet-5-5-medium",
+      "claude-sonnet-5-5-low",
       "gpt-oss-120b-medium",
     ];
     this.cachedModels = defaults;
@@ -117,7 +124,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     const sessionEngines = this.plugin.settings.sessionEngines ?? {};
     for (const [id, msgs] of Object.entries(histories)) {
       if (seenIds.has(id)) continue;
-      if (sessionEngines[id] === "antigravity" || (!sessionEngines[id] && id.includes("-"))) {
+      if (sessionEngines[id] === "antigravity" || (!sessionEngines[id] && ANTIGRAVITY_ID_HINT.test(id))) {
         const firstUser = msgs.find((m) => m.role === "user");
         const title = firstUser?.text ? firstUser.text.slice(0, 40) : id;
         sessions.push({
@@ -172,16 +179,16 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async getSessionTokens(sessionId: string): Promise<{ input: number; output: number }> {
-    let input = 0;
-    let output = 0;
+    // The context bar needs the *current* context size, which is the prompt size
+    // of the last turn, not the sum over the whole conversation.
     const history = this.plugin.getHistory(sessionId);
-    for (const msg of history) {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const msg = history[i];
       if (msg.role === "assistant" && msg.tokens) {
-        input += msg.tokens.input ?? 0;
-        output += msg.tokens.output ?? 0;
+        return { input: msg.tokens.input ?? 0, output: msg.tokens.output ?? 0 };
       }
     }
-    return { input, output };
+    return { input: 0, output: 0 };
   }
 
   async getUsageStats(): Promise<UsageStats> {
@@ -249,7 +256,11 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       args.push("--model", model);
     }
 
-    if (s.antigravityEffort) {
+    // Antigravity model ids already encode the reasoning effort (e.g.
+    // "gemini-3.8-flash-low"); passing --effort as well makes the CLI reject the
+    // combination. Only send --effort for models without an effort suffix.
+    const modelEncodesEffort = /-(low|medium|high|xhigh|max)$/i.test(model || "");
+    if (!modelEncodesEffort && s.antigravityEffort) {
       args.push("--effort", s.antigravityEffort);
     }
 

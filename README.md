@@ -21,9 +21,24 @@ An **Obsidian** plugin that integrates local AI agents into your vault: chat wit
 
 ## Requirements
 
-- Obsidian (desktop, Windows/macOS/Linux)
-- At least one supported agent CLI on your machine (e.g. **Antigravity CLI** `agy`, **OpenCode CLI** `opencode`, etc.)
-- [anydoc](https://github.com/firecrawl/anydoc) (optional, for document conversion): `npm install -g @firecrawl/anydoc`
+- **Obsidian** desktop **1.5.0** or newer (Windows/macOS/Linux).
+- At least **one** supported agent CLI installed and available on your `PATH`:
+  - **Antigravity CLI** (`agy`), **1.3.x** (tested with 1.3.5).
+  - **OpenCode CLI** (`opencode`), **2.x** (tested with 2.0.29).
+- **[sqlite3](https://sqlite.org/)** on your `PATH` — used by the Antigravity session manager and by the OpenCode database self-cleanup.
+- [anydoc](https://github.com/firecrawl/anydoc) (optional, for document conversion): `npm install -g @firecrawl/anydoc`.
+
+### Agent CLI compatibility
+
+| Component | Tested with | Minimum | Notes |
+| --- | --- | --- | --- |
+| Obsidian | 1.5.7 | 1.5.0 | Desktop only (`isDesktopOnly: true`). |
+| Antigravity CLI (`agy`) | 1.3.5 | 1.3.x | Runs `agy --print --output-format stream-json --model … --effort …`. Model ids already embed the reasoning effort (e.g. `gemini-3.8-flash-low`), so `--effort` is only sent for models without a suffix. |
+| OpenCode CLI (`opencode`) | 2.0.29 | 2.x | Uses `opencode run --format json`, `opencode models`, `opencode session …`, `opencode debug paths`, and the local API (`opencode api GET /api/model`, `/api/session/{id}`, `/api/experimental/session/stats`). |
+| sqlite3 | 3.51.2 | any recent | Session management for Antigravity and database cleanup for OpenCode. |
+| anydoc (optional) | 0.2.4 | 0.2.x | Document → Markdown conversion for attachments. |
+
+> **OpenCode 1.x is not supported.** The integration relies on the local API introduced in OpenCode 2.x (`opencode api …`) for model context limits and token/usage statistics; older releases exposed a different CLI surface (e.g. `opencode db`) that has since been removed.
 
 ### Platform requirements
 
@@ -31,6 +46,7 @@ The plugin is cross-platform: the chat, sessions, `/ @ !` commands, stats, and h
 
 On **all** platforms:
 - **Node.js** (to build the plugin) and the agent CLIs on your `PATH`.
+- **sqlite3** available on your `PATH` (see the compatibility table above).
 
 ### Build requirements
 
@@ -38,6 +54,8 @@ On **all** platforms:
 npm install
 npm run build
 ```
+
+> Building only produces `main.js` in the repository. Copy `main.js`, `manifest.json` and `styles.css` into your vault's `.obsidian/plugins/vault-agents/` folder and reload the plugin in Obsidian to apply the changes.
 
 ## Installation
 

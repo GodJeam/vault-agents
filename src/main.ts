@@ -5,25 +5,15 @@ import { ProviderRegistry } from "./core/registry";
 import type { AgentProvider } from "./core/provider";
 import { DEFAULT_SETTINGS } from "./core/types";
 import { OpencodeSettingTab } from "./features/settings/settingsTab";
-import type { OpencodeSettings } from "./core/types";
+import type { HistoryMap, HistoryMessage, OpencodeSettings } from "./core/types";
 import { translate } from "./i18n";
 
-export interface HistoryUser {
-  role: "user";
-  text: string;
-  contextLabel?: string;
-}
-
-export interface HistoryAssistant {
-  role: "assistant";
-  text: string;
-  reasoning?: string;
-  tokens?: { total?: number; input?: number; output?: number };
-  cost?: number;
-}
-
-export type HistoryMessage = HistoryUser | HistoryAssistant;
-export type HistoryMap = Record<string, HistoryMessage[]>;
+export type {
+  HistoryUser,
+  HistoryAssistant,
+  HistoryMessage,
+  HistoryMap,
+} from "./core/types";
 
 export default class OpencodePlugin extends Plugin {
   settings!: OpencodeSettings;
@@ -32,10 +22,6 @@ export default class OpencodePlugin extends Plugin {
   opencodeRunner!: OpencodeRunner;
   antigravityRunner!: AntigravityRunner;
   private saveTimer: number | null = null;
-
-  get runner(): AgentProvider {
-    return this.registry.resolveProvider(this.settings.engine);
-  }
 
   getRunnerForSession(sessionId?: string): AgentProvider {
     return this.registry.resolveProvider(
@@ -57,9 +43,8 @@ export default class OpencodePlugin extends Plugin {
     this.registry.register(this.opencodeRunner);
     this.registry.register(this.antigravityRunner);
 
-    if (this.settings.engine === "opencode") {
-      void this.opencodeRunner.pruneOversizedParts();
-    }
+    // Best-effort opencode database cleanup on load (no-op if opencode is absent).
+    void this.opencodeRunner.pruneOversizedParts();
     const t = this.t.bind(this);
 
     this.registerView(CHAT_VIEW_TYPE, (leaf) => new ChatView(leaf, this));

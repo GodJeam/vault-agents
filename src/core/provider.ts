@@ -1,9 +1,7 @@
 import type {
   EngineType,
-  FinishInfo,
   RunHandle,
   SessionInfo,
-  StepInfo,
   StreamCallbacks,
   UsageStats,
 } from "./types";
@@ -17,6 +15,12 @@ export interface AgentProvider {
 
   /** Compatibility alias for legacy runner interface */
   readonly engine: EngineType;
+
+  /** True when usage is included in a subscription (no per-token cost is shown) */
+  readonly included: boolean;
+
+  /** Human-readable note about cost/inclusion (e.g. "Google AI Pro") */
+  readonly costNote?: string;
 
   /** Check CLI version */
   getVersion(): Promise<string>;

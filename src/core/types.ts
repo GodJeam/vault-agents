@@ -90,7 +90,7 @@ export interface PluginSettings {
   // Antigravity settings
   antigravityBinary: string;
   antigravityModel: string;
-  antigravityEffort: "low" | "medium" | "high" | "max";
+  antigravityEffort: "low" | "medium" | "high" | "xhigh" | "max";
   // Shared settings
   anydocEnabled: boolean;
   anydocBinary: string;
@@ -113,7 +113,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   language: "en",
   engine: "antigravity",
   binaryPath: "opencode",
-  model: "opencode-go/deepseek-v4-flash",
+  model: "opencode-go/deepseek-v4.1-flash",
   agent: "",
   antigravityBinary: "agy",
   antigravityModel: "gemini-3.8-flash-high",
