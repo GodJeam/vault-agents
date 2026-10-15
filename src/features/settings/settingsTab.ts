@@ -73,23 +73,29 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
 
       new Setting(containerEl)
         .setName(t("Model"))
-        .setDesc(t("Pick a model from Antigravity (Gemini 3.8/3.7/3.1, Claude Sonnet 4.6). Included with Google AI Pro."))
+        .setDesc(t("Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet 5.5). The effort is part of the model name. Included with Google AI Pro."))
         .addDropdown((dd) => {
           void this.populateAntigravityModelDropdown(dd);
         });
 
       new Setting(containerEl)
         .setName(t("Reasoning effort"))
-        .setDesc(t("Effort level for reasoning models like Gemini 3.8/3.7 Flash and Claude Thinking."))
+        .setDesc(t("Effort sent only for models whose name does not already include it. Antigravity model names usually end with -low/-medium/-high."))
         .addDropdown((dd) =>
           dd
             .addOption("low", t("Low"))
             .addOption("medium", t("Medium"))
             .addOption("high", t("High"))
+            .addOption("xhigh", t("Extra high"))
             .addOption("max", t("Max"))
             .setValue(this.plugin.settings.antigravityEffort || "high")
             .onChange(async (val) => {
-              this.plugin.settings.antigravityEffort = val as "low" | "medium" | "high" | "max";
+              this.plugin.settings.antigravityEffort = val as
+                | "low"
+                | "medium"
+                | "high"
+                | "xhigh"
+                | "max";
               await this.plugin.saveSettings();
             })
         );
@@ -388,13 +394,12 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
       for (const m of models) addOption(m, m);
     } catch {
       addOption("gemini-3.8-flash-high", "Gemini 3.8 Flash (High)");
-      addOption("gemini-3.1-pro-high", "Gemini 3.1 Pro (High)");
-      addOption("claude-sonnet-4-6", "Claude Sonnet 4.6 (Thinking)");
+      addOption("claude-opus-5-5-high", "Claude Opus 5.5 (High)");
+      addOption("claude-sonnet-5-5-high", "Claude Sonnet 5.5 (High)");
     }
     dd.setValue(cur);
     dd.onChange(async (val) => {
       this.plugin.settings.antigravityModel = val;
-      this.plugin.settings.model = val;
       await this.plugin.saveSettings();
     });
   }

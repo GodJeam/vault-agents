@@ -27,3 +27,23 @@ export interface OpencodeEvent {
   part?: OpencodePart;
   error?: unknown;
 }
+
+/** Model metadata returned by `opencode api GET /api/model`. */
+export interface OpencodeModelInfo {
+  id?: string;
+  modelID?: string;
+  providerID?: string;
+  limit?: { context?: number; output?: number };
+}
+
+/** Assistant message metadata returned by `opencode api GET /api/session/{id}/message`. */
+export interface OpencodeMessageInfo {
+  role?: string;
+  type?: string;
+  tokens?: {
+    input?: number;
+    output?: number;
+    reasoning?: number;
+    cache?: { read?: number; write?: number };
+  };
+}

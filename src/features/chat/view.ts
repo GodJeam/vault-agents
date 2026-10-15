@@ -1,18 +1,15 @@
 import {
-  App,
   FileSystemAdapter,
   ItemView,
   MarkdownRenderer,
   Notice,
-  TFile,
   WorkspaceLeaf,
   setIcon,
 } from "obsidian";
 import type OpencodePlugin from "../../main";
-import type { HistoryAssistant } from "../../core/types";
 import { DEFAULT_SETTINGS } from "../../core/types";
 import type { AgentProvider } from "../../core/provider";
-import type { FinishInfo, RunHandle, SessionInfo, StepInfo } from "../../core/types";
+import type { FinishInfo, RunHandle, SessionInfo, EngineType } from "../../core/types";
 import { substitute } from "../../i18n";
 import {
   ConfirmModal,
@@ -87,6 +84,25 @@ export class ChatView extends ItemView {
 
   getRunner(): AgentProvider {
     return this.plugin.getRunnerForSession(this.viewSession);
+  }
+
+  /** Engine associated with the session currently shown (falls back to the global engine). */
+  private sessionEngine(): EngineType {
+    const id = this.viewSession;
+    return (id && this.plugin.settings.sessionEngines?.[id]) || this.plugin.settings.engine;
+  }
+
+  /** Active model id for the given engine, keeping the two engines' fields separate. */
+  private activeModelFor(engine: EngineType): string {
+    return engine === "antigravity"
+      ? this.plugin.settings.antigravityModel || DEFAULT_SETTINGS.antigravityModel
+      : this.plugin.settings.model || DEFAULT_SETTINGS.model;
+  }
+
+  /** Human-readable label for an engine, driven by the provider capability. */
+  private engineLabel(engine: EngineType): string {
+    const provider = this.plugin.registry.get(engine);
+    return provider?.costNote || provider?.displayName || engine;
   }
 
   assistantLabel(): string {
@@ -206,7 +222,10 @@ export class ChatView extends ItemView {
       attr: { title: this.plugin.t("Token and cost statistics") },
     });
     setIcon(statsBtn, "bar-chart-3");
-    statsBtn.addEventListener("click", () => new StatsModal(this.app, this.plugin).open());
+    statsBtn.addEventListener(
+      "click",
+      () => new StatsModal(this.app, this.plugin, this.sessionEngine()).open()
+    );
 
     const attachBtn = this.contextBar.createEl("button", { cls: "opencode-add-note-btn" });
     attachBtn.setText("＋ " + this.plugin.t("Attach file"));
@@ -318,6 +337,9 @@ export class ChatView extends ItemView {
             const pi = pinned.indexOf(id);
             if (pi >= 0) pinned.splice(pi, 1);
             this.plugin.settings.pinned = pinned;
+            if (this.plugin.settings.sessionEngines) {
+              delete this.plugin.settings.sessionEngines[id];
+            }
             if (this.viewSession === id) {
               this.viewSession = "";
               this.plugin.settings.sessionId = "";
@@ -416,7 +438,13 @@ export class ChatView extends ItemView {
     const existing = this.statsBar.querySelector(".opencode-stats-text");
     if (existing) existing.remove();
     this.statsBar.createSpan({
-      text: this.fmtTokens(this.stats.total, this.stats.input, this.stats.output, this.stats.cost),
+      text: this.fmtTokens(
+        this.stats.total,
+        this.stats.input,
+        this.stats.output,
+        this.stats.cost,
+        this.sessionEngine()
+      ),
       cls: "opencode-stats-text",
     });
   }
@@ -446,15 +474,12 @@ export class ChatView extends ItemView {
       return;
     }
     try {
-      const tokens = await this.getRunner().getSessionTokens(sid);
+      const runner = this.getRunner();
+      const tokens = await runner.getSessionTokens(sid);
       this.contextBaseInput = tokens.input;
       this.contextUsed = tokens.input;
       if (!this.contextLimit) {
-        const isAgy = this.getRunner().id === "antigravity";
-        const m = isAgy
-          ? (this.plugin.settings.antigravityModel || "gemini-3.8-flash-high")
-          : (this.plugin.settings.model || DEFAULT_SETTINGS.model);
-        this.contextLimit = await this.getRunner().getModelContextLimit(m);
+        this.contextLimit = await runner.getModelContextLimit(this.activeModelFor(runner.id));
       }
     } catch (e) {
       console.error("[vault-agents] refreshContext error:", e);
@@ -538,22 +563,16 @@ export class ChatView extends ItemView {
 
   private updateModelBtn(): void {
     if (!this.modelBtn) return;
-    const isAgy = this.getRunner().id === "antigravity";
-    const m = isAgy
-      ? (this.plugin.settings.antigravityModel || "gemini-3.8-flash-high")
-      : (this.plugin.settings.model || DEFAULT_SETTINGS.model);
+    const engine = this.sessionEngine();
+    const m = this.activeModelFor(engine);
     this.modelBtn.setText(m.length > 30 ? m.slice(0, 27) + "⬦" : m);
-    this.modelBtn.setAttribute(
-      "title",
-      isAgy ? `${m} (Google AI Pro)` : `${m} (OpenCode)`
-    );
+    this.modelBtn.setAttribute("title", `${m} (${this.engineLabel(engine)})`);
   }
 
   private async openModelList(): Promise<void> {
-    const isAgyActive = this.getRunner().id === "antigravity";
-    const cur = isAgyActive
-      ? (this.plugin.settings.antigravityModel || "gemini-3.8-flash-high")
-      : (this.plugin.settings.model || DEFAULT_SETTINGS.model);
+    const engine = this.sessionEngine();
+    const isAgyActive = engine === "antigravity";
+    const cur = this.activeModelFor(engine);
 
     try {
       const agyProvider = this.plugin.registry.get("antigravity");
@@ -606,12 +625,22 @@ export class ChatView extends ItemView {
       }
 
       new ModelSuggestModal(this.app, this.plugin, items, (item) => {
+        const engineChanged = item.engine !== engine;
         this.plugin.settings.engine = item.engine;
         if (item.engine === "antigravity") {
           this.plugin.settings.antigravityModel = item.id;
-          this.plugin.settings.model = item.id;
         } else {
           this.plugin.settings.model = item.id;
+        }
+        if (this.viewSession && engineChanged) {
+          // The open session belongs to another engine: its id cannot be reused,
+          // so start a fresh session for the newly selected engine.
+          this.viewSession = "";
+          this.plugin.settings.sessionId = "";
+          void this.plugin.saveSettings();
+          this.loadHistoryForSession("");
+          new Notice(`${this.plugin.t("Model set:")} ${item.id} (${item.provider})`);
+          return;
         }
         if (this.viewSession) {
           if (!this.plugin.settings.sessionEngines) this.plugin.settings.sessionEngines = {};
@@ -619,6 +648,7 @@ export class ChatView extends ItemView {
         }
         void this.plugin.saveSettings();
         this.updateModelBtn();
+        this.updateStatsBar();
         this.contextLimit = 0;
         void this.refreshContext();
         new Notice(`${this.plugin.t("Model set:")} ${item.id} (${item.provider})`);
@@ -660,10 +690,13 @@ export class ChatView extends ItemView {
       "Summarize in detail this conversation: goals, decisions made, work done, current state and next steps. Write the summary so the work can continue in a new session without losing context."
     );
 
-    const proc = this.getRunner().runStream(promptText, [], {
+    const runner = this.getRunner();
+    const proc = runner.runStream(promptText, [], {
       onSession: (id) => {
         this.viewSession = id;
         this.plugin.settings.sessionId = id;
+        if (!this.plugin.settings.sessionEngines) this.plugin.settings.sessionEngines = {};
+        this.plugin.settings.sessionEngines[id] = runner.id;
         void this.plugin.saveSettings();
       },
       onText: (text) => bubble.setText(text),
@@ -904,7 +937,7 @@ export class ChatView extends ItemView {
         desc: this.plugin.t("Token and cost statistics"),
         action: () => {
           this.removeTrigger();
-          new StatsModal(this.app, this.plugin).open();
+          new StatsModal(this.app, this.plugin, this.sessionEngine()).open();
         },
       },
       {
@@ -993,7 +1026,7 @@ export class ChatView extends ItemView {
         desc: this.plugin.t("Tokens and costs (5h, week, month)"),
         action: () => {
           this.removeTrigger();
-          new StatsModal(this.app, this.plugin).open();
+          new StatsModal(this.app, this.plugin, this.sessionEngine()).open();
         },
       },
       {
@@ -1205,7 +1238,8 @@ export class ChatView extends ItemView {
       }
     }, 2000);
 
-    const proc = this.getRunner().runStream(prompt, fileAttachments, {
+    const runner = this.getRunner();
+    const proc = runner.runStream(prompt, fileAttachments, {
       onSession: (id) => {
         lastEventTime = Date.now();
         const prev = this.viewSession;
@@ -1213,7 +1247,7 @@ export class ChatView extends ItemView {
           this.viewSession = id;
           this.plugin.settings.sessionId = id;
           if (!this.plugin.settings.sessionEngines) this.plugin.settings.sessionEngines = {};
-          this.plugin.settings.sessionEngines[id] = this.getRunner().id;
+          this.plugin.settings.sessionEngines[id] = runner.id;
           void this.plugin.saveSettings();
           void this.populateSessionSelect();
         }
@@ -1315,7 +1349,8 @@ export class ChatView extends ItemView {
       this.plugin.settings.showToolIO,
       () => this.scheduleScroll(),
       (t) => this.copyText(t),
-      (total, input, output, cost) => this.fmtTokens(total, input, output, cost)
+      (total, input, output, cost) =>
+        this.fmtTokens(total, input, output, cost, this.sessionEngine())
     );
     this.activeBubble = bubble;
     this.scrollToBottom();
@@ -1355,6 +1390,9 @@ export class ChatView extends ItemView {
           "The saved session no longer exists: a new one will be created, resend the message."
         )
       );
+      if (this.viewSession && this.plugin.settings.sessionEngines) {
+        delete this.plugin.settings.sessionEngines[this.viewSession];
+      }
       this.viewSession = "";
       this.plugin.settings.sessionId = "";
       void this.plugin.saveSettings();
@@ -1369,7 +1407,7 @@ export class ChatView extends ItemView {
     const detail = this.lastStderr.trim().replace(/\s+/g, " ").slice(0, 300);
     const base = substitute(
       this.plugin.t(
-        "The opencode process exited with code $1. Check the binary path and the model in the settings."
+        "The agent process exited with code $1. Check the binary path and the model in the settings."
       ),
       code
     );
@@ -1424,7 +1462,8 @@ export class ChatView extends ItemView {
               rec.tokens.total ?? 0,
               rec.tokens.input ?? 0,
               rec.tokens.output ?? 0,
-              rec.cost
+              rec.cost,
+              this.sessionEngine()
             )
           );
           this.addStats({ tokens: rec.tokens, cost: rec.cost });
@@ -1435,14 +1474,14 @@ export class ChatView extends ItemView {
     void this.refreshContext();
   }
 
-  fmtTokens(total: number, input: number, output: number, cost?: number): string {
+  fmtTokens(total: number, input: number, output: number, cost?: number, engine?: EngineType): string {
     const locale = this.plugin.settings.language === "it" ? "it-IT" : "en-US";
     const parts = [
       `${this.plugin.t("Token:")} ${total.toLocaleString(locale)} (${input.toLocaleString(locale)} ${this.plugin.t("in")} / ${output.toLocaleString(locale)} ${this.plugin.t("out")})`,
     ];
-    const isAgy = this.getRunner().id === "antigravity";
-    if (isAgy) {
-      parts.push("(Google AI Pro)");
+    const provider = this.plugin.registry.get(engine ?? this.sessionEngine());
+    if (provider?.included) {
+      parts.push(provider.costNote ? `(${provider.costNote})` : `(${this.plugin.t("included")})`);
     } else if (typeof cost === "number" && cost > 0) {
       parts.push(`${this.plugin.t("Cost:")} ${cost.toFixed(4)} $`);
     }

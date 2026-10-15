@@ -13,27 +13,18 @@ const IT: Record<string, string> = {
   "Italian": "Italiano",
   "Binary path": "Percorso binario",
   "Convert documents with anydoc": "Converti i documenti con anydoc",
-  "Run anydoc on attached documents (PDF, Word, Excel, etc.) and attach them as Markdown instead of the original file. Install with: npm install -g @firecrawl/anydoc":
-    "Esegue anydoc sugli allegati documento (PDF, Word, Excel, ecc.) e li allega come Markdown invece del file originale. Installazione: npm install -g @firecrawl/anydoc",
   "Anydoc binary path": "Percorso binario anydoc",
   "Command or full path to the anydoc executable (npm install -g @firecrawl/anydoc).":
     "Comando o percorso completo dell'eseguibile anydoc (npm install -g @firecrawl/anydoc).",
   "anydoc conversion failed": "Conversione anydoc fallita",
-  "Command or full path to the opencode executable. Usually 'opencode' is enough if it is on your PATH. If you have issues, use the full path (e.g. on Windows .../npm/opencode.cmd, on macOS/Linux .../bin/opencode).":
-    "Comando o percorso completo dell'eseguibile opencode. Di solito basta 'opencode' se è nel PATH. In caso di problemi usa il percorso completo (es. su Windows .../npm/opencode.cmd, su macOS/Linux .../bin/opencode).",
+  "Command or full path to the opencode executable. Usually 'opencode' is enough if it is on your PATH.":
+    "Comando o percorso completo dell'eseguibile opencode. Di solito basta 'opencode' se è nel PATH.",
   "Model": "Modello",
-  "Pick a model from the opencode list. The same selector is also available in the chat bar. The default uses the OpenCode Go provider (the same as the desktop app).":
-    "Seleziona un modello dalla lista di opencode. Lo stesso selettore è disponibile anche nella barra della chat. Il default usa il provider OpenCode Go (lo stesso dell'app desktop).",
-  "Refresh model list": "Aggiorna elenco modelli",
-  "Reload the list of available models from opencode.": "Ricarica la lista dei modelli disponibili da opencode.",
-  "Refresh": "Aggiorna",
   "Agent": "Agent",
   "The opencode agent to use (e.g. build, plan). Leave empty for the default.":
     "Agente opencode da usare (es. build, plan). Lascia vuoto per il default.",
   "e.g. build": "es. build",
   "Session ID": "Session ID",
-  "The persistent session id used for the chat. It is managed automatically: the first time a new session starts, then it is reused. Empty = new session on the next message.":
-    "ID della sessione persistente usata per la chat. Viene gestito automaticamente: la prima volta parte una sessione nuova, poi viene riusata. Vuoto = nuova sessione al prossimo messaggio.",
   "(automatic)": "(automatico)",
   "Reset session": "Azzera sessione",
   "Clear the saved session and start from scratch on the next message.":
@@ -42,11 +33,7 @@ const IT: Record<string, string> = {
   "Session reset: the next message will start from a new session.":
     "Sessione azzerata: il prossimo messaggio partirà da una nuova sessione.",
   "Auto-approve permissions": "Auto-approve permessi",
-  "Automatically allow the tool permissions (bash, file edits, etc.). In non-interactive mode opencode would deny everything without this flag. Turn it off for extra safety.":
-    "Concede automaticamente i permessi degli strumenti (bash, edit file, ecc.). In modalità non interattiva opencode negherebbe tutto senza questo flag. Disattivalo per maggiore sicurezza.",
   "Show reasoning": "Mostra ragionamento",
-  "Show the model's reasoning blocks (uses the --thinking flag).":
-    "Mostra i blocchi di reasoning del modello (usa il flag --thinking).",
   "Show tool details": "Mostra dettagli degli strumenti",
   "Show the input and output of every tool executed during the request, in collapsible blocks.":
     "Mostra input e output di ogni strumento eseguito durante la richiesta, in blocchi apribili con un clic.",
@@ -163,17 +150,17 @@ const IT: Record<string, string> = {
   "INPUT:": "INPUT:",
   "OUTPUT:": "OUTPUT:",
   "(no details)": "(nessun dettaglio)",
-  "events": "eventi",
   "Token:": "Token:",
   "in": "in",
   "out": "out",
+  "included": "incluso",
   "Cost:": "Costo:",
   "The selected model does not support images. Remove the attached image or choose a multimodal (vision) model from the Model menu.":
     "Il modello selezionato non supporta le immagini. Rimuovi l'allegato immagine oppure scegli un modello multimodale (con supporto vision) dal menu Modello.",
   "The saved session no longer exists: a new one will be created, resend the message.":
     "La sessione salvata non esiste più: ne verrà creata una nuova, rispedisci il messaggio.",
-  "The opencode process exited with code $1. Check the binary path and the model in the settings.":
-    "Il processo opencode è terminato con codice $1. Verifica il percorso del binario e il modello nelle impostazioni.",
+  "The agent process exited with code $1. Check the binary path and the model in the settings.":
+    "Il processo dell'agente è terminato con codice $1. Verifica il percorso del binario e il modello nelle impostazioni.",
   "Session at the limit: new session created with the recent history.":
     "Sessione al limite: nuova sessione creata con la cronologia recente.",
   "New session created with the summary of the previous one.":
@@ -199,7 +186,6 @@ const IT: Record<string, string> = {
   "Attach a file": "Allega un file",
   "Token and cost statistics": "Statistiche token e costi",
   "/stats": "/statistiche",
-  "/pin": "/pin",
   "/rename": "/rinomina",
   "/prompt": "/prompt",
   "Insert a saved prompt": "Inserisci un prompt salvato",
@@ -224,8 +210,6 @@ const IT: Record<string, string> = {
   "pin/unpin session": "fissa/rimuovi sessione",
   "Pin the session in the list": "Fissa la sessione nella lista",
   "active model": "modello attivo",
-  "Hi! I am the plugin that connects your vault to opencode. Write a message below. Try the commands: / for commands, @ to attach a file, ! for quick actions.":
-    "Ciao! Sono il plugin che collega il tuo vault a opencode. Scrivi un messaggio qui sotto. Prova i comandi: / per i comandi, @ per allegare un file, ! per le azioni rapide.",
   "Summarize in detail this conversation: goals, decisions made, work done, current state and next steps. Write the summary so the work can continue in a new session without losing context.":
     "Riassumi in dettaglio questa conversazione: obiettivi, decisioni prese, lavoro svolto, stato attuale e prossimi passi. Scrivi il riassunto in modo che si possa continuare il lavoro in una nuova sessione senza perdere il contesto.",
 
@@ -242,16 +226,17 @@ const IT: Record<string, string> = {
   "Antigravity binary path": "Percorso binario Antigravity",
   "Command or full path to the agy executable. Default is 'agy' or '~/.local/bin/agy'.":
     "Comando o percorso completo dell'eseguibile agy. Il default è 'agy' o '~/.local/bin/agy'.",
-  "Pick a model from Antigravity (Gemini 3.8/3.7/3.1, Claude Sonnet 4.6). Included with Google AI Pro.":
-    "Scegli un modello da Antigravity (Gemini 3.8/3.7/3.1, Claude Sonnet 4.6). Incluso con Google AI Pro.",
+  "Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet 5.5). The effort is part of the model name. Included with Google AI Pro.":
+    "Scegli un modello da Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet 5.5). L'effort fa parte del nome del modello. Incluso con Google AI Pro.",
   "Pick a model from the opencode list. Default uses the OpenCode Go provider.":
     "Scegli un modello dall'elenco opencode. Il default usa il provider OpenCode Go.",
   "Reasoning effort": "Livello di ragionamento (Effort)",
-  "Effort level for reasoning models like Gemini 3.8/3.7 Flash and Claude Thinking.":
-    "Livello di effort per i modelli di reasoning come Gemini 3.8/3.7 Flash e Claude Thinking.",
+  "Effort sent only for models whose name does not already include it. Antigravity model names usually end with -low/-medium/-high.":
+    "Effort inviato solo per i modelli il cui nome non lo include già. I nomi dei modelli Antigravity di solito terminano con -low/-medium/-high.",
   "Low": "Basso",
   "Medium": "Medio",
   "High": "Alto",
+  "Extra high": "Extra alto",
   "Max": "Massimo",
   "Antigravity found:": "Antigravity trovato:",
   "Run 'agy --version' to verify the binary is reachable.":
@@ -263,11 +248,10 @@ const IT: Record<string, string> = {
     "L'ID di sessione persistente usato per la chat. Gestito automaticamente. Vuoto = nuova sessione al prossimo messaggio.",
   "Run anydoc on attached documents (PDF, Word, Excel, etc.) and attach them as Markdown instead of the original file.":
     "Esegue anydoc sui documenti allegati (PDF, Word, Excel, ecc.) e li allega come Markdown anziché il file originale.",
-  "Periodically remove large file attachments from the opencode database.":
-    "Rimuove periodicamente gli allegati di grandi dimensioni dal database di opencode.",
   "Save reusable prompt templates. In the chat, type /prompt to quickly insert them into the composer.":
     "Salva modelli di prompt riutilizzabili. Nella chat, digita /prompt per inserirli rapidamente nel compositore.",
-  "Included with Google AI Pro ($0.00)": "Incluso con Google AI Pro ($0.00)",
+  "Included with $1 ($0.00)": "Incluso con $1 ($0.00)",
+  "Included ($0.00)": "Incluso ($0.00)",
   "Search models... (e.g. gemini, claude, flash, deepseek)":
     "Cerca modelli... (es. gemini, claude, flash, deepseek)",
   "select": "seleziona",
