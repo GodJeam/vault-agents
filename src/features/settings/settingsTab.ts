@@ -3,7 +3,7 @@ import type OpencodePlugin from "../../main";
 import { PromptModal } from "../../shared/modals";
 import type { Language } from "../../i18n";
 import type { EngineType } from "../../core/types";
-import { DEFAULT_SETTINGS } from "../../core/types";
+import type { AgentProvider } from "../../core/provider";
 
 export class VaultAgentsSettingTab extends PluginSettingTab {
   plugin: OpencodePlugin;
@@ -23,7 +23,11 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
     // Language setting
     new Setting(containerEl)
       .setName(t("Language"))
-      .setDesc(t("Interface language. English is the default. Some command names update after reloading Obsidian."))
+      .setDesc(
+        t(
+          "Interface language. English is the default. Some command names update after reloading Obsidian."
+        )
+      )
       .addDropdown((dd) =>
         dd
           .addOption("en", t("English"))
@@ -37,150 +41,132 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           })
       );
 
-    // AI Engine selection
+    const descriptors = this.plugin.registry.getDescriptors();
+    const activeProvider = this.plugin.registry.resolveProvider(this.plugin.settings.engine);
+    const activeDesc = activeProvider.descriptor;
+    const activeCfg = this.plugin.getEngineConfig(activeDesc.id);
+
+    // AI Engine selection (generated dynamically from registered descriptors)
     new Setting(containerEl)
       .setName(t("AI Engine"))
-      .setDesc(t("Select which AI backend to use. Antigravity connects directly to your Google AI Pro subscription with no API key needed."))
-      .addDropdown((dd) =>
-        dd
-          .addOption("antigravity", t("Antigravity CLI (Google AI Pro)"))
-          .addOption("opencode", t("OpenCode CLI"))
-          .setValue(this.plugin.settings.engine || "antigravity")
+      .setDesc(
+        t(
+          "Select which AI backend to use. Antigravity connects directly to your Google AI Pro subscription with no API key needed."
+        )
+      )
+      .addDropdown((dd) => {
+        for (const desc of descriptors) {
+          dd.addOption(desc.id, t(desc.displayName));
+        }
+        dd.setValue(activeDesc.id);
+        dd.onChange(async (value) => {
+          this.plugin.settings.engine = value as EngineType;
+          await this.plugin.saveSettings();
+          this.display();
+        });
+      });
+
+    // Data-driven Engine Settings section
+    const sectionTitle =
+      activeDesc.id === "antigravity"
+        ? t("Antigravity settings (Google AI Pro)")
+        : activeDesc.id === "opencode"
+          ? t("OpenCode settings")
+          : activeDesc.displayName;
+    containerEl.createEl("h3", { text: sectionTitle });
+
+    const binaryNameLabel =
+      activeDesc.id === "antigravity" ? t("Antigravity binary path") : t("Binary path");
+
+    new Setting(containerEl)
+      .setName(binaryNameLabel)
+      .setDesc(t(activeDesc.binaryDesc))
+      .addText((text) =>
+        text
+          .setPlaceholder(activeDesc.defaultBinary)
+          .setValue(activeCfg.binary)
           .onChange(async (value) => {
-            this.plugin.settings.engine = value as EngineType;
+            activeCfg.binary = value.trim() || activeDesc.defaultBinary;
             await this.plugin.saveSettings();
-            this.display();
           })
       );
 
-    const isAntigravity = this.plugin.settings.engine === "antigravity";
+    new Setting(containerEl)
+      .setName(t("Model"))
+      .setDesc(t(activeDesc.modelDesc))
+      .addDropdown((dd) => {
+        void this.populateProviderModelDropdown(dd, activeProvider);
+      });
 
-    if (isAntigravity) {
-      containerEl.createEl("h3", { text: t("Antigravity settings (Google AI Pro)") });
-
-      new Setting(containerEl)
-        .setName(t("Antigravity binary path"))
-        .setDesc(t("Command or full path to the agy executable. Default is 'agy' or '~/.local/bin/agy'."))
-        .addText((text) =>
-          text
-            .setPlaceholder("agy")
-            .setValue(this.plugin.settings.antigravityBinary)
-            .onChange(async (value) => {
-              this.plugin.settings.antigravityBinary = value.trim() || "agy";
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName(t("Model"))
-        .setDesc(t("Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet 5.5). The effort is part of the model name. Included with Google AI Pro."))
-        .addDropdown((dd) => {
-          void this.populateAntigravityModelDropdown(dd);
+    // Render descriptor-defined engine options (e.g. effort, agent, etc.)
+    for (const opt of activeDesc.options) {
+      const setting = new Setting(containerEl).setName(t(opt.label)).setDesc(t(opt.desc));
+      if (opt.type === "select" && opt.choices) {
+        setting.addDropdown((dd) => {
+          for (const ch of opt.choices!) {
+            dd.addOption(ch.value, t(ch.label));
+          }
+          dd.setValue(activeCfg.options[opt.key] || opt.default);
+          dd.onChange(async (val) => {
+            activeCfg.options[opt.key] = val;
+            await this.plugin.saveSettings();
+          });
         });
-
-      new Setting(containerEl)
-        .setName(t("Reasoning effort"))
-        .setDesc(t("Effort sent only for models whose name does not already include it. Antigravity model names usually end with -low/-medium/-high."))
-        .addDropdown((dd) =>
-          dd
-            .addOption("low", t("Low"))
-            .addOption("medium", t("Medium"))
-            .addOption("high", t("High"))
-            .addOption("xhigh", t("Extra high"))
-            .addOption("max", t("Max"))
-            .setValue(this.plugin.settings.antigravityEffort || "high")
-            .onChange(async (val) => {
-              this.plugin.settings.antigravityEffort = val as
-                | "low"
-                | "medium"
-                | "high"
-                | "xhigh"
-                | "max";
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName(t("Test connection"))
-        .setDesc(t("Run 'agy --version' to verify the binary is reachable."))
-        .addButton((btn) =>
-          btn.setButtonText(t("Test")).onClick(async () => {
-            btn.setDisabled(true);
-            btn.setButtonText(t("Testing..."));
-            try {
-              const provider = this.plugin.registry.get("antigravity");
-              const version = provider ? await provider.getVersion() : await this.plugin.antigravityRunner.getVersion();
-              new Notice(`${t("Antigravity found:")} ${version}`);
-            } catch (e) {
-              new Notice(`${t("Error:")} ${(e as Error).message}`);
-            } finally {
-              btn.setDisabled(false);
-              btn.setButtonText(t("Test"));
-            }
-          })
-        );
-    } else {
-      containerEl.createEl("h3", { text: t("OpenCode settings") });
-
-      new Setting(containerEl)
-        .setName(t("Binary path"))
-        .setDesc(t("Command or full path to the opencode executable. Usually 'opencode' is enough if it is on your PATH."))
-        .addText((text) =>
+      } else {
+        setting.addText((text) =>
           text
-            .setPlaceholder("opencode")
-            .setValue(this.plugin.settings.binaryPath)
+            .setPlaceholder(opt.placeholder ? t(opt.placeholder) : "")
+            .setValue(activeCfg.options[opt.key] ?? opt.default)
             .onChange(async (value) => {
-              this.plugin.settings.binaryPath = value.trim() || "opencode";
+              activeCfg.options[opt.key] = value.trim();
               await this.plugin.saveSettings();
             })
         );
-
-      new Setting(containerEl)
-        .setName(t("Model"))
-        .setDesc(t("Pick a model from the opencode list. Default uses the OpenCode Go provider."))
-        .addDropdown((dd) => {
-          void this.populateOpencodeModelDropdown(dd);
-        });
-
-      new Setting(containerEl)
-        .setName(t("Agent"))
-        .setDesc(t("The opencode agent to use (e.g. build, plan). Leave empty for the default."))
-        .addText((text) =>
-          text
-            .setPlaceholder(t("e.g. build"))
-            .setValue(this.plugin.settings.agent)
-            .onChange(async (value) => {
-              this.plugin.settings.agent = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName(t("Test connection"))
-        .setDesc(t("Run 'opencode --version' to verify the binary is reachable."))
-        .addButton((btn) =>
-          btn.setButtonText(t("Test")).onClick(async () => {
-            btn.setDisabled(true);
-            btn.setButtonText(t("Testing..."));
-            try {
-              const provider = this.plugin.registry.get("opencode");
-              const version = provider ? await provider.getVersion() : await this.plugin.opencodeRunner.getVersion();
-              new Notice(`${t("Opencode found:")} ${version}`);
-            } catch (e) {
-              new Notice(`${t("Error:")} ${(e as Error).message}`);
-            } finally {
-              btn.setDisabled(false);
-              btn.setButtonText(t("Test"));
-            }
-          })
-        );
+      }
     }
+
+    const testDesc =
+      activeDesc.id === "antigravity"
+        ? t("Run 'agy --version' to verify the binary is reachable.")
+        : activeDesc.id === "opencode"
+          ? t("Run 'opencode --version' to verify the binary is reachable.")
+          : `Run '${activeDesc.defaultBinary} --version' to verify the binary is reachable.`;
+
+    const foundPrefix =
+      activeDesc.id === "antigravity"
+        ? t("Antigravity found:")
+        : activeDesc.id === "opencode"
+          ? t("Opencode found:")
+          : `${activeDesc.shortName}:`;
+
+    new Setting(containerEl)
+      .setName(t("Test connection"))
+      .setDesc(testDesc)
+      .addButton((btn) =>
+        btn.setButtonText(t("Test")).onClick(async () => {
+          btn.setDisabled(true);
+          btn.setButtonText(t("Testing..."));
+          try {
+            const version = await activeProvider.getVersion();
+            new Notice(`${foundPrefix} ${version}`);
+          } catch (e) {
+            new Notice(`${t("Error:")} ${(e as Error).message}`);
+          } finally {
+            btn.setDisabled(false);
+            btn.setButtonText(t("Test"));
+          }
+        })
+      );
 
     containerEl.createEl("h3", { text: t("General settings") });
 
     new Setting(containerEl)
       .setName(t("Auto-approve permissions"))
-      .setDesc(t("Automatically allow tool permissions (bash, file edits, etc.). Turn it off for extra safety."))
+      .setDesc(
+        t(
+          "Automatically allow tool permissions (bash, file edits, etc.). Turn it off for extra safety."
+        )
+      )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.autoApprove).onChange(async (value) => {
           this.plugin.settings.autoApprove = value;
@@ -200,7 +186,11 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName(t("Show tool details"))
-      .setDesc(t("Show the input and output of every tool executed during the request, in collapsible blocks."))
+      .setDesc(
+        t(
+          "Show the input and output of every tool executed during the request, in collapsible blocks."
+        )
+      )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.showToolIO).onChange(async (value) => {
           this.plugin.settings.showToolIO = value;
@@ -210,7 +200,11 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName(t("Session ID"))
-      .setDesc(t("The persistent session id used for the chat. Managed automatically. Empty = new session on next message."))
+      .setDesc(
+        t(
+          "The persistent session id used for the chat. Managed automatically. Empty = new session on next message."
+        )
+      )
       .addText((text) =>
         text
           .setPlaceholder(t("(automatic)"))
@@ -236,7 +230,11 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName(t("Convert documents with anydoc"))
-      .setDesc(t("Run anydoc on attached documents (PDF, Word, Excel, etc.) and attach them as Markdown instead of the original file."))
+      .setDesc(
+        t(
+          "Run anydoc on attached documents (PDF, Word, Excel, etc.) and attach them as Markdown instead of the original file."
+        )
+      )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.anydocEnabled).onChange(async (value) => {
           this.plugin.settings.anydocEnabled = value;
@@ -246,7 +244,9 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName(t("Anydoc binary path"))
-      .setDesc(t("Command or full path to the anydoc executable (npm install -g @firecrawl/anydoc)."))
+      .setDesc(
+        t("Command or full path to the anydoc executable (npm install -g @firecrawl/anydoc).")
+      )
       .addText((text) =>
         text
           .setPlaceholder("anydoc")
@@ -257,12 +257,16 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           })
       );
 
-    if (!isAntigravity) {
+    if (activeDesc.supportsDbCleanup && activeProvider.pruneOversizedParts) {
       containerEl.createEl("h3", { text: t("Database self-cleanup") });
 
       new Setting(containerEl)
         .setName(t("Enable automatic cleanup"))
-        .setDesc(t("Periodically remove large file attachments from the opencode database (opencode.db), which would otherwise bloat it. Only file attachments older than the minimum age and larger than the max size are removed; conversation text is never touched."))
+        .setDesc(
+          t(
+            "Periodically remove large file attachments from the opencode database (opencode.db), which would otherwise bloat it. Only file attachments older than the minimum age and larger than the max size are removed; conversation text is never touched."
+          )
+        )
         .addToggle((toggle) =>
           toggle.setValue(this.plugin.settings.dbAutoCleanup).onChange(async (value) => {
             this.plugin.settings.dbAutoCleanup = value;
@@ -300,7 +304,11 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
 
       new Setting(containerEl)
         .setName(t("Max attachment size (MB)"))
-        .setDesc(t("When anydoc fails to convert a document, files larger than this are not attached to the request, to avoid storing unusable copies in the database."))
+        .setDesc(
+          t(
+            "When anydoc fails to convert a document, files larger than this are not attached to the request, to avoid storing unusable copies in the database."
+          )
+        )
         .addText((text) =>
           text
             .setPlaceholder("20")
@@ -320,7 +328,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
             btn.setDisabled(true);
             btn.setButtonText(t("Cleaning..."));
             try {
-              await this.plugin.opencodeRunner.pruneOversizedParts(true, true);
+              await activeProvider.pruneOversizedParts?.(true, true);
               new Notice(t("Cleanup done."));
             } catch (e) {
               new Notice(`${t("Error:")} ${(e as Error).message}`);
@@ -334,7 +342,9 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
 
     containerEl.createEl("h3", { text: t("Prompt templates") });
     containerEl.createEl("p", {
-      text: t("Save reusable prompt templates. In the chat, type /prompt to quickly insert them into the composer."),
+      text: t(
+        "Save reusable prompt templates. In the chat, type /prompt to quickly insert them into the composer."
+      ),
       cls: "setting-item-description",
     });
 
@@ -346,12 +356,15 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         .setDesc(p.text.length > 90 ? p.text.slice(0, 87) + "…" : p.text);
       s.addButton((b) => b.setButtonText(t("Edit")).onClick(() => this.editPrompt(i)));
       s.addButton((b) =>
-        b.setButtonText(t("Delete")).setWarning().onClick(async () => {
-          prompts.splice(i, 1);
-          this.plugin.settings.prompts = prompts;
-          await this.plugin.saveSettings();
-          this.display();
-        })
+        b
+          .setButtonText(t("Delete"))
+          .setWarning()
+          .onClick(async () => {
+            prompts.splice(i, 1);
+            this.plugin.settings.prompts = prompts;
+            await this.plugin.saveSettings();
+            this.display();
+          })
       );
     }
     new Setting(containerEl).addButton((b) =>
@@ -380,55 +393,46 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
     ).open();
   }
 
-  private async populateAntigravityModelDropdown(dd: DropdownComponent): Promise<void> {
-    const cur = this.plugin.settings.antigravityModel || "gemini-3.8-flash-high";
-    const seen = new Set<string>();
-    const addOption = (val: string, display: string) => {
-      if (seen.has(val)) return;
-      seen.add(val);
-      dd.addOption(val, display);
-    };
-    try {
-      const provider = this.plugin.registry.get("antigravity");
-      const models = provider ? await provider.listModels() : await this.plugin.antigravityRunner.listModels();
-      for (const m of models) addOption(m, m);
-    } catch {
-      addOption("gemini-3.8-flash-high", "Gemini 3.8 Flash (High)");
-      addOption("claude-opus-5-5-high", "Claude Opus 5.5 (High)");
-      addOption("claude-sonnet-5-5-high", "Claude Sonnet 5.5 (High)");
-    }
-    dd.setValue(cur);
-    dd.onChange(async (val) => {
-      this.plugin.settings.antigravityModel = val;
-      await this.plugin.saveSettings();
-    });
-  }
-
-  private async populateOpencodeModelDropdown(dd: DropdownComponent): Promise<void> {
+  private async populateProviderModelDropdown(
+    dd: DropdownComponent,
+    provider: AgentProvider
+  ): Promise<void> {
     const t = (s: string) => this.plugin.t(s);
-    const cur = this.plugin.settings.model || DEFAULT_SETTINGS.model;
+    const desc = provider.descriptor;
+    const cfg = this.plugin.getEngineConfig(desc.id);
+    const cur = cfg.model || desc.defaultModel;
     const seen = new Set<string>();
     const addOption = (val: string, display: string) => {
       if (seen.has(val)) return;
       seen.add(val);
       dd.addOption(val, display);
     };
-    addOption("", t("(default from opencode)"));
-    if (cur) addOption(cur, cur + (cur.includes("/") ? "" : ` ${t("(custom)")}`));
+
+    if (!desc.included) {
+      addOption("", t("(default from opencode)"));
+      if (cur) addOption(cur, cur + (cur.includes("/") ? "" : ` ${t("(custom)")}`));
+    }
+
     try {
-      const provider = this.plugin.registry.get("opencode");
-      const models = provider ? await provider.listModels() : await this.plugin.opencodeRunner.listModels();
+      const models = await provider.listModels();
       for (const m of models) addOption(m, m);
       dd.setValue(cur || "");
     } catch (e) {
-      const opt = dd.selectEl.createEl("option");
-      opt.value = "__error__";
-      opt.textContent = `${t("Error:")} ${(e as Error).message}`;
-      opt.disabled = true;
+      if (desc.id === "antigravity") {
+        addOption("gemini-3.8-flash-high", "Gemini 3.8 Flash (High)");
+        addOption("claude-opus-5-5-high", "Claude Opus 5.5 (High)");
+        addOption("claude-sonnet-5-5-high", "Claude Sonnet 5.5 (High)");
+      } else {
+        const opt = dd.selectEl.createEl("option");
+        opt.value = "__error__";
+        opt.textContent = `${t("Error:")} ${(e as Error).message}`;
+        opt.disabled = true;
+      }
       dd.setValue(cur || "");
     }
+
     dd.onChange(async (val) => {
-      this.plugin.settings.model = val;
+      cfg.model = val;
       await this.plugin.saveSettings();
     });
   }

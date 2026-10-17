@@ -1,18 +1,20 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "child_process";
 import { createHash } from "crypto";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { copyFile, mkdir, readdir, stat, unlink } from "fs/promises";
-import { extname, join } from "path";
+import { dirname, extname, join } from "path";
 import { homedir, tmpdir } from "os";
-import { FileSystemAdapter } from "obsidian";
-import type OpencodePlugin from "../main";
+import type { RunnerHost } from "../core/provider";
+import type { RunHandle, RunRequest, StreamCallbacks } from "../core/types";
+
+export const MAX_STREAM_LINE_BYTES = 20_000_000;
 
 export abstract class BaseCliRunner {
-  protected plugin: OpencodePlugin;
+  protected plugin: RunnerHost;
   protected resolvedBinaries = new Map<string, string | null>();
   protected activeProcs = new Set<ChildProcess>();
 
-  constructor(plugin: OpencodePlugin) {
+  constructor(plugin: RunnerHost) {
     this.plugin = plugin;
   }
 
@@ -98,7 +100,83 @@ export abstract class BaseCliRunner {
   }
 
   /**
-   * Execute a CLI binary synchronously-like via promise, returning standard output
+   * Normalize both `runStream(req, cb)` and legacy `runStream(prompt, files, cb)` signatures
+   */
+  protected normalizeRunArgs(
+    reqOrPrompt: RunRequest | string,
+    fileAttachmentsOrCb?: string[] | StreamCallbacks,
+    maybeCb?: StreamCallbacks
+  ): { req: RunRequest; cb: StreamCallbacks } {
+    if (typeof reqOrPrompt === "string") {
+      return {
+        req: {
+          prompt: reqOrPrompt,
+          fileAttachments: Array.isArray(fileAttachmentsOrCb) ? fileAttachmentsOrCb : [],
+        },
+        cb: maybeCb as StreamCallbacks,
+      };
+    }
+    return {
+      req: reqOrPrompt,
+      cb: fileAttachmentsOrCb as StreamCallbacks,
+    };
+  }
+
+  /**
+   * Shared JSONL streaming execution loop for CLI providers
+   */
+  protected spawnJsonlStream(
+    bin: string,
+    args: string[],
+    cwd: string | undefined,
+    onLine: (line: string) => void,
+    cb: StreamCallbacks
+  ): RunHandle {
+    const child = this.spawnBinary(bin, args, cwd);
+
+    let buffer = "";
+    child.stdout?.on("data", (d: Buffer) => {
+      buffer += d.toString();
+      let idx: number;
+      while ((idx = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, idx).trim();
+        buffer = buffer.slice(idx + 1);
+        if (!line) continue;
+        try {
+          onLine(line);
+        } catch (e) {
+          console.error("[vault-agents] error handling stream event:", e);
+        }
+      }
+    });
+
+    child.stdout?.on("end", () => {
+      const remaining = buffer.trim();
+      if (remaining) {
+        try {
+          onLine(remaining);
+        } catch (e) {
+          console.error("[vault-agents] error handling final stream event:", e);
+        }
+      }
+    });
+
+    child.stderr?.on("data", (d: Buffer) => {
+      cb.onRaw?.(d.toString());
+    });
+
+    child.on("error", (e) => cb.onError(e.message));
+    child.on("close", (code) => {
+      cb.onDone(code ?? -1);
+    });
+
+    return {
+      abort: () => this.killProc(child, true),
+    };
+  }
+
+  /**
+   * Execute a CLI binary via promise, returning standard output
    */
   protected execCli(
     bin: string,
@@ -156,7 +234,6 @@ export abstract class BaseCliRunner {
       }
     }
 
-    this.resolvedBinaries.set(bin, bin);
     return bin;
   }
 
@@ -185,9 +262,7 @@ export abstract class BaseCliRunner {
 
   private resolveCmdShim(shimPath: string): string | null {
     try {
-      const { readFileSync } = require("fs");
       const content = readFileSync(shimPath, "utf8");
-      const { dirname } = require("path");
       const dir = dirname(shimPath);
       const m = content.match(/"([^"]+\.exe)"/i);
       if (m) {
@@ -201,14 +276,10 @@ export abstract class BaseCliRunner {
   }
 
   /**
-   * Retrieve the absolute filesystem path of the Obsidian vault
+   * Retrieve the absolute filesystem path of the Obsidian vault via RunnerHost
    */
   getVaultPath(): string | null {
-    const adapter = this.plugin.app.vault.adapter;
-    if (adapter instanceof FileSystemAdapter) {
-      return adapter.getBasePath();
-    }
-    return null;
+    return this.plugin.getVaultPath();
   }
 
   /**
@@ -233,16 +304,20 @@ export abstract class BaseCliRunner {
     await this.cleanupTempFiles(dir);
 
     const bin = this.resolveBinaryPath(this.plugin.settings.anydocBinary || "anydoc");
-    await new Promise<void>((resolve, reject) => {
-      const child = this.spawnBinary(bin, [cleanInput, "-o", outPath]);
-      let err = "";
-      child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
-      child.on("error", (e) => reject(e));
-      child.on("close", (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`anydoc exited with code ${code}: ${err.trim().slice(0, 200)}`));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const child = this.spawnBinary(bin, [cleanInput, "-o", outPath]);
+        let err = "";
+        child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
+        child.on("error", (e) => reject(e));
+        child.on("close", (code) => {
+          if (code === 0) resolve();
+          else reject(new Error(`anydoc exited with code ${code}: ${err.trim().slice(0, 200)}`));
+        });
       });
-    });
+    } finally {
+      await unlink(cleanInput).catch(() => {});
+    }
 
     return outPath;
   }

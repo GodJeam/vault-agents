@@ -1,11 +1,12 @@
 {
   "name": "vault-agents",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Multi-agent AI integration for Obsidian",
   "main": "main.js",
   "scripts": {
     "dev": "node build/esbuild.config.mjs",
-    "build": "tsc --noEmit --skipLibCheck -p build/tsconfig.json && node build/esbuild.config.mjs production"
+    "build": "tsc --noEmit --skipLibCheck -p build/tsconfig.json && node build/esbuild.config.mjs production",
+    "test": "node build/run-tests.mjs"
   },
   "keywords": [
     "obsidian",

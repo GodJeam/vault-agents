@@ -1,0 +1,5 @@
+{"sessionID":"ses_abc12345","type":"reasoning","part":{"id":"r1","type":"reasoning","text":"Pianifico i passaggi..."}}
+{"sessionID":"ses_abc12345","type":"tool_use","part":{"id":"t1","callID":"call_1","type":"tool","tool":"bash","state":{"status":"running","title":"List files","input":{"cmd":"ls"}}}}
+{"sessionID":"ses_abc12345","type":"tool_use","part":{"id":"t1","callID":"call_1","type":"tool","tool":"bash","state":{"status":"completed","title":"List files","input":{"cmd":"ls"},"output":"README.md"}}}
+{"sessionID":"ses_abc12345","type":"text","part":{"id":"p1","type":"text","text":"Operazione completata con successo."}}
+{"sessionID":"ses_abc12345","type":"step_finish","part":{"tokens":{"total":850,"input":600,"output":200,"reasoning":50},"cost":0.0025}}

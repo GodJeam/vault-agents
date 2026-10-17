@@ -1,11 +1,18 @@
-import { Notice, Plugin, WorkspaceLeaf } from "obsidian";
+import { FileSystemAdapter, Notice, Plugin, WorkspaceLeaf } from "obsidian";
 import { CHAT_VIEW_TYPE, ChatView } from "./features/chat";
 import { OpencodeRunner, AntigravityRunner } from "./providers";
 import { ProviderRegistry } from "./core/registry";
-import type { AgentProvider } from "./core/provider";
-import { DEFAULT_SETTINGS } from "./core/types";
+import type { AgentProvider, RunnerHost } from "./core/provider";
+import {
+  getEngineConfig,
+  migrateSettings,
+  syncSettingsFields,
+  type EngineConfig,
+  type HistoryMap,
+  type HistoryMessage,
+  type OpencodeSettings,
+} from "./core/types";
 import { OpencodeSettingTab } from "./features/settings/settingsTab";
-import type { HistoryMap, HistoryMessage, OpencodeSettings } from "./core/types";
 import { translate } from "./i18n";
 
 export type {
@@ -15,7 +22,7 @@ export type {
   HistoryMap,
 } from "./core/types";
 
-export default class OpencodePlugin extends Plugin {
+export default class OpencodePlugin extends Plugin implements RunnerHost {
   settings!: OpencodeSettings;
   histories: HistoryMap = {};
   registry!: ProviderRegistry;
@@ -31,11 +38,23 @@ export default class OpencodePlugin extends Plugin {
     );
   }
 
+  getEngineConfig(engineId: string): EngineConfig {
+    return getEngineConfig(this.settings, engineId);
+  }
+
+  getVaultPath(): string | null {
+    const adapter = this.app.vault.adapter;
+    if (adapter instanceof FileSystemAdapter) {
+      return adapter.getBasePath();
+    }
+    return null;
+  }
+
   async onload(): Promise<void> {
-    const data = (await this.loadData()) ?? {};
-    const { histories, ...rest } = data as { histories?: HistoryMap } & Record<string, unknown>;
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, rest);
-    this.histories = histories ?? {};
+    const raw = (await this.loadData()) as Record<string, unknown> | null;
+    const migrated = migrateSettings(raw);
+    this.settings = migrated.settings;
+    this.histories = migrated.histories;
 
     this.opencodeRunner = new OpencodeRunner(this);
     this.antigravityRunner = new AntigravityRunner(this);
@@ -151,26 +170,31 @@ export default class OpencodePlugin extends Plugin {
       await this.app.workspace.revealLeaf(existing);
       return existing.view as ChatView;
     }
-    return this.openNewChatView();
+    return this.openNewChatView(false);
   }
 
-  async openNewChatView(): Promise<ChatView> {
+  async openNewChatView(resetSession = true): Promise<ChatView> {
     const { workspace } = this.app;
-    // Opens a new chat in a side-by-side pane (vertical split) so that
-    // multiple sessions can be managed at the same time.
+    const hadExistingChat = workspace.getLeavesOfType(CHAT_VIEW_TYPE).length > 0;
     let leaf: WorkspaceLeaf;
     try {
       leaf = workspace.getLeaf("split", "vertical");
     } catch {
       leaf = workspace.getLeaf(true);
     }
+    if (resetSession && hadExistingChat) {
+      this.settings.sessionId = "";
+    }
     await leaf.setViewState({ type: CHAT_VIEW_TYPE, active: true });
     await workspace.revealLeaf(leaf);
-    return leaf.view as ChatView;
+    const view = leaf.view as ChatView;
+    if (resetSession && hadExistingChat) {
+      view.startNewSession(true);
+    }
+    return view;
   }
 
   onunload(): void {
-    // Persist any debounced history write before tearing down.
     void this.flushSave();
     if (this.registry) {
       for (const provider of this.registry.getAll()) {
@@ -179,12 +203,11 @@ export default class OpencodePlugin extends Plugin {
     }
   }
 
-  // Debounce history writes: appendHistory is called on every message and
-  // rewriting the whole data.json each time is wasteful.
   private scheduleSave(): void {
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null;
+      syncSettingsFields(this.settings);
       void this.saveData({ ...this.settings, histories: this.histories });
     }, 500);
   }
@@ -194,6 +217,7 @@ export default class OpencodePlugin extends Plugin {
       window.clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
+    syncSettingsFields(this.settings);
     await this.saveData({ ...this.settings, histories: this.histories });
   }
 
@@ -203,15 +227,24 @@ export default class OpencodePlugin extends Plugin {
 
   async appendHistory(sessionId: string, msg: HistoryMessage): Promise<void> {
     if (!sessionId) return;
-    // Cap the size of stored messages to keep data.json (and its saves) light,
-    // since responses of long tasks can be very large.
     const cap = (s: string | undefined): string | undefined =>
       s && s.length > 50000 ? s.slice(0, 50000) + "…" : s;
-    msg.text = cap(msg.text) ?? "";
-    if (msg.role === "assistant") msg.reasoning = cap(msg.reasoning);
+    const cloned: HistoryMessage =
+      msg.role === "assistant"
+        ? {
+            ...msg,
+            text: cap(msg.text) ?? "",
+            reasoning: cap(msg.reasoning),
+            timestamp: msg.timestamp ?? Date.now(),
+          }
+        : {
+            ...msg,
+            text: cap(msg.text) ?? "",
+            timestamp: msg.timestamp ?? Date.now(),
+          };
     if (!this.histories[sessionId]) this.histories[sessionId] = [];
     const arr = this.histories[sessionId];
-    arr.push(msg);
+    arr.push(cloned);
     if (arr.length > 100) arr.splice(0, arr.length - 100);
     this.scheduleSave();
   }
