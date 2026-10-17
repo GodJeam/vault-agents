@@ -1,12 +1,72 @@
 import type {
+  EngineConfig,
   EngineType,
+  HistoryMap,
+  HistoryMessage,
+  PluginSettings,
   RunHandle,
+  RunRequest,
   SessionInfo,
   StreamCallbacks,
   UsageStats,
 } from "./types";
 
+export interface ProviderOptionDescriptor {
+  key: string;
+  label: string;
+  desc: string;
+  type: "text" | "select";
+  placeholder?: string;
+  choices?: Array<{ value: string; label: string }>;
+  default: string;
+}
+
+export interface ProviderDescriptor {
+  /** Unique engine identifier (e.g. 'antigravity', 'opencode', 'pi', 'hermes') */
+  id: EngineType;
+  /** Full human-readable name for settings and dropdowns */
+  displayName: string;
+  /** Short name displayed in chat message headers */
+  shortName: string;
+  /** Default CLI executable name */
+  defaultBinary: string;
+  /** Default model identifier */
+  defaultModel: string;
+  /** Description shown under the model dropdown in Settings */
+  modelDesc: string;
+  /** Description shown under the binary path field in Settings */
+  binaryDesc: string;
+  /** True when usage is included in a subscription (no per-token cost is shown) */
+  included: boolean;
+  /** Human-readable note about cost/inclusion (e.g. "Google AI Pro") */
+  costNote?: string;
+  /** Session persistence mechanism supported by this provider */
+  supportsSessions: "api" | "local-db" | "none";
+  /** Whether the provider supports token/cost usage statistics */
+  supportsUsageStats: boolean;
+  /** Whether the provider supports database attachment self-cleanup */
+  supportsDbCleanup?: boolean;
+  /** Engine-specific configuration fields rendered dynamically in Settings */
+  options: ProviderOptionDescriptor[];
+}
+
+/**
+ * Host interface injected into CLI runners so they do not depend on the
+ * Obsidian runtime module directly and can be tested in pure Node.js.
+ */
+export interface RunnerHost {
+  readonly settings: PluginSettings;
+  readonly histories: HistoryMap;
+  getHistory(sessionId: string): HistoryMessage[];
+  getEngineConfig(engineId: string): EngineConfig;
+  getVaultPath(): string | null;
+  t(text: string): string;
+}
+
 export interface AgentProvider {
+  /** Static metadata and capability descriptor for this engine */
+  readonly descriptor: ProviderDescriptor;
+
   /** Unique engine identifier (e.g. 'antigravity', 'opencode') */
   readonly id: EngineType;
 
@@ -40,17 +100,20 @@ export interface AgentProvider {
   /** Get context token limit for a specific model */
   getModelContextLimit(model: string): Promise<number>;
 
-  /** Get token usage for a session */
+  /** Get token usage for a session (last turn prompt size) */
   getSessionTokens(sessionId: string): Promise<{ input: number; output: number }>;
 
   /** Get global usage statistics if supported */
   getUsageStats(): Promise<UsageStats>;
 
   /** Run a streaming execution with real-time callbacks */
-  runStream(prompt: string, fileAttachments: string[], cb: StreamCallbacks): RunHandle;
+  runStream(req: RunRequest | string, fileAttachmentsOrCb?: string[] | StreamCallbacks, maybeCb?: StreamCallbacks): RunHandle;
 
   /** Convert documents (PDF, DOCX, XLSX) to Markdown via anydoc */
   convertDocument(absPath: string): Promise<string>;
+
+  /** Optional database self-cleanup for engines that store file blobs in SQLite */
+  pruneOversizedParts?(force?: boolean, ignoreAge?: boolean): Promise<void>;
 
   /** Abort and kill all running child processes for this provider */
   killAll(): void;

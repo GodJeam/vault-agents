@@ -186,6 +186,7 @@ const IT: Record<string, string> = {
   "Attach a file": "Allega un file",
   "Token and cost statistics": "Statistiche token e costi",
   "/stats": "/statistiche",
+  "/pin": "/fissa",
   "/rename": "/rinomina",
   "/prompt": "/prompt",
   "Insert a saved prompt": "Inserisci un prompt salvato",

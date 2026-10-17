@@ -1,35 +1,26 @@
-import {
-  FileSystemAdapter,
-  ItemView,
-  MarkdownRenderer,
-  Notice,
-  WorkspaceLeaf,
-  setIcon,
-} from "obsidian";
+import { ItemView, MarkdownRenderer, Notice, WorkspaceLeaf, setIcon } from "obsidian";
 import type OpencodePlugin from "../../main";
-import { DEFAULT_SETTINGS } from "../../core/types";
 import type { AgentProvider } from "../../core/provider";
 import type { FinishInfo, RunHandle, SessionInfo, EngineType } from "../../core/types";
 import { substitute } from "../../i18n";
 import {
   ConfirmModal,
-  FileSuggestModal,
   ModelSuggestModal,
   RenameModal,
   StatsModal,
   type ModelItem,
 } from "../../shared/modals";
-import type { TurnContext, SessionStats, SuggestItem, AttachmentItem } from "./types";
+import type { TurnContext, SessionStats } from "./types";
 import {
   AssistantBubble,
   renderUserBubble,
   renderErrorBubble,
   metaWithCopy,
 } from "./messageBubble";
+import { SuggestPopup } from "./suggestPopup";
+import { AttachmentManager } from "./attachmentManager";
 
 export const CHAT_VIEW_TYPE = "opencode-chat-view";
-
-const MAX_SUGGEST = 50;
 
 export class ChatView extends ItemView {
   plugin: OpencodePlugin;
@@ -48,9 +39,8 @@ export class ChatView extends ItemView {
   private statsBar!: HTMLElement;
   private contextEl!: HTMLElement;
   private contextFillEl!: HTMLElement;
-  private attachmentsBar!: HTMLElement;
-  private suggestEl!: HTMLElement;
-  private attachments: AttachmentItem[] = [];
+  private attachmentManager!: AttachmentManager;
+  private suggestPopup!: SuggestPopup;
   private viewSession: string;
   private pendingUser: { text: string; contextLabel?: string } | null = null;
   private currentProc: RunHandle | null = null;
@@ -67,13 +57,6 @@ export class ChatView extends ItemView {
   private contextBaseInput = 0;
   private contextRunInput = 0;
   private activityTimer: number | null = null;
-  private suggestItems: SuggestItem[] = [];
-  private suggestRows: HTMLElement[] = [];
-  private suggestIndex = 0;
-  private suggestOpen = false;
-  private suggestTrigger: { char: string; start: number } | null = null;
-  private vaultPaths: string[] | null = null;
-  private vaultPathsLower: string[] | null = null;
   private activeBubble: AssistantBubble | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: OpencodePlugin) {
@@ -92,21 +75,22 @@ export class ChatView extends ItemView {
     return (id && this.plugin.settings.sessionEngines?.[id]) || this.plugin.settings.engine;
   }
 
-  /** Active model id for the given engine, keeping the two engines' fields separate. */
+  /** Active model id for the given engine via its EngineConfig. */
   private activeModelFor(engine: EngineType): string {
-    return engine === "antigravity"
-      ? this.plugin.settings.antigravityModel || DEFAULT_SETTINGS.antigravityModel
-      : this.plugin.settings.model || DEFAULT_SETTINGS.model;
+    const cfg = this.plugin.getEngineConfig(engine);
+    const provider = this.plugin.registry.get(engine);
+    return cfg.model || provider?.descriptor.defaultModel || "";
   }
 
-  /** Human-readable label for an engine, driven by the provider capability. */
+  /** Human-readable label for an engine, driven by the provider descriptor. */
   private engineLabel(engine: EngineType): string {
     const provider = this.plugin.registry.get(engine);
     return provider?.costNote || provider?.displayName || engine;
   }
 
   assistantLabel(): string {
-    return this.getRunner().id === "antigravity" ? "Antigravity" : this.plugin.t("Opencode");
+    const desc = this.getRunner().descriptor;
+    return desc.id === "opencode" ? this.plugin.t(desc.shortName) : desc.shortName;
   }
 
   getViewType(): string {
@@ -128,9 +112,21 @@ export class ChatView extends ItemView {
 
     this.messagesEl = container.createDiv({ cls: "opencode-messages" });
     this.buildContextBar(container);
-    this.buildAttachmentsBar(container);
+    this.attachmentManager = new AttachmentManager(container, this.app, this.plugin);
     this.buildStatsBar(container);
     this.buildInputArea(container);
+
+    // Keep @ file suggestions reactive when vault files change
+    this.registerEvent(
+      this.app.vault.on("create", () => this.suggestPopup?.invalidateVaultCache())
+    );
+    this.registerEvent(
+      this.app.vault.on("delete", () => this.suggestPopup?.invalidateVaultCache())
+    );
+    this.registerEvent(
+      this.app.vault.on("rename", () => this.suggestPopup?.invalidateVaultCache())
+    );
+
     void this.populateSessionSelect().then(() => {
       this.loadHistoryForSession(this.viewSession);
     });
@@ -164,6 +160,17 @@ export class ChatView extends ItemView {
   sendText(text: string): void {
     if (this.inputEl) this.inputEl.value = text;
     void this.send();
+  }
+
+  startNewSession(silent = false): void {
+    this.viewSession = "";
+    this.plugin.settings.sessionId = "";
+    void this.plugin.saveSettings();
+    void this.populateSessionSelect();
+    this.loadHistoryForSession("");
+    if (!silent) {
+      new Notice(this.plugin.t("New session: the next message will start from scratch."));
+    }
   }
 
   private buildContextBar(container: HTMLElement): void {
@@ -229,56 +236,13 @@ export class ChatView extends ItemView {
 
     const attachBtn = this.contextBar.createEl("button", { cls: "opencode-add-note-btn" });
     attachBtn.setText("＋ " + this.plugin.t("Attach file"));
-    attachBtn.addEventListener("click", () => this.openFilePicker());
+    attachBtn.addEventListener("click", () => this.attachmentManager.openFilePicker());
 
     const add = this.contextBar.createEl("button", { cls: "opencode-add-note-btn" });
     add.setText("+ " + this.plugin.t("Current note"));
     add.addEventListener("click", () => this.attachCurrentNote());
 
     this.updateContextBar();
-  }
-
-  private buildAttachmentsBar(container: HTMLElement): void {
-    this.attachmentsBar = container.createDiv({ cls: "opencode-attachments-bar hidden" });
-    this.updateAttachmentsBar();
-  }
-
-  private updateAttachmentsBar(): void {
-    if (!this.attachmentsBar) return;
-    this.attachmentsBar.empty();
-    if (this.attachments.length === 0) {
-      this.attachmentsBar.addClass("hidden");
-      return;
-    }
-    this.attachmentsBar.removeClass("hidden");
-    for (const a of this.attachments) {
-      const chip = this.attachmentsBar.createSpan({ cls: "opencode-attachment-chip" });
-      const icon = chip.createSpan({ cls: "opencode-attachment-icon" });
-      setIcon(icon, a.image ? "image" : "file-text");
-      chip.createSpan({ text: a.label, cls: "opencode-attachment-label" });
-      const rm = chip.createEl("button", { cls: "opencode-icon-btn" });
-      setIcon(rm, "x");
-      rm.addEventListener("click", () => {
-        this.attachments = this.attachments.filter((x) => x.path !== a.path);
-        this.updateAttachmentsBar();
-      });
-    }
-  }
-
-  private openFilePicker(): void {
-    new FileSuggestModal(this.app, this.plugin, (file) => this.addAttachment(file.path)).open();
-  }
-
-  private addAttachment(path: string): void {
-    if (this.attachments.some((a) => a.path === path)) return;
-    const isImage = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(path);
-    this.attachments.push({ path, label: path, image: isImage });
-    this.updateAttachmentsBar();
-    if (isImage) {
-      new Notice(
-        this.plugin.t("Image attached: check that the selected model supports images (vision).")
-      );
-    }
   }
 
   private togglePin(): void {
@@ -326,7 +290,11 @@ export class ChatView extends ItemView {
       this.app,
       this.plugin,
       this.plugin.t("Delete session"),
-      this.plugin.t('Do you want to delete the session "$1"? The history saved in Obsidian will also be removed.').replace("$1", title),
+      this.plugin
+        .t(
+          'Do you want to delete the session "$1"? The history saved in Obsidian will also be removed.'
+        )
+        .replace("$1", title),
       this.plugin.t("Delete"),
       () => {
         this.getRunner()
@@ -367,6 +335,7 @@ export class ChatView extends ItemView {
   }
 
   private async populateSessionSelect(): Promise<void> {
+    if (!this.sessionSelect) return;
     const sel = this.sessionSelect;
     sel.empty();
     const newOpt = sel.createEl("option");
@@ -416,9 +385,10 @@ export class ChatView extends ItemView {
 
   private updateSessionBtnStates(): void {
     const hasSession = !!this.viewSession;
-    this.renameBtn.disabled = !hasSession;
-    this.deleteBtn.disabled = !hasSession;
-    this.pinBtn.disabled = !hasSession;
+    const supportsSessions = this.getRunner().descriptor.supportsSessions !== "none";
+    this.renameBtn.disabled = !hasSession || !supportsSessions;
+    this.deleteBtn.disabled = !hasSession || !supportsSessions;
+    this.pinBtn.disabled = !hasSession || !supportsSessions;
     const pinned = (this.plugin.settings.pinned ?? []).includes(this.viewSession);
     this.pinBtn.toggleClass("is-active", pinned);
   }
@@ -517,29 +487,46 @@ export class ChatView extends ItemView {
   private buildInputArea(container: HTMLElement): void {
     const inputArea = container.createDiv({ cls: "opencode-input-area" });
 
-    this.suggestEl = inputArea.createDiv({ cls: "opencode-suggest hidden" });
-
     this.inputEl = inputArea.createEl("textarea", {
       cls: "opencode-input",
       attr: {
-        placeholder:
-          this.plugin.t("Type a message for the agent... (Enter to send, Shift+Enter for a new line)"),
+        placeholder: this.plugin.t(
+          "Type a message for the agent... (Enter to send, Shift+Enter for a new line)"
+        ),
       },
     });
-    this.inputEl.addEventListener("keydown", (e) => this.onInputKeydown(e));
-    this.inputEl.addEventListener("input", () => this.onInputChange());
+
+    this.suggestPopup = new SuggestPopup(inputArea, this.inputEl, this.app, this.plugin, {
+      onOpenModelList: () => void this.openModelList(),
+      onStartNewSession: () => this.startNewSession(),
+      onAttachCurrentNote: () => void this.attachCurrentNote(),
+      onOpenFilePicker: () => this.attachmentManager.openFilePicker(),
+      onOpenStats: () => new StatsModal(this.app, this.plugin, this.sessionEngine()).open(),
+      onTogglePin: () => this.togglePin(),
+      onRenameSession: () => this.renameCurrentSession(),
+      onAddAttachment: (path) => this.attachmentManager.addAttachment(path),
+    });
+
+    this.inputEl.addEventListener("keydown", (e) => {
+      if (this.suggestPopup.handleKeydown(e)) return;
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        void this.send();
+      }
+    });
+    this.inputEl.addEventListener("input", () => this.suggestPopup.onInputChange());
 
     const buttons = inputArea.createDiv({ cls: "opencode-buttons" });
 
     this.modelBtn = buttons.createEl("button", { cls: "opencode-model-btn" });
     this.updateModelBtn();
-    this.modelBtn.addEventListener("click", () => this.openModelList());
+    this.modelBtn.addEventListener("click", () => void this.openModelList());
 
     buttons.createSpan({ cls: "opencode-buttons-spacer" });
 
     this.sendBtn = buttons.createEl("button", { cls: "opencode-send-btn" });
     this.sendBtn.setText(this.plugin.t("Send"));
-    this.sendBtn.addEventListener("click", () => this.send());
+    this.sendBtn.addEventListener("click", () => void this.send());
 
     this.stopBtn = buttons.createEl("button", { cls: "opencode-stop-btn" });
     this.stopBtn.setText(this.plugin.t("Stop"));
@@ -570,68 +557,40 @@ export class ChatView extends ItemView {
   }
 
   private async openModelList(): Promise<void> {
-    const engine = this.sessionEngine();
-    const isAgyActive = engine === "antigravity";
-    const cur = this.activeModelFor(engine);
+    const activeEngine = this.sessionEngine();
+    const cur = this.activeModelFor(activeEngine);
 
     try {
-      const agyProvider = this.plugin.registry.get("antigravity");
-      const ocProvider = this.plugin.registry.get("opencode");
+      const providers = this.plugin.registry.getAll();
+      // Place the currently active engine first
+      const orderedProviders = [
+        ...providers.filter((p) => p.id === activeEngine),
+        ...providers.filter((p) => p.id !== activeEngine),
+      ];
 
-      const [agyRes, ocRes] = await Promise.allSettled([
-        agyProvider ? agyProvider.listModels() : Promise.resolve([]),
-        ocProvider ? ocProvider.listModels() : Promise.resolve([]),
-      ]);
-
-      const agyModels = agyRes.status === "fulfilled" ? agyRes.value : [];
-      const ocModels = ocRes.status === "fulfilled" ? ocRes.value : [];
-
+      const results = await Promise.allSettled(orderedProviders.map((p) => p.listModels()));
       const items: ModelItem[] = [];
 
-      if (isAgyActive) {
-        for (const m of agyModels) {
+      orderedProviders.forEach((provider, idx) => {
+        const res = results[idx];
+        const models = res.status === "fulfilled" ? res.value : [];
+        const providerLabel = provider.costNote || provider.descriptor.shortName;
+        for (const m of models) {
           items.push({
             id: m,
-            engine: "antigravity",
-            provider: "Google AI Pro",
-            isActive: m === cur,
+            engine: provider.id,
+            provider: providerLabel,
+            isActive: provider.id === activeEngine && m === cur,
           });
         }
-        for (const m of ocModels) {
-          items.push({
-            id: m,
-            engine: "opencode",
-            provider: "OpenCode",
-            isActive: false,
-          });
-        }
-      } else {
-        for (const m of ocModels) {
-          items.push({
-            id: m,
-            engine: "opencode",
-            provider: "OpenCode",
-            isActive: m === cur,
-          });
-        }
-        for (const m of agyModels) {
-          items.push({
-            id: m,
-            engine: "antigravity",
-            provider: "Google AI Pro",
-            isActive: false,
-          });
-        }
-      }
+      });
 
       new ModelSuggestModal(this.app, this.plugin, items, (item) => {
-        const engineChanged = item.engine !== engine;
+        const engineChanged = item.engine !== activeEngine;
         this.plugin.settings.engine = item.engine;
-        if (item.engine === "antigravity") {
-          this.plugin.settings.antigravityModel = item.id;
-        } else {
-          this.plugin.settings.model = item.id;
-        }
+        const cfg = this.plugin.getEngineConfig(item.engine);
+        cfg.model = item.id;
+
         if (this.viewSession && engineChanged) {
           // The open session belongs to another engine: its id cannot be reused,
           // so start a fresh session for the newly selected engine.
@@ -658,15 +617,6 @@ export class ChatView extends ItemView {
     }
   }
 
-  private startNewSession(): void {
-    this.viewSession = "";
-    this.plugin.settings.sessionId = "";
-    void this.plugin.saveSettings();
-    void this.populateSessionSelect();
-    this.loadHistoryForSession("");
-    new Notice(this.plugin.t("New session: the next message will start from scratch."));
-  }
-
   continueInNewSession(): void {
     if (this.running) {
       new Notice(this.plugin.t("There is already a request in progress."));
@@ -691,55 +641,66 @@ export class ChatView extends ItemView {
     );
 
     const runner = this.getRunner();
-    const proc = runner.runStream(promptText, [], {
-      onSession: (id) => {
-        this.viewSession = id;
-        this.plugin.settings.sessionId = id;
-        if (!this.plugin.settings.sessionEngines) this.plugin.settings.sessionEngines = {};
-        this.plugin.settings.sessionEngines[id] = runner.id;
-        void this.plugin.saveSettings();
+    const proc = runner.runStream(
+      {
+        prompt: promptText,
+        fileAttachments: [],
+        sessionId: oldSession,
       },
-      onText: (text) => bubble.setText(text),
-      onReasoning: (text) => bubble.setReasoning(text),
-      onStep: (step) => bubble.addStep(step),
-      onFinish: (info) => bubble.setFinish(info),
-      onError: (err) => {
-        this.hadStreamError = true;
-        this.addErrorBubble(err);
-      },
-      onRaw: (line) => {
-        this.lastStderr = line;
-      },
-      onDone: (code) => {
-        const isCurrent = this.currentProc === proc;
-        if (isCurrent) this.currentProc = null;
-        bubble.finalize();
-        if (!isCurrent) return;
-        this.running = false;
-        this.setRunningUI(false);
-        const failed = code !== 0 || this.hadStreamError;
-        if (failed && !this.stoppedByUser) {
-          if (!this.hadStreamError) {
-            const detail = this.lastStderr.trim().replace(/\s+/g, " ").slice(0, 300);
-            const base = `${this.plugin.t("The session summary could not be generated.")} (${code}).`;
-            this.addErrorBubble(detail ? `${base} ${detail}` : base);
+      {
+        onSession: (id) => {
+          this.viewSession = id;
+          this.plugin.settings.sessionId = id;
+          if (!this.plugin.settings.sessionEngines) this.plugin.settings.sessionEngines = {};
+          this.plugin.settings.sessionEngines[id] = runner.id;
+          void this.plugin.saveSettings();
+        },
+        onText: (text) => bubble.setText(text),
+        onReasoning: (text) => bubble.setReasoning(text),
+        onStep: (step) => bubble.addStep(step),
+        onFinish: (info) => bubble.setFinish(info),
+        onError: (err) => {
+          this.hadStreamError = true;
+          this.addErrorBubble(err);
+        },
+        onRaw: (line) => {
+          this.lastStderr = line;
+        },
+        onDone: (code) => {
+          const isCurrent = this.currentProc === proc;
+          if (isCurrent) this.currentProc = null;
+          bubble.finalize();
+          if (!isCurrent) return;
+          this.running = false;
+          this.setRunningUI(false);
+          const failed = code !== 0 || this.hadStreamError;
+          if (failed && !this.stoppedByUser) {
+            if (!this.hadStreamError) {
+              const detail = this.lastStderr.trim().replace(/\s+/g, " ").slice(0, 300);
+              const base = `${this.plugin.t("The session summary could not be generated.")} (${code}).`;
+              this.addErrorBubble(detail ? `${base} ${detail}` : base);
+            }
+            this.finishContinuation(
+              this.buildLocalContinuation(oldSession),
+              this.plugin.t("Session at the limit: new session created with the recent history.")
+            );
+            return;
           }
+          const summary = bubble.getSnapshot().text.trim();
+          const prompt = summary
+            ? this.plugin.t("[SUMMARY OF THE PREVIOUS SESSION]") +
+              "\n" +
+              summary +
+              "\n\n---\n\n" +
+              this.plugin.t("Continue the work from here.")
+            : this.plugin.t("Continue the work from the previous session.");
           this.finishContinuation(
-            this.buildLocalContinuation(oldSession),
-            this.plugin.t("Session at the limit: new session created with the recent history.")
+            prompt,
+            this.plugin.t("New session created with the summary of the previous one.")
           );
-          return;
-        }
-        const summary = bubble.getSnapshot().text.trim();
-        const prompt = summary
-          ? this.plugin.t("[SUMMARY OF THE PREVIOUS SESSION]") + "\n" + summary + "\n\n---\n\n" + this.plugin.t("Continue the work from here.")
-          : this.plugin.t("Continue the work from the previous session.");
-        this.finishContinuation(
-          prompt,
-          this.plugin.t("New session created with the summary of the previous one.")
-        );
-      },
-    });
+        },
+      }
+    );
     this.currentProc = proc;
   }
 
@@ -758,362 +719,40 @@ export class ChatView extends ItemView {
     const history = this.plugin.getHistory(sessionId);
     const recent = history.slice(-24);
     if (recent.length === 0) {
-      return this.plugin.t("The previous session has no saved history. Continue the work from here.");
+      return this.plugin.t(
+        "The previous session has no saved history. Continue the work from here."
+      );
     }
+    const assistantWho = this.assistantLabel();
     const lines: string[] = [];
     for (const rec of recent) {
-      const who = rec.role === "user" ? this.plugin.t("User") : "Opencode";
+      const who = rec.role === "user" ? this.plugin.t("User") : assistantWho;
       const text = rec.text.length > 800 ? rec.text.slice(0, 800) + "⬦" : rec.text;
       lines.push(`${who}: ${text}`);
     }
     return (
-      this.plugin.t("[RECENT HISTORY OF THE PREVIOUS SESSION]") + "\n" + lines.join(
-        "\n\n"
-      ) + "\n\n---\n\n" + this.plugin.t("Continue the work from here, keeping the context above in mind.")
+      this.plugin.t("[RECENT HISTORY OF THE PREVIOUS SESSION]") +
+      "\n" +
+      lines.join("\n\n") +
+      "\n\n---\n\n" +
+      this.plugin.t("Continue the work from here, keeping the context above in mind.")
     );
-  }
-
-  private onInputKeydown(e: KeyboardEvent): void {
-    if (this.suggestOpen) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        this.suggestIndex = Math.min(this.suggestIndex + 1, this.suggestItems.length - 1);
-        this.highlightSuggest();
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        this.suggestIndex = Math.max(this.suggestIndex - 1, 0);
-        this.highlightSuggest();
-        return;
-      }
-      if (e.key === "Enter" || e.key === "Tab") {
-        e.preventDefault();
-        this.chooseSuggest(this.suggestIndex);
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        this.closeSuggest();
-        return;
-      }
-    }
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      void this.send();
-    }
-  }
-
-  private onInputChange(): void {
-    if (this.suggestOpen && !this.suggestTrigger) {
-      this.closeSuggest();
-    }
-    const tr = this.detectTrigger();
-    if (!tr) {
-      this.closeSuggest();
-      return;
-    }
-    const items = this.buildSuggestItems(tr.char, tr.query);
-    if (items.length === 0) {
-      this.closeSuggest();
-      return;
-    }
-    this.suggestTrigger = { char: tr.char, start: tr.start };
-    this.suggestItems = items;
-    this.suggestIndex = 0;
-    this.suggestOpen = true;
-    this.renderSuggest();
-  }
-
-  private detectTrigger(): { char: string; start: number; query: string } | null {
-    const v = this.inputEl.value;
-    const pos = this.inputEl.selectionStart ?? v.length;
-    let i = pos - 1;
-    while (i >= 0 && !/\s/.test(v[i])) i--;
-    const start = i + 1;
-    const token = v.slice(start, pos);
-    if (!token) return null;
-    const ch = token[0];
-    if (ch !== "/" && ch !== "@" && ch !== "!") return null;
-    return { char: ch, start, query: token.slice(1).toLowerCase() };
-  }
-
-  private buildSuggestItems(char: string, query: string): SuggestItem[] {
-    const q = query.toLowerCase();
-    if (char === "/") {
-      if (q.startsWith("prompt")) return this.promptItems(query.slice(6));
-      return this.filterItems(this.commandItems(), q);
-    }
-    if (char === "@") {
-      return this.fileItems(query);
-    }
-    return this.filterItems(this.actionItems(), q);
-  }
-
-  private filterItems(items: SuggestItem[], q: string): SuggestItem[] {
-    if (!q) return items;
-    return items.filter(
-      (x) => x.label.toLowerCase().includes(q) || (x.desc ?? "").toLowerCase().includes(q)
-    );
-  }
-
-  private promptItems(sub: string): SuggestItem[] {
-    const prompts = this.plugin.settings.prompts ?? [];
-    if (prompts.length === 0) {
-      return [
-        {
-          label: "/prompt",
-          desc: this.plugin.t("No saved prompts — add them in Settings"),
-          action: () => this.removeTrigger(),
-        },
-      ];
-    }
-    const q = sub.trim().toLowerCase();
-    const list = q ? prompts.filter((p) => p.name.toLowerCase().includes(q)) : prompts;
-    return list.map((p) => ({
-      label: p.name,
-      desc: p.text.length > 80 ? p.text.slice(0, 77) + "…" : p.text,
-      action: () => this.insertPromptText(p.text),
-    }));
-  }
-
-  private insertPromptText(text: string): void {
-    const tr = this.suggestTrigger;
-    if (tr) {
-      const v = this.inputEl.value;
-      const end = this.inputEl.selectionStart ?? v.length;
-      this.inputEl.value = v.slice(0, tr.start) + text + v.slice(end);
-      const pos = tr.start + text.length;
-      this.inputEl.setSelectionRange(pos, pos);
-    }
-    this.closeSuggest();
-    this.inputEl.focus();
-  }
-
-  private startPromptSelection(): void {
-    this.closeSuggest();
-    this.inputEl.value = "/prompt";
-    this.inputEl.setSelectionRange(this.inputEl.value.length, this.inputEl.value.length);
-    this.inputEl.focus();
-    this.onInputChange();
-  }
-
-  private commandItems(): SuggestItem[] {
-    return [
-      {
-        label: this.plugin.t("/model"),
-        desc: this.plugin.t("Change the model"),
-        action: () => {
-          this.removeTrigger();
-          void this.openModelList();
-        },
-      },
-      {
-        label: this.plugin.t("/new"),
-        desc: this.plugin.t("New session"),
-        action: () => {
-          this.removeTrigger();
-          this.startNewSession();
-        },
-      },
-      {
-        label: this.plugin.t("/note"),
-        desc: this.plugin.t("Attach the current note"),
-        action: () => {
-          this.removeTrigger();
-          void this.attachCurrentNote();
-        },
-      },
-      {
-        label: this.plugin.t("/attach"),
-        desc: this.plugin.t("Attach a file"),
-        action: () => {
-          this.removeTrigger();
-          this.openFilePicker();
-        },
-      },
-      {
-        label: this.plugin.t("/stats"),
-        desc: this.plugin.t("Token and cost statistics"),
-        action: () => {
-          this.removeTrigger();
-          new StatsModal(this.app, this.plugin, this.sessionEngine()).open();
-        },
-      },
-      {
-        label: "/pin",
-        desc: this.plugin.t("Pin/Unpin session"),
-        action: () => {
-          this.removeTrigger();
-          this.togglePin();
-        },
-      },
-      {
-        label: this.plugin.t("/rename"),
-        desc: this.plugin.t("Rename session"),
-        action: () => {
-          this.removeTrigger();
-          this.renameCurrentSession();
-        },
-      },
-      {
-        label: this.plugin.t("/prompt"),
-        desc: this.plugin.t("Insert a saved prompt"),
-        action: () => {
-          this.removeTrigger();
-          this.startPromptSelection();
-        },
-      },
-    ];
-  }
-
-  private fileItems(query: string): SuggestItem[] {
-    if (!this.vaultPaths) {
-      this.vaultPaths = this.app.vault
-        .getFiles()
-        .map((f) => f.path)
-        .sort((a, b) => a.localeCompare(b));
-      this.vaultPathsLower = this.vaultPaths.map((p) => p.toLowerCase());
-    }
-    const paths = this.vaultPaths;
-    const lower = this.vaultPathsLower ?? [];
-    const q = query.toLowerCase();
-    const desc = this.plugin.t("Attached");
-    const items: SuggestItem[] = [];
-    for (let i = 0; i < paths.length && items.length < MAX_SUGGEST; i++) {
-      if (q && !lower[i].includes(q)) continue;
-      const p = paths[i];
-      items.push({
-        label: p,
-        desc,
-        action: () => {
-          this.removeTrigger();
-          this.addAttachment(p);
-        },
-      });
-    }
-    return items;
-  }
-
-  private actionItems(): SuggestItem[] {
-    return [
-      {
-        label: this.plugin.t("current note"),
-        desc: this.plugin.t("Attach the open note as context"),
-        action: () => {
-          this.removeTrigger();
-          void this.attachCurrentNote();
-        },
-      },
-      {
-        label: this.plugin.t("attach file"),
-        desc: this.plugin.t("Pick a file to attach"),
-        action: () => {
-          this.removeTrigger();
-          this.openFilePicker();
-        },
-      },
-      {
-        label: this.plugin.t("new session"),
-        desc: this.plugin.t("Start from an empty session"),
-        action: () => {
-          this.removeTrigger();
-          this.startNewSession();
-        },
-      },
-      {
-        label: this.plugin.t("statistics"),
-        desc: this.plugin.t("Tokens and costs (5h, week, month)"),
-        action: () => {
-          this.removeTrigger();
-          new StatsModal(this.app, this.plugin, this.sessionEngine()).open();
-        },
-      },
-      {
-        label: this.plugin.t("pin/unpin session"),
-        desc: this.plugin.t("Pin the session in the list"),
-        action: () => {
-          this.removeTrigger();
-          this.togglePin();
-        },
-      },
-      {
-        label: this.plugin.t("active model"),
-        desc: this.plugin.t("Change the model"),
-        action: () => {
-          this.removeTrigger();
-          void this.openModelList();
-        },
-      },
-    ];
-  }
-
-  private renderSuggest(): void {
-    this.suggestEl.empty();
-    this.suggestRows = [];
-    if (this.suggestItems.length === 0) {
-      this.closeSuggest();
-      return;
-    }
-    this.suggestEl.removeClass("hidden");
-    for (let i = 0; i < this.suggestItems.length; i++) {
-      const it = this.suggestItems[i];
-      const row = this.suggestEl.createDiv({ cls: "opencode-suggest-item" });
-      row.createDiv({ text: it.label, cls: "opencode-suggest-label" });
-      if (it.desc) {
-        row.createDiv({ text: it.desc, cls: "opencode-suggest-desc" });
-      }
-      row.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        this.chooseSuggest(i);
-      });
-      this.suggestRows.push(row);
-    }
-    this.highlightSuggest();
-  }
-
-  private highlightSuggest(): void {
-    for (let i = 0; i < this.suggestRows.length; i++) {
-      this.suggestRows[i].toggleClass("is-selected", i === this.suggestIndex);
-    }
-    const current = this.suggestRows[this.suggestIndex];
-    if (current) current.scrollIntoView({ block: "nearest" });
-  }
-
-  private closeSuggest(): void {
-    this.suggestOpen = false;
-    this.suggestTrigger = null;
-    this.suggestItems = [];
-    this.suggestRows = [];
-    this.suggestIndex = 0;
-    this.suggestEl?.addClass("hidden");
-    this.suggestEl?.empty();
-  }
-
-  private chooseSuggest(index: number): void {
-    const item = this.suggestItems[index];
-    if (item) item.action();
-  }
-
-  private removeTrigger(): void {
-    const tr = this.suggestTrigger;
-    if (!tr) return;
-    const v = this.inputEl.value;
-    const end = this.inputEl.selectionStart ?? v.length;
-    this.inputEl.value = v.slice(0, tr.start) + v.slice(end);
-    const pos = Math.min(tr.start, this.inputEl.value.length);
-    this.inputEl.setSelectionRange(pos, pos);
-    this.closeSuggest();
-    this.inputEl.focus();
   }
 
   private addWelcome(): void {
     const row = this.messagesEl.createDiv({
       cls: "opencode-message opencode-message--assistant",
     });
-    const text =
-      this.plugin.t("Hi! I am Vault Agents, connecting AI agents directly to your notes. Write a message below. Try the commands: / for commands, @ to attach a file, ! for quick actions.");
-    metaWithCopy(row, this.assistantLabel(), () => text, (t) => this.copyText(t), this.plugin.t("Copy text"));
+    const text = this.plugin.t(
+      "Hi! I am Vault Agents, connecting AI agents directly to your notes. Write a message below. Try the commands: / for commands, @ to attach a file, ! for quick actions."
+    );
+    metaWithCopy(
+      row,
+      this.assistantLabel(),
+      () => text,
+      (t) => this.copyText(t),
+      this.plugin.t("Copy text")
+    );
     row.createDiv({ text, cls: "opencode-bubble" });
   }
 
@@ -1146,65 +785,13 @@ export class ChatView extends ItemView {
 
     this.dispatching = true;
     try {
-      const filePaths = await this.prepareAttachments();
+      const filePaths = await this.attachmentManager.prepareAttachments(this.getRunner());
       this.dispatching = false;
       this.doRun(prompt, filePaths);
     } catch (e) {
       this.dispatching = false;
       new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`);
     }
-  }
-
-  private async prepareAttachments(): Promise<string[]> {
-    const useAnydoc = this.plugin.settings.anydocEnabled;
-    const tasks = this.attachments.map(async (a) => {
-      if (a.image) return a.path;
-      if (!useAnydoc) return a.path;
-      const isDoc = /\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|epub|html?)$/i.test(a.path);
-      if (!isDoc) return a.path;
-      try {
-        const abs = this.resolveVaultFile(a.path);
-        if (!abs) return a.path;
-        return await this.getRunner().convertDocument(abs);
-      } catch (e) {
-        new Notice(
-          `${this.plugin.t("anydoc conversion failed")}: ${a.label} (${(e as Error).message})`
-        );
-        const maxMB = this.plugin.settings.maxAttachMB || 20;
-        try {
-          const abs = this.resolveVaultFile(a.path);
-          if (abs) {
-            const fs = await import("fs/promises");
-            const st = await fs.stat(abs);
-            if (st.size > maxMB * 1024 * 1024) {
-              new Notice(
-                substitute(
-                  this.plugin.t(
-                    "Attachment skipped: the file is larger than $1 MB and could not be converted, so it was not attached."
-                  ),
-                  maxMB
-                )
-              );
-              return null;
-            }
-          }
-        } catch {
-          // ignore
-        }
-        return a.path;
-      }
-    });
-
-    const results = await Promise.all(tasks);
-    return results.filter((p): p is string => typeof p === "string");
-  }
-
-  private resolveVaultFile(relPath: string): string | null {
-    const adapter = this.app.vault.adapter;
-    if (adapter instanceof FileSystemAdapter) {
-      return adapter.getFullPath(relPath);
-    }
-    return null;
   }
 
   private doRun(prompt: string, fileAttachments: string[]): void {
@@ -1239,100 +826,113 @@ export class ChatView extends ItemView {
     }, 2000);
 
     const runner = this.getRunner();
-    const proc = runner.runStream(prompt, fileAttachments, {
-      onSession: (id) => {
-        lastEventTime = Date.now();
-        const prev = this.viewSession;
-        if (prev !== id) {
-          this.viewSession = id;
-          this.plugin.settings.sessionId = id;
-          if (!this.plugin.settings.sessionEngines) this.plugin.settings.sessionEngines = {};
-          this.plugin.settings.sessionEngines[id] = runner.id;
-          void this.plugin.saveSettings();
-          void this.populateSessionSelect();
-        }
-        if (this.pendingUser) {
-          void this.plugin.appendHistory(id, {
-            role: "user",
-            text: this.pendingUser.text,
-            contextLabel: this.pendingUser.contextLabel,
-          });
+    const proc = runner.runStream(
+      {
+        prompt,
+        fileAttachments,
+        sessionId: this.viewSession,
+      },
+      {
+        onSession: (id) => {
+          lastEventTime = Date.now();
+          const prev = this.viewSession;
+          if (prev !== id) {
+            this.viewSession = id;
+            this.plugin.settings.sessionId = id;
+            if (!this.plugin.settings.sessionEngines) this.plugin.settings.sessionEngines = {};
+            this.plugin.settings.sessionEngines[id] = runner.id;
+            void this.plugin.saveSettings();
+            void this.populateSessionSelect();
+          }
+          if (this.pendingUser) {
+            void this.plugin.appendHistory(id, {
+              role: "user",
+              text: this.pendingUser.text,
+              contextLabel: this.pendingUser.contextLabel,
+            });
+            this.pendingUser = null;
+          }
+        },
+        onText: (text) => {
+          lastEventTime = Date.now();
+          bubble.status.setText("");
+          bubble.setText(text);
+        },
+        onReasoning: (text) => {
+          lastEventTime = Date.now();
+          bubble.status.setText(this.plugin.t("Reasoning") + "...");
+          bubble.setReasoning(text);
+        },
+        onStep: (step) => {
+          lastEventTime = Date.now();
+          bubble.status.setText("");
+          bubble.addStep(step);
+        },
+        onFinish: (info) => {
+          lastEventTime = Date.now();
+          bubble.setFinish(info);
+          this.addStats(info);
+          if (info.tokens?.input) {
+            this.contextRunInput = info.tokens.input;
+            this.contextUsed = Math.max(this.contextBaseInput, this.contextRunInput);
+            this.updateContextUsage();
+          }
+        },
+        onError: (err) => {
+          lastEventTime = Date.now();
+          this.hadStreamError = true;
+          this.handleStreamError(err);
+        },
+        onRaw: (line) => {
+          this.lastStderr = line;
+        },
+        onDone: (code) => {
+          if (this.activityTimer !== null) {
+            clearInterval(this.activityTimer);
+            this.activityTimer = null;
+          }
+          const isCurrent = this.currentProc === proc;
+          if (isCurrent) this.currentProc = null;
+          bubble.finalize();
+          if (!isCurrent) return;
+
+          this.running = false;
+          this.setRunningUI(false);
+
+          const snap = bubble.getSnapshot();
+          const currentSession = this.viewSession;
+          if (currentSession && snap.text.trim()) {
+            void this.plugin.appendHistory(currentSession, {
+              role: "assistant",
+              text: snap.text,
+              reasoning: snap.reasoning || undefined,
+              tokens: snap.tokens,
+              cost: snap.cost,
+            });
+          }
+
+          const failed = code !== 0 || this.hadStreamError;
+          if (failed && !this.stoppedByUser) {
+            this.handleProcessFailure(code);
+          }
+          this.stoppedByUser = false;
           this.pendingUser = null;
-        }
-      },
-      onText: (text) => {
-        lastEventTime = Date.now();
-        bubble.status.setText("");
-        bubble.setText(text);
-      },
-      onReasoning: (text) => {
-        lastEventTime = Date.now();
-        bubble.status.setText(this.plugin.t("Reasoning") + "...");
-        bubble.setReasoning(text);
-      },
-      onStep: (step) => {
-        lastEventTime = Date.now();
-        bubble.status.setText("");
-        bubble.addStep(step);
-      },
-      onFinish: (info) => {
-        lastEventTime = Date.now();
-        bubble.setFinish(info);
-        this.addStats(info);
-        if (info.tokens?.input) {
-          this.contextRunInput = info.tokens.input;
-          this.contextUsed = Math.max(this.contextBaseInput, this.contextRunInput);
-          this.updateContextUsage();
-        }
-      },
-      onError: (err) => {
-        lastEventTime = Date.now();
-        this.hadStreamError = true;
-        this.handleStreamError(err);
-      },
-      onRaw: (line) => {
-        this.lastStderr = line;
-      },
-      onDone: (code) => {
-        if (this.activityTimer !== null) {
-          clearInterval(this.activityTimer);
-          this.activityTimer = null;
-        }
-        const isCurrent = this.currentProc === proc;
-        if (isCurrent) this.currentProc = null;
-        bubble.finalize();
-        if (!isCurrent) return;
-
-        this.running = false;
-        this.setRunningUI(false);
-
-        const snap = bubble.getSnapshot();
-        const currentSession = this.viewSession;
-        if (currentSession && snap.text.trim()) {
-          void this.plugin.appendHistory(currentSession, {
-            role: "assistant",
-            text: snap.text,
-            reasoning: snap.reasoning || undefined,
-            tokens: snap.tokens,
-            cost: snap.cost,
-          });
-        }
-
-        const failed = code !== 0 || this.hadStreamError;
-        if (failed && !this.stoppedByUser) {
-          this.handleProcessFailure(code);
-        }
-        this.stoppedByUser = false;
-        this.pendingUser = null;
-        void this.refreshContext();
-      },
-    });
+          void this.refreshContext();
+        },
+      }
+    );
 
     this.currentProc = proc;
   }
 
   private addUserMessage(text: string, ctxLabel?: string): void {
-    renderUserBubble(this.messagesEl, text, ctxLabel, (s) => this.plugin.t(s), (t) => this.copyText(t));
+    renderUserBubble(
+      this.messagesEl,
+      text,
+      ctxLabel,
+      (s) => this.plugin.t(s),
+      (t) => this.copyText(t)
+    );
     this.scrollToBottom();
   }
 
@@ -1358,7 +958,12 @@ export class ChatView extends ItemView {
   }
 
   private addErrorBubble(msg: string): void {
-    renderErrorBubble(this.messagesEl, msg, (s) => this.plugin.t(s), (t) => this.copyText(t));
+    renderErrorBubble(
+      this.messagesEl,
+      msg,
+      (s) => this.plugin.t(s),
+      (t) => this.copyText(t)
+    );
     this.scrollToBottom();
   }
 
@@ -1443,7 +1048,13 @@ export class ChatView extends ItemView {
         const row = this.messagesEl.createDiv({
           cls: "opencode-message opencode-message--assistant",
         });
-        metaWithCopy(row, this.assistantLabel(), () => rec.text, (t) => this.copyText(t), this.plugin.t("Copy text"));
+        metaWithCopy(
+          row,
+          this.assistantLabel(),
+          () => rec.text,
+          (t) => this.copyText(t),
+          this.plugin.t("Copy text")
+        );
         if (rec.reasoning) {
           const det = row.createEl("details", { cls: "opencode-reasoning" });
           det.createEl("summary", { text: this.plugin.t("Reasoning") });
@@ -1474,14 +1085,22 @@ export class ChatView extends ItemView {
     void this.refreshContext();
   }
 
-  fmtTokens(total: number, input: number, output: number, cost?: number, engine?: EngineType): string {
+  fmtTokens(
+    total: number,
+    input: number,
+    output: number,
+    cost?: number,
+    engine?: EngineType
+  ): string {
     const locale = this.plugin.settings.language === "it" ? "it-IT" : "en-US";
     const parts = [
       `${this.plugin.t("Token:")} ${total.toLocaleString(locale)} (${input.toLocaleString(locale)} ${this.plugin.t("in")} / ${output.toLocaleString(locale)} ${this.plugin.t("out")})`,
     ];
     const provider = this.plugin.registry.get(engine ?? this.sessionEngine());
     if (provider?.included) {
-      parts.push(provider.costNote ? `(${provider.costNote})` : `(${this.plugin.t("included")})`);
+      parts.push(
+        provider.costNote ? `(${provider.costNote})` : `(${this.plugin.t("included")})`
+      );
     } else if (typeof cost === "number" && cost > 0) {
       parts.push(`${this.plugin.t("Cost:")} ${cost.toFixed(4)} $`);
     }

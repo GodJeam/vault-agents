@@ -1,3 +1,3 @@
-export { BaseCliRunner } from "./base";
-export { AntigravityRunner } from "./antigravity/runner";
-export { OpencodeRunner } from "./opencode/runner";
+export { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "./base";
+export { AntigravityRunner, ANTIGRAVITY_DESCRIPTOR } from "./antigravity/runner";
+export { OpencodeRunner, OPENCODE_DESCRIPTOR } from "./opencode/runner";

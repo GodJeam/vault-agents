@@ -1,4 +1,4 @@
-import type { AgentProvider } from "./provider";
+import type { AgentProvider, ProviderDescriptor } from "./provider";
 import type { EngineType } from "./types";
 
 export class ProviderRegistry {
@@ -22,6 +22,10 @@ export class ProviderRegistry {
 
   getAll(): AgentProvider[] {
     return Array.from(this.providers.values());
+  }
+
+  getDescriptors(): ProviderDescriptor[] {
+    return Array.from(this.providers.values()).map((p) => p.descriptor);
   }
 
   getAvailableIds(): EngineType[] {

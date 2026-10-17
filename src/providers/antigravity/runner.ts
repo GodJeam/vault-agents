@@ -1,17 +1,17 @@
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, statSync } from "fs";
 import { basename, isAbsolute, join } from "path";
 import { homedir } from "os";
-import { FileSystemAdapter } from "obsidian";
-import type OpencodePlugin from "../../main";
-import type { AgentProvider } from "../../core/provider";
+import type { AgentProvider, ProviderDescriptor, RunnerHost } from "../../core/provider";
 import type {
   EngineType,
   RunHandle,
+  RunRequest,
   SessionInfo,
   StreamCallbacks,
   UsageStats,
+  UsageWindow,
 } from "../../core/types";
-import { BaseCliRunner } from "../base";
+import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
 import type { AntigravityEvent } from "./types";
 
 // Legacy Antigravity conversation ids are UUID-style (they contain "-"), while
@@ -19,7 +19,44 @@ import type { AntigravityEvent } from "./types";
 // history entries that pre-date `sessionEngines`.
 const ANTIGRAVITY_ID_HINT = /-/;
 
+// Maximum size (in bytes) of a text attachment to inline directly into CLI args
+// so we never hit OS ARG_MAX / E2BIG limits. Larger files are passed by path.
+const MAX_INLINE_ATTACHMENT_BYTES = 256 * 1024;
+
+export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
+  id: "antigravity",
+  displayName: "Antigravity CLI (Google AI Pro)",
+  shortName: "Antigravity",
+  defaultBinary: "agy",
+  defaultModel: "gemini-3.8-flash-high",
+  binaryDesc: "Command or full path to the agy executable. Default is 'agy' or '~/.local/bin/agy'.",
+  modelDesc:
+    "Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet 5.5). The effort is part of the model name. Included with Google AI Pro.",
+  included: true,
+  costNote: "Google AI Pro",
+  supportsSessions: "local-db",
+  supportsUsageStats: true,
+  supportsDbCleanup: false,
+  options: [
+    {
+      key: "effort",
+      label: "Reasoning effort",
+      desc: "Effort sent only for models whose name does not already include it. Antigravity model names usually end with -low/-medium/-high.",
+      type: "select",
+      default: "high",
+      choices: [
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium" },
+        { value: "high", label: "High" },
+        { value: "xhigh", label: "Extra high" },
+        { value: "max", label: "Max" },
+      ],
+    },
+  ],
+};
+
 export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
+  readonly descriptor = ANTIGRAVITY_DESCRIPTOR;
   readonly id: EngineType = "antigravity";
   readonly displayName = "Antigravity CLI";
   readonly engine: EngineType = "antigravity";
@@ -28,12 +65,16 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
 
   private cachedModels: string[] | null = null;
 
-  constructor(plugin: OpencodePlugin) {
+  constructor(plugin: RunnerHost) {
     super(plugin);
   }
 
+  private getConfig() {
+    return this.plugin.getEngineConfig("antigravity");
+  }
+
   async getVersion(): Promise<string> {
-    const bin = this.resolveBinaryPath(this.plugin.settings.antigravityBinary || "agy");
+    const bin = this.resolveBinaryPath(this.getConfig().binary || "agy");
     const out = await this.execCli(bin, ["--version"]);
     const first = out.trim().split("\n")[0];
     if (!first) throw new Error("Empty output from agy --version");
@@ -44,7 +85,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
       return this.cachedModels;
     }
-    const bin = this.resolveBinaryPath(this.plugin.settings.antigravityBinary || "agy");
+    const bin = this.resolveBinaryPath(this.getConfig().binary || "agy");
     try {
       const out = await this.execCli(bin, ["models"]);
       const models: string[] = [];
@@ -92,20 +133,24 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     const sessions: SessionInfo[] = [];
     const seenIds = new Set<string>();
 
-    // 1. Try querying conversation_summaries.db via sqlite3
+    // 1. Try querying conversation_summaries.db via sqlite3 -json
     const dbPath = this.getDbPath();
     if (existsSync(dbPath)) {
       try {
         const query =
-          "SELECT conversation_id, title, strftime('%s', last_modified_time) FROM conversation_summaries ORDER BY last_modified_time DESC LIMIT 50";
-        const out = await this.execSqlite(dbPath, query);
-        for (const line of out.trim().split("\n")) {
-          const parts = line.split("|");
-          const id = parts[0]?.trim();
+          "SELECT conversation_id AS id, title, CAST(strftime('%s', last_modified_time) AS INTEGER) AS sec FROM conversation_summaries ORDER BY last_modified_time DESC LIMIT 50";
+        const out = await this.execCli("sqlite3", ["-json", dbPath, query]);
+        const rows = JSON.parse(out.trim() || "[]") as Array<{
+          id?: string;
+          title?: string;
+          sec?: number;
+        }>;
+        for (const row of rows) {
+          const id = row.id?.trim();
           if (!id) continue;
-          const title = parts[1]?.trim() || id;
-          const sec = parseInt(parts[2]?.trim() || "", 10);
-          const updated = !isNaN(sec) && sec > 0 ? sec * 1000 : Date.now();
+          const title = row.title?.trim() || id;
+          const sec = Number(row.sec);
+          const updated = Number.isFinite(sec) && sec > 0 ? sec * 1000 : Date.now();
           sessions.push({
             id,
             title,
@@ -115,7 +160,29 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
           seenIds.add(id);
         }
       } catch {
-        // Sqlite query not available or error, fall through to history
+        // Fallback if sqlite3 is missing or older than 3.33 (no -json flag)
+        try {
+          const query =
+            "SELECT conversation_id, replace(replace(title, char(10), ' '), '|', ' '), strftime('%s', last_modified_time) FROM conversation_summaries ORDER BY last_modified_time DESC LIMIT 50";
+          const out = await this.execSqlite(dbPath, query);
+          for (const line of out.trim().split("\n")) {
+            const parts = line.split("|");
+            const id = parts[0]?.trim();
+            if (!id) continue;
+            const title = parts[1]?.trim() || id;
+            const sec = parseInt(parts[2]?.trim() || "", 10);
+            const updated = !isNaN(sec) && sec > 0 ? sec * 1000 : Date.now();
+            sessions.push({
+              id,
+              title,
+              updated,
+              engine: "antigravity",
+            });
+            seenIds.add(id);
+          }
+        } catch {
+          // Fall through to history
+        }
       }
     }
 
@@ -179,8 +246,6 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async getSessionTokens(sessionId: string): Promise<{ input: number; output: number }> {
-    // The context bar needs the *current* context size, which is the prompt size
-    // of the last turn, not the sum over the whole conversation.
     const history = this.plugin.getHistory(sessionId);
     for (let i = history.length - 1; i >= 0; i--) {
       const msg = history[i];
@@ -192,49 +257,77 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async getUsageStats(): Promise<UsageStats> {
-    let totalIn = 0;
-    let totalOut = 0;
+    const now = Date.now();
+    const h5Cutoff = now - 5 * 3600 * 1000;
+    const weekCutoff = now - 7 * 24 * 3600 * 1000;
+    const monthCutoff = now - 30 * 24 * 3600 * 1000;
+
+    const h5: UsageWindow = { input: 0, output: 0, cost: 0 };
+    const week: UsageWindow = { input: 0, output: 0, cost: 0 };
+    const month: UsageWindow = { input: 0, output: 0, cost: 0 };
+
     const histories = this.plugin.histories ?? {};
     const sessionEngines = this.plugin.settings.sessionEngines ?? {};
     for (const [id, msgs] of Object.entries(histories)) {
-      if (sessionEngines[id] === "antigravity" || !sessionEngines[id]) {
-        for (const msg of msgs) {
-          if (msg.role === "assistant" && msg.tokens) {
-            totalIn += msg.tokens.input ?? 0;
-            totalOut += msg.tokens.output ?? 0;
+      const isAgy =
+        sessionEngines[id] === "antigravity" ||
+        (!sessionEngines[id] && ANTIGRAVITY_ID_HINT.test(id));
+      if (!isAgy) continue;
+
+      for (const msg of msgs) {
+        if (msg.role === "assistant" && msg.tokens) {
+          const inp = msg.tokens.input ?? 0;
+          const out = msg.tokens.output ?? 0;
+          const ts = msg.timestamp;
+          if (!ts || ts >= monthCutoff) {
+            month.input += inp;
+            month.output += out;
+          }
+          if (!ts || ts >= weekCutoff) {
+            week.input += inp;
+            week.output += out;
+          }
+          if (!ts || ts >= h5Cutoff) {
+            h5.input += inp;
+            h5.output += out;
           }
         }
       }
     }
-    const win = { input: totalIn, output: totalOut, cost: 0 };
-    return {
-      h5: win,
-      week: win,
-      month: win,
-    };
+    return { h5, week, month };
   }
 
-  runStream(prompt: string, fileAttachments: string[], cb: StreamCallbacks): RunHandle {
+  /**
+   * Build CLI arguments for an Antigravity invocation (exposed for testing)
+   */
+  public buildArgs(req: RunRequest): string[] {
     const s = this.plugin.settings;
-    const adapter = this.plugin.app.vault.adapter;
-    const cwd = adapter instanceof FileSystemAdapter ? adapter.getBasePath() : undefined;
+    const cfg = this.getConfig();
+    const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
 
-    let finalPrompt = prompt;
+    let finalPrompt = req.prompt;
 
-    // Attach contents of text/markdown files directly so Antigravity can reason over them.
-    // Avoid reading binary files (images, PDFs, archives) as raw UTF-8 strings to prevent token explosion.
     const BINARY_EXT_REGEX =
       /\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|7z|rar|bin|exe|dmg|iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$/i;
+    const maxInlineBytes = Math.min(
+      MAX_INLINE_ATTACHMENT_BYTES,
+      Math.max(1, s.maxAttachMB || 20) * 1024 * 1024
+    );
 
-    for (const p of fileAttachments) {
+    for (const p of req.fileAttachments) {
       const fullPath = !isAbsolute(p) && cwd ? join(cwd, p) : p;
       if (BINARY_EXT_REGEX.test(fullPath)) {
         finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
       } else {
         try {
-          const content = readFileSync(fullPath, "utf-8");
-          const filename = basename(fullPath);
-          finalPrompt = `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
+          const st = statSync(fullPath);
+          if (st.size > maxInlineBytes) {
+            finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+          } else {
+            const content = readFileSync(fullPath, "utf-8");
+            const filename = basename(fullPath);
+            finalPrompt = `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
+          }
         } catch {
           finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
         }
@@ -243,15 +336,16 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
 
     const args = ["-p", finalPrompt, "--output-format", "stream-json"];
 
-    // Automatically approve tool execution and file modification permissions
-    args.push("--dangerously-skip-permissions");
+    if (s.autoApprove) {
+      args.push("--dangerously-skip-permissions");
+    }
 
-    const sid = s.sessionId;
+    const sid = req.sessionId !== undefined ? req.sessionId : s.sessionId;
     if (sid && !sid.startsWith("ses_")) {
       args.push("--conversation", sid);
     }
 
-    const model = s.antigravityModel || s.model;
+    const model = cfg.model || s.antigravityModel || ANTIGRAVITY_DESCRIPTOR.defaultModel;
     if (model) {
       args.push("--model", model);
     }
@@ -259,56 +353,41 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     // Antigravity model ids already encode the reasoning effort (e.g.
     // "gemini-3.8-flash-low"); passing --effort as well makes the CLI reject the
     // combination. Only send --effort for models without an effort suffix.
+    const effort = cfg.options.effort || s.antigravityEffort;
     const modelEncodesEffort = /-(low|medium|high|xhigh|max)$/i.test(model || "");
-    if (!modelEncodesEffort && s.antigravityEffort) {
-      args.push("--effort", s.antigravityEffort);
+    if (!modelEncodesEffort && effort) {
+      args.push("--effort", effort);
     }
 
-    const bin = this.resolveBinaryPath(s.antigravityBinary || "agy");
-    const child = this.spawnBinary(bin, args, cwd);
-
-    const streamState = { accumulatedText: "" };
-
-    let buffer = "";
-    child.stdout?.on("data", (d: Buffer) => {
-      buffer += d.toString();
-      let idx;
-      while ((idx = buffer.indexOf("\n")) >= 0) {
-        const line = buffer.slice(0, idx).trim();
-        buffer = buffer.slice(idx + 1);
-        if (!line) continue;
-        try {
-          this.handleLine(line, cb, streamState);
-        } catch (e) {
-          console.error("vault-agents: error handling antigravity event:", e);
-        }
-      }
-    });
-
-    child.stdout?.on("end", () => {
-      if (buffer.trim()) this.handleLine(buffer.trim(), cb, streamState);
-    });
-
-    child.stderr?.on("data", (d: Buffer) => {
-      if (cb.onRaw) cb.onRaw(d.toString());
-    });
-
-    child.on("error", (e) => cb.onError(e.message));
-    child.on("close", (code) => {
-      cb.onDone(code ?? -1);
-    });
-
-    return {
-      abort: () => this.killProc(child, true),
-    };
+    return args;
   }
 
-  private handleLine(
+  runStream(
+    reqOrPrompt: RunRequest | string,
+    fileAttachmentsOrCb?: string[] | StreamCallbacks,
+    maybeCb?: StreamCallbacks
+  ): RunHandle {
+    const { req, cb } = this.normalizeRunArgs(reqOrPrompt, fileAttachmentsOrCb, maybeCb);
+    const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
+    const args = this.buildArgs({ ...req, cwd });
+    const bin = this.resolveBinaryPath(this.getConfig().binary || "agy");
+    const streamState = { accumulatedText: "" };
+
+    return this.spawnJsonlStream(
+      bin,
+      args,
+      cwd,
+      (line) => this.handleLine(line, cb, streamState),
+      cb
+    );
+  }
+
+  public handleLine(
     line: string,
     cb: StreamCallbacks,
-    streamState: { accumulatedText: string }
+    streamState: { accumulatedText: string } = { accumulatedText: "" }
   ): void {
-    if (line.length > 20_000_000) {
+    if (line.length > MAX_STREAM_LINE_BYTES) {
       cb.onRaw?.(`[omitted event of ${line.length} bytes]\n`);
       return;
     }

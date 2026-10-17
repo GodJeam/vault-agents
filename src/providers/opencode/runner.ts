@@ -1,22 +1,47 @@
-import { FileSystemAdapter } from "obsidian";
-import type OpencodePlugin from "../../main";
-import type { AgentProvider } from "../../core/provider";
+import type { AgentProvider, ProviderDescriptor, RunnerHost } from "../../core/provider";
 import type {
   EngineType,
   RunHandle,
+  RunRequest,
   SessionInfo,
   StreamCallbacks,
   UsageStats,
   UsageWindow,
 } from "../../core/types";
 import { DEFAULT_SETTINGS } from "../../core/types";
-import { BaseCliRunner } from "../base";
+import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
 import type { OpencodeEvent, OpencodeModelInfo, OpencodeMessageInfo } from "./types";
 
 /** Used when the model catalogue cannot be queried. */
 const DEFAULT_CONTEXT_LIMIT = 128_000;
 
+export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
+  id: "opencode",
+  displayName: "OpenCode CLI",
+  shortName: "Opencode",
+  defaultBinary: "opencode",
+  defaultModel: "opencode-go/deepseek-v4.1-flash",
+  binaryDesc:
+    "Command or full path to the opencode executable. Usually 'opencode' is enough if it is on your PATH.",
+  modelDesc: "Pick a model from the opencode list. Default uses the OpenCode Go provider.",
+  included: false,
+  supportsSessions: "api",
+  supportsUsageStats: true,
+  supportsDbCleanup: true,
+  options: [
+    {
+      key: "agent",
+      label: "Agent",
+      desc: "The opencode agent to use (e.g. build, plan). Leave empty for the default.",
+      type: "text",
+      placeholder: "e.g. build",
+      default: "",
+    },
+  ],
+};
+
 export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
+  readonly descriptor = OPENCODE_DESCRIPTOR;
   readonly id: EngineType = "opencode";
   readonly displayName = "OpenCode CLI";
   readonly engine: EngineType = "opencode";
@@ -25,13 +50,20 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   private contextLimitCache = new Map<string, number>();
   private cachedModels: string[] | null = null;
 
-  constructor(plugin: OpencodePlugin) {
+  constructor(plugin: RunnerHost) {
     super(plugin);
   }
 
+  private getConfig() {
+    return this.plugin.getEngineConfig("opencode");
+  }
+
+  private getBin(): string {
+    return this.resolveBinaryPath(this.getConfig().binary || "opencode");
+  }
+
   async getVersion(): Promise<string> {
-    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
-    const out = await this.execCli(bin, ["--version"]);
+    const out = await this.execCli(this.getBin(), ["--version"]);
     const first = out.trim().split("\n")[0];
     if (!first) throw new Error("Empty output from opencode --version");
     return first;
@@ -41,8 +73,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
       return this.cachedModels;
     }
-    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
-    const out = await this.execCli(bin, ["models"]);
+    const out = await this.execCli(this.getBin(), ["models"]);
     this.cachedModels = out
       .split("\n")
       .map((l) => l.trim())
@@ -52,9 +83,8 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async listSessions(): Promise<SessionInfo[]> {
-    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
     try {
-      const out = await this.execCli(bin, ["session", "list", "--format", "json"]);
+      const out = await this.execCli(this.getBin(), ["session", "list", "--format", "json"]);
       const arr = JSON.parse(out);
       return Array.isArray(arr) ? (arr as SessionInfo[]) : [];
     } catch {
@@ -63,8 +93,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async renameSession(sessionId: string, title: string): Promise<void> {
-    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
-    await this.execCli(bin, [
+    await this.execCli(this.getBin(), [
       "api",
       "PATCH",
       `/api/session/${sessionId}`,
@@ -74,8 +103,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async deleteSession(sessionId: string): Promise<void> {
-    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
-    await this.execCli(bin, ["session", "delete", sessionId]);
+    await this.execCli(this.getBin(), ["session", "delete", sessionId]);
   }
 
   async getModelContextLimit(model: string): Promise<number> {
@@ -96,12 +124,9 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
 
   /**
    * Query the local OpenCode API for the model catalogue and read `limit.context`.
-   * The previous approach (`opencode models <provider> --verbose`) is not
-   * supported by the CLI (v2.x) and always failed.
    */
   private async fetchModelContextLimit(model: string): Promise<number> {
-    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
-    const out = await this.execCli(bin, ["api", "GET", "/api/model"]);
+    const out = await this.execCli(this.getBin(), ["api", "GET", "/api/model"]);
     const parsed = JSON.parse(out) as { data?: OpencodeModelInfo[] };
     const models = Array.isArray(parsed.data) ? parsed.data : [];
     const target = model.split("#")[0];
@@ -119,11 +144,12 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async getSessionTokens(sessionId: string): Promise<{ input: number; output: number }> {
-    // The context size is the prompt of the last turn: uncached input plus the
-    // prompt-cache reads/writes. Using the session totals would overstate it.
-    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
     try {
-      const out = await this.execCli(bin, ["api", "GET", `/api/session/${sessionId}/message`]);
+      const out = await this.execCli(this.getBin(), [
+        "api",
+        "GET",
+        `/api/session/${sessionId}/message`,
+      ]);
       const parsed = JSON.parse(out) as { data?: OpencodeMessageInfo[] };
       const messages = Array.isArray(parsed.data) ? parsed.data : [];
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -149,7 +175,6 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     if (!dbPath) return;
     const maxBytes = Math.max(1, s.dbCleanupMaxMB || 5) * 1024 * 1024;
     const ageDays = Math.max(0, s.dbCleanupAgeDays ?? 7);
-    // `part.time_created` is stored in milliseconds in the v2 schema.
     const cutoffMs = Date.now() - ageDays * 86400 * 1000;
     const q =
       `DELETE FROM part WHERE data LIKE '%"type":"file%' AND length(CAST(data AS BLOB)) > ${maxBytes}` +
@@ -162,9 +187,8 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   private async getDbPath(): Promise<string | null> {
-    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
     try {
-      const out = await this.execCli(bin, ["debug", "paths"]);
+      const out = await this.execCli(this.getBin(), ["debug", "paths"]);
       for (const line of out.split(/\r?\n/)) {
         const m = line.match(/^\s*db\s+(.+\.db)\s*$/);
         if (m) return m[1].trim();
@@ -195,9 +219,8 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   private async fetchUsageWindow(from: number, to: number): Promise<UsageWindow | null> {
-    const bin = this.resolveBinaryPath(this.plugin.settings.binaryPath || "opencode");
     try {
-      const out = await this.execCli(bin, [
+      const out = await this.execCli(this.getBin(), [
         "api",
         "GET",
         "/api/experimental/session/stats",
@@ -220,62 +243,50 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     }
   }
 
-  runStream(prompt: string, fileAttachments: string[], cb: StreamCallbacks): RunHandle {
+  /**
+   * Build CLI arguments for an OpenCode invocation (exposed for testing)
+   */
+  public buildArgs(req: RunRequest): string[] {
     const s = this.plugin.settings;
+    const cfg = this.getConfig();
     const args = ["run", "--format", "json"];
-    // Only reuse ids that belong to opencode ("ses..."); a session id inherited
-    // from another engine would make the CLI fail.
-    if (s.sessionId && /^ses/.test(s.sessionId)) args.push("--session", s.sessionId);
-    // Model must always be explicit: running without --model hangs opencode run
-    args.push("--model", s.model || DEFAULT_SETTINGS.model);
-    if (s.agent) args.push("--agent", s.agent);
+
+    const sid = req.sessionId !== undefined ? req.sessionId : s.sessionId;
+    if (sid && /^ses/.test(sid)) {
+      args.push("--session", sid);
+    }
+
+    const model = cfg.model || s.model || DEFAULT_SETTINGS.model;
+    args.push("--model", model);
+
+    const agent = cfg.options.agent ?? s.agent;
+    if (agent) args.push("--agent", agent);
     if (s.autoApprove) args.push("--auto");
     if (s.showThinking) args.push("--thinking");
+
     // IMPORTANT: prompt must precede --file flags
-    args.push(prompt);
-    for (const f of fileAttachments) args.push("--file", f);
-
-    const adapter = this.plugin.app.vault.adapter;
-    const cwd = adapter instanceof FileSystemAdapter ? adapter.getBasePath() : undefined;
-    const bin = this.resolveBinaryPath(s.binaryPath || "opencode");
-    const child = this.spawnBinary(bin, args, cwd);
-
-    let buffer = "";
-    child.stdout?.on("data", (d: Buffer) => {
-      buffer += d.toString();
-      let idx;
-      while ((idx = buffer.indexOf("\n")) >= 0) {
-        const line = buffer.slice(0, idx).trim();
-        buffer = buffer.slice(idx + 1);
-        if (!line) continue;
-        try {
-          this.handleLine(line, cb);
-        } catch (e) {
-          console.error("vault-agents: error handling an event:", e);
-        }
-      }
-    });
-
-    child.stdout?.on("end", () => {
-      if (buffer.trim()) this.handleLine(buffer.trim(), cb);
-    });
-
-    child.stderr?.on("data", (d: Buffer) => {
-      if (cb.onRaw) cb.onRaw(d.toString());
-    });
-
-    child.on("error", (e) => cb.onError(e.message));
-    child.on("close", (code) => {
-      cb.onDone(code ?? -1);
-    });
-
-    return {
-      abort: () => this.killProc(child, true),
-    };
+    args.push(req.prompt);
+    for (const f of req.fileAttachments) {
+      args.push("--file", f);
+    }
+    return args;
   }
 
-  private handleLine(line: string, cb: StreamCallbacks): void {
-    if (line.length > 20_000_000) {
+  runStream(
+    reqOrPrompt: RunRequest | string,
+    fileAttachmentsOrCb?: string[] | StreamCallbacks,
+    maybeCb?: StreamCallbacks
+  ): RunHandle {
+    const { req, cb } = this.normalizeRunArgs(reqOrPrompt, fileAttachmentsOrCb, maybeCb);
+    const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
+    const args = this.buildArgs(req);
+    const bin = this.getBin();
+
+    return this.spawnJsonlStream(bin, args, cwd, (line) => this.handleLine(line, cb), cb);
+  }
+
+  public handleLine(line: string, cb: StreamCallbacks): void {
+    if (line.length > MAX_STREAM_LINE_BYTES) {
       cb.onRaw?.(`[omitted event of ${line.length} bytes]\n`);
       return;
     }

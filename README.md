@@ -48,14 +48,15 @@ On **all** platforms:
 - **Node.js** (to build the plugin) and the agent CLIs on your `PATH`.
 - **sqlite3** available on your `PATH` (see the compatibility table above).
 
-### Build requirements
+### Build & test
 
 ```bash
 npm install
 npm run build
+npm test
 ```
 
-> Building only produces `main.js` in the repository. Copy `main.js`, `manifest.json` and `styles.css` into your vault's `.obsidian/plugins/vault-agents/` folder and reload the plugin in Obsidian to apply the changes.
+> Building produces `main.js` in the repository. `npm test` runs the offline fixture-based test suite (`node --test` + `esbuild`) without requiring authenticated CLIs. Copy `main.js`, `manifest.json` and `styles.css` into your vault's `.obsidian/plugins/vault-agents/` folder and reload the plugin in Obsidian to apply the changes.
 
 ## Installation
 
@@ -91,20 +92,23 @@ npm run build
 
 ```text
 src/
-├── core/                        # Provider contracts, registry, and execution types
+├── core/                        # Provider descriptors, registry, settings migration, and types
 ├── providers/
-│   ├── antigravity/             # Antigravity CLI runner & stream parser
-│   ├── opencode/                # OpenCode CLI runner & stream parser
-│   └── base.ts                  # Shared process execution and CLI utilities
+│   ├── antigravity/             # Antigravity CLI descriptor, runner & stream parser
+│   ├── opencode/                # OpenCode CLI descriptor, runner & stream parser
+│   └── base.ts                  # Shared process execution, JSONL stream loop & CLI utilities
 ├── features/
-│   ├── chat/                    # Chat view, streaming bubbles, step widgets
-│   └── settings/                # Settings tab and engine configuration
-├── shared/                      # Reusable UI modals (file suggest, stats)
+│   ├── chat/                    # Chat view, streaming bubbles, step widgets, suggest popup & attachments
+│   └── settings/                # Data-driven settings tab rendered from provider descriptors
+├── shared/                      # Reusable UI modals (file suggest, model switcher, stats)
 ├── i18n/                        # Internationalization (English, Italian)
 └── main.ts                      # Plugin lifecycle and command palette registration
+test/
+├── fixtures/                    # Recorded .ndjson stream fixtures for offline testing
+└── suite.test.ts                # Unit tests for stream parsers, settings migration, and CLI flags
 ```
 
-- `build/` — build tooling (esbuild config, tsconfig)
+- `build/` — build and test tooling (`esbuild.config.mjs`, `run-tests.mjs`, `tsconfig.json`)
 - `main.js` / `manifest.json` / `styles.css` — built plugin files (copy into the vault)
 
 ## License
