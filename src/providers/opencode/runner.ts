@@ -1,3 +1,4 @@
+import { isAbsolute, join } from "path";
 import type { AgentProvider, ProviderDescriptor, RunnerHost } from "../../core/provider";
 import type {
   EngineType,
@@ -249,6 +250,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   public buildArgs(req: RunRequest): string[] {
     const s = this.plugin.settings;
     const cfg = this.getConfig();
+    const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
     const args = ["run", "--format", "json"];
 
     const sid = req.sessionId !== undefined ? req.sessionId : s.sessionId;
@@ -267,7 +269,8 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     // IMPORTANT: prompt must precede --file flags
     args.push(req.prompt);
     for (const f of req.fileAttachments) {
-      args.push("--file", f);
+      const fullPath = !isAbsolute(f) && cwd ? join(cwd, f) : f;
+      args.push("--file", fullPath);
     }
     return args;
   }
@@ -279,7 +282,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   ): RunHandle {
     const { req, cb } = this.normalizeRunArgs(reqOrPrompt, fileAttachmentsOrCb, maybeCb);
     const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
-    const args = this.buildArgs(req);
+    const args = this.buildArgs({ ...req, cwd });
     const bin = this.getBin();
 
     return this.spawnJsonlStream(bin, args, cwd, (line) => this.handleLine(line, cb), cb);
