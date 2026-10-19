@@ -1,7 +1,7 @@
 {
   "id": "vault-agents",
   "name": "Vault Agents",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "minAppVersion": "1.5.0",
   "description": "Multi-agent AI orchestrator for Obsidian: connect local CLI agents (Antigravity, OpenCode, and future engines) directly to your vault.",
   "author": "GodJeam",

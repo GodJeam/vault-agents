@@ -251,3 +251,19 @@ test("AntigravityRunner.getUsageStats filters untagged sessions and time windows
   assert.equal(stats.week.input, 300);
   assert.equal(stats.month.input, 700);
 });
+
+test("OpencodeRunner.buildArgs resolves relative fileAttachments against vault path", () => {
+  const host = createMockHost();
+  const oc = new OpencodeRunner(host);
+  const args = oc.buildArgs({
+    prompt: "Riassumi",
+    fileAttachments: ["PDF APA/Lezione 1.pdf", "/tmp/already-abs.md"],
+  });
+  const firstFileIdx = args.indexOf("--file");
+  assert.ok(firstFileIdx >= 0);
+  assert.equal(args[firstFileIdx + 1], "/mock/vault/PDF APA/Lezione 1.pdf");
+  const secondFileIdx = args.indexOf("--file", firstFileIdx + 1);
+  assert.ok(secondFileIdx >= 0);
+  assert.equal(args[secondFileIdx + 1], "/tmp/already-abs.md");
+});
+

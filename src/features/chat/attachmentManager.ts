@@ -38,12 +38,13 @@ export class AttachmentManager {
   async prepareAttachments(runner: AgentProvider): Promise<string[]> {
     const useAnydoc = this.plugin.settings.anydocEnabled;
     const tasks = this.attachments.map(async (a) => {
-      if (a.image) return a.path;
-      if (!useAnydoc) return a.path;
+      const abs = this.resolveVaultFile(a.path);
+      const resolvedPath = abs || a.path;
+      if (a.image) return resolvedPath;
+      if (!useAnydoc) return resolvedPath;
       const isDoc = /\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|epub|html?)$/i.test(a.path);
-      if (!isDoc) return a.path;
+      if (!isDoc) return resolvedPath;
       try {
-        const abs = this.resolveVaultFile(a.path);
         if (!abs) return a.path;
         return await runner.convertDocument(abs);
       } catch (e) {
@@ -52,7 +53,6 @@ export class AttachmentManager {
         );
         const maxMB = this.plugin.settings.maxAttachMB || 20;
         try {
-          const abs = this.resolveVaultFile(a.path);
           if (abs) {
             const st = await stat(abs);
             if (st.size > maxMB * 1024 * 1024) {
@@ -70,7 +70,7 @@ export class AttachmentManager {
         } catch {
           // ignore
         }
-        return a.path;
+        return resolvedPath;
       }
     });
 

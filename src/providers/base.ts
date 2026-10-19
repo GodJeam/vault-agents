@@ -87,11 +87,15 @@ export abstract class BaseCliRunner {
     extraEnv?: NodeJS.ProcessEnv
   ): ChildProcess {
     const isWin = process.platform === "win32";
+    const env: NodeJS.ProcessEnv =
+      cwd || extraEnv
+        ? Object.assign({}, process.env, cwd ? { PWD: cwd } : undefined, extraEnv)
+        : process.env;
     const options: SpawnOptions = {
       cwd,
       shell: isWin && (bin.endsWith(".cmd") || bin.endsWith(".bat")),
       windowsHide: true,
-      env: extraEnv ? Object.assign({}, process.env, extraEnv) : process.env,
+      env,
       stdio: ["ignore", "pipe", "pipe"],
     };
     const child = spawn(bin, args, options);
@@ -306,7 +310,7 @@ export abstract class BaseCliRunner {
     const bin = this.resolveBinaryPath(this.plugin.settings.anydocBinary || "anydoc");
     try {
       await new Promise<void>((resolve, reject) => {
-        const child = this.spawnBinary(bin, [cleanInput, "-o", outPath]);
+        const child = this.spawnBinary(bin, [cleanInput, "--ocr", "hosted", "-o", outPath]);
         let err = "";
         child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
         child.on("error", (e) => reject(e));
