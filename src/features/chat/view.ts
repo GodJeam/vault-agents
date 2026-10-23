@@ -655,9 +655,11 @@ export class ChatView extends ItemView {
           this.plugin.settings.sessionEngines[id] = runner.id;
           void this.plugin.saveSettings();
         },
+        onActivity: (activity) => bubble.setActivity(activity),
         onText: (text) => bubble.setText(text),
         onReasoning: (text) => bubble.setReasoning(text),
         onStep: (step) => bubble.addStep(step),
+        onQuestion: (questions) => bubble.addQuestions(questions),
         onFinish: (info) => bubble.setFinish(info),
         onError: (err) => {
           this.hadStreamError = true;
@@ -796,7 +798,8 @@ export class ChatView extends ItemView {
 
   private doRun(prompt: string, fileAttachments: string[]): void {
     const bubble = this.addAssistantMessage();
-    bubble.status.setText(this.plugin.t("Starting..."));
+    let currentActivity = this.plugin.t("Connecting to agent...");
+    bubble.setActivity(currentActivity);
 
     this.running = true;
     this.hadStreamError = false;
@@ -816,12 +819,15 @@ export class ChatView extends ItemView {
         return;
       }
       const idleSec = Math.floor((Date.now() - lastEventTime) / 1000);
-      if (idleSec >= 15) {
-        bubble.status.setText(
-          `${substitute(this.plugin.t("last update $1s ago"), idleSec)} (${this.plugin.t("Possibly stuck")})`
+      if (idleSec >= 20) {
+        bubble.setActivity(
+          `${currentActivity} · ${substitute(this.plugin.t("last update $1s ago"), idleSec)} (${this.plugin.t("Possibly stuck")})`,
+          true
         );
-      } else if (idleSec >= 3) {
-        bubble.status.setText(substitute(this.plugin.t("last update $1s ago"), idleSec));
+      } else if (idleSec >= 6) {
+        bubble.setActivity(
+          `${currentActivity} · ${substitute(this.plugin.t("last update $1s ago"), idleSec)}`
+        );
       }
     }, 2000);
 
@@ -853,20 +859,32 @@ export class ChatView extends ItemView {
             this.pendingUser = null;
           }
         },
+        onActivity: (activity) => {
+          lastEventTime = Date.now();
+          currentActivity = activity;
+          bubble.setActivity(activity);
+        },
         onText: (text) => {
           lastEventTime = Date.now();
-          bubble.status.setText("");
+          currentActivity = this.plugin.t("Writing response...");
+          bubble.setActivity(currentActivity);
           bubble.setText(text);
         },
         onReasoning: (text) => {
           lastEventTime = Date.now();
-          bubble.status.setText(this.plugin.t("Reasoning") + "...");
+          currentActivity = this.plugin.t("Thinking...");
+          bubble.setActivity(currentActivity);
           bubble.setReasoning(text);
         },
         onStep: (step) => {
           lastEventTime = Date.now();
-          bubble.status.setText("");
           bubble.addStep(step);
+        },
+        onQuestion: (questions) => {
+          lastEventTime = Date.now();
+          currentActivity = this.plugin.t("Waiting for your answer...");
+          bubble.setActivity(currentActivity);
+          bubble.addQuestions(questions);
         },
         onFinish: (info) => {
           lastEventTime = Date.now();
@@ -950,11 +968,25 @@ export class ChatView extends ItemView {
       () => this.scheduleScroll(),
       (t) => this.copyText(t),
       (total, input, output, cost) =>
-        this.fmtTokens(total, input, output, cost, this.sessionEngine())
+        this.fmtTokens(total, input, output, cost, this.sessionEngine()),
+      (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer)
     );
     this.activeBubble = bubble;
     this.scrollToBottom();
     return bubble;
+  }
+
+  private handleQuestionAnswer(formattedAnswer: string): void {
+    if (!formattedAnswer.trim()) return;
+    if (this.running) {
+      this.stoppedByUser = true;
+      this.currentProc?.abort();
+      window.setTimeout(() => {
+        this.sendText(formattedAnswer);
+      }, 250);
+    } else {
+      this.sendText(formattedAnswer);
+    }
   }
 
   private addErrorBubble(msg: string): void {

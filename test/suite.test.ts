@@ -6,6 +6,7 @@ import {
   DEFAULT_SETTINGS,
   getEngineConfig,
   migrateSettings,
+  type AgentQuestion,
   type FinishInfo,
   type HistoryMap,
   type PluginSettings,
@@ -16,6 +17,8 @@ import type { RunnerHost } from "../src/core/provider";
 import { ProviderRegistry } from "../src/core/registry";
 import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
+import { formatToolAction } from "../src/features/chat/stepWidget";
+import { formatQuestionAnswers } from "../src/features/chat/questionCard";
 import { translate } from "../src/i18n";
 
 function createMockHost(
@@ -38,6 +41,8 @@ function createCollector() {
   const texts: Array<{ text: string; partId: string }> = [];
   const reasonings: Array<{ text: string; partId: string }> = [];
   const steps: StepInfo[] = [];
+  const questions: AgentQuestion[][] = [];
+  const activities: string[] = [];
   const finishes: FinishInfo[] = [];
   const errors: string[] = [];
   const raws: string[] = [];
@@ -48,13 +53,27 @@ function createCollector() {
     onText: (text, partId) => texts.push({ text, partId }),
     onReasoning: (text, partId) => reasonings.push({ text, partId }),
     onStep: (step) => steps.push(step),
+    onQuestion: (qs) => questions.push(qs),
+    onActivity: (act) => activities.push(act),
     onFinish: (info) => finishes.push(info),
     onError: (msg) => errors.push(msg),
     onRaw: (line) => raws.push(line),
     onDone: (code) => dones.push(code),
   };
 
-  return { cb, sessions, texts, reasonings, steps, finishes, errors, raws, dones };
+  return {
+    cb,
+    sessions,
+    texts,
+    reasonings,
+    steps,
+    questions,
+    activities,
+    finishes,
+    errors,
+    raws,
+    dones,
+  };
 }
 
 test("migrateSettings migrates legacy flat fields into engines map", () => {
@@ -265,5 +284,165 @@ test("OpencodeRunner.buildArgs resolves relative fileAttachments against vault p
   const secondFileIdx = args.indexOf("--file", firstFileIdx + 1);
   assert.ok(secondFileIdx >= 0);
   assert.equal(args[secondFileIdx + 1], "/tmp/already-abs.md");
+});
+
+test("OpencodeRunner intercepts failed question tool_use and extracts human-friendly tool titles", () => {
+  const host = createMockHost({ language: "it" });
+  const oc = new OpencodeRunner(host);
+  const col = createCollector();
+
+  // 1. step_start emits live activity
+  oc.handleLine(
+    JSON.stringify({
+      type: "step_start",
+      sessionID: "ses_q123",
+      part: { type: "step-start", id: "prt_1" },
+    }),
+    col.cb
+  );
+  assert.equal(col.activities.at(-1), "Analisi e pianificazione in corso...");
+
+  // 2. read tool_use with raw title "read" extracts basename from input.filePath
+  oc.handleLine(
+    JSON.stringify({
+      type: "tool_use",
+      sessionID: "ses_q123",
+      part: {
+        id: "prt_read",
+        callID: "call_read",
+        type: "tool",
+        tool: "read",
+        state: {
+          status: "completed",
+          title: "read",
+          input: { filePath: "/mock/vault/Appunti/Architettura.md" },
+          time: { start: 1000, end: 1250 },
+        },
+      },
+    }),
+    col.cb
+  );
+  assert.equal(col.steps.length, 1);
+  assert.equal(col.steps[0].title, "Architettura.md");
+  assert.equal(col.steps[0].durationMs, 250);
+
+  // 3. question tool_use (cancelled by opencode run CLI with status "error") is intercepted cleanly
+  oc.handleLine(
+    JSON.stringify({
+      type: "tool_use",
+      sessionID: "ses_q123",
+      part: {
+        id: "prt_q",
+        callID: "call_q",
+        type: "tool",
+        tool: "question",
+        state: {
+          status: "error",
+          input: {
+            questions: [
+              {
+                header: "Formato",
+                question: "Come preferisci il riassunto?",
+                options: [
+                  { label: "Elenco puntato", description: "Sintetico e rapido" },
+                  { label: " Discorsivo ", description: "Approfondito" },
+                ],
+                multiple: false,
+              },
+            ],
+          },
+          error: "The question couldn't be shown to the user in this client.",
+        },
+      },
+    }),
+    col.cb
+  );
+
+  assert.equal(col.questions.length, 1);
+  assert.equal(col.questions[0].length, 1);
+  assert.equal(col.questions[0][0].header, "Formato");
+  assert.equal(col.questions[0][0].question, "Come preferisci il riassunto?");
+  assert.equal(col.questions[0][0].options.length, 2);
+  assert.equal(col.questions[0][0].options[0].label, "Elenco puntato");
+  assert.equal(col.steps.at(-1)?.state, "completed"); // error suppressed!
+  assert.equal(col.activities.at(-1), "In attesa della tua risposta...");
+});
+
+test("AntigravityRunner intercepts ask_question tool and deduplicates across step updates", () => {
+  const host = createMockHost({ language: "it" });
+  const agy = new AntigravityRunner(host);
+  const col = createCollector();
+  const streamState = { accumulatedText: "" };
+
+  const askEvent = (state: string) =>
+    JSON.stringify({
+      event: "step_update",
+      step_update: {
+        conversation_id: "uuid-ask-1",
+        step_index: 5,
+        step_type: "tool",
+        state,
+        tool_name: "ask_question",
+        tool_info: {
+          name: "ask_question",
+          parameters: {
+            questions: [
+              {
+                question: "Quali sezioni vuoi includere?",
+                options: ["Introduzione", "Esempi pratici"],
+                is_multi_select: true,
+              },
+            ],
+          },
+        },
+      },
+    });
+
+  agy.handleLine(askEvent("RUNNING"), col.cb, streamState);
+  agy.handleLine(askEvent("DONE"), col.cb, streamState);
+
+  assert.equal(col.questions.length, 1); // deduplicated!
+  assert.equal(col.questions[0][0].question, "Quali sezioni vuoi includere?");
+  assert.equal(col.questions[0][0].multiple, true);
+  assert.deepEqual(
+    col.questions[0][0].options.map((o) => o.label),
+    ["Introduzione", "Esempi pratici"]
+  );
+  assert.equal(col.steps.at(-1)?.state, "completed");
+});
+
+test("formatToolAction and formatQuestionAnswers produce human-readable localized output", () => {
+  const tIt = (s: string) => translate("it", s);
+
+  const readFmt = formatToolAction("read", "Nota.md", tIt);
+  assert.equal(readFmt.label, "Lettura file");
+  assert.equal(readFmt.target, "Nota.md");
+  assert.equal(readFmt.icon, "file-text");
+
+  const dupFmt = formatToolAction("bash", "bash", tIt);
+  assert.equal(dupFmt.label, "Esecuzione comando");
+  assert.equal(dupFmt.target, "");
+
+  const questions: AgentQuestion[] = [
+    {
+      header: "Stile",
+      question: "Quale tono usare?",
+      options: [{ label: "Formale" }, { label: "Informale" }],
+    },
+    {
+      header: "Lingua",
+      question: "In che lingua?",
+      options: [{ label: "Italiano" }, { label: "Inglese" }],
+    },
+  ];
+  const selected = new Map<number, Set<string>>([
+    [0, new Set(["Formale"])],
+    [1, new Set(["Italiano"])],
+  ]);
+  const custom = new Map<number, string>([[0, "con riferimenti accademici"]]);
+  const formatted = formatQuestionAnswers(questions, selected, custom, tIt);
+  assert.match(formatted, /Ecco le mie risposte alle tue domande:/);
+  assert.match(formatted, /\*\*Stile — Quale tono usare\?\*\*: Formale, con riferimenti accademici/);
+  assert.match(formatted, /\*\*Lingua — In che lingua\?\*\*: Italiano/);
 });
 

@@ -38,6 +38,19 @@ export interface StepInfo {
   state: string;
   input?: unknown;
   output?: unknown;
+  durationMs?: number;
+}
+
+export interface AgentQuestionOption {
+  label: string;
+  description?: string;
+}
+
+export interface AgentQuestion {
+  header?: string;
+  question: string;
+  options: AgentQuestionOption[];
+  multiple?: boolean;
 }
 
 export interface FinishInfo {
@@ -67,6 +80,8 @@ export interface StreamCallbacks {
   onText: (text: string, partId: string) => void;
   onReasoning: (text: string, partId: string) => void;
   onStep: (step: StepInfo) => void;
+  onQuestion?: (questions: AgentQuestion[]) => void;
+  onActivity?: (activity: string) => void;
   onFinish: (info: FinishInfo) => void;
   onError: (message: string) => void;
   onDone: (exitCode: number) => void;

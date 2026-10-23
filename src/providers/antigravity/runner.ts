@@ -3,6 +3,8 @@ import { basename, isAbsolute, join } from "path";
 import { homedir } from "os";
 import type { AgentProvider, ProviderDescriptor, RunnerHost } from "../../core/provider";
 import type {
+  AgentQuestion,
+  AgentQuestionOption,
   EngineType,
   RunHandle,
   RunRequest,
@@ -11,6 +13,7 @@ import type {
   UsageStats,
   UsageWindow,
 } from "../../core/types";
+import { substitute } from "../../i18n";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
 import type { AntigravityEvent } from "./types";
 
@@ -371,7 +374,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
     const args = this.buildArgs({ ...req, cwd });
     const bin = this.resolveBinaryPath(this.getConfig().binary || "agy");
-    const streamState = { accumulatedText: "" };
+    const streamState = { accumulatedText: "", emittedQuestionSteps: new Set<string>() };
 
     return this.spawnJsonlStream(
       bin,
@@ -385,7 +388,9 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
   public handleLine(
     line: string,
     cb: StreamCallbacks,
-    streamState: { accumulatedText: string } = { accumulatedText: "" }
+    streamState: { accumulatedText: string; emittedQuestionSteps?: Set<string> } = {
+      accumulatedText: "",
+    }
   ): void {
     if (line.length > MAX_STREAM_LINE_BYTES) {
       cb.onRaw?.(`[omitted event of ${line.length} bytes]\n`);
@@ -405,6 +410,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       if (typeof cid === "string" && cid) {
         cb.onSession(cid);
       }
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
       return;
     }
 
@@ -419,16 +425,23 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       const stepType = su.step_type;
       const stepIndex = su.step_index;
 
+      if (stepType === "user_input") {
+        cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      }
+
       // Accumulate incremental text chunks (delta)
       if (typeof su.text_delta === "string" && su.text_delta) {
         streamState.accumulatedText += su.text_delta;
+        cb.onActivity?.(this.plugin.t("Writing response..."));
         cb.onText(streamState.accumulatedText, String(stepIndex ?? 0));
       }
 
       // Reasoning / thought block if present
       if (typeof su.thought === "string" && su.thought) {
+        cb.onActivity?.(this.plugin.t("Thinking..."));
         cb.onReasoning(su.thought, String(stepIndex ?? 0));
       } else if (typeof su.reasoning === "string" && su.reasoning) {
+        cb.onActivity?.(this.plugin.t("Thinking..."));
         cb.onReasoning(su.reasoning, String(stepIndex ?? 0));
       }
 
@@ -438,25 +451,42 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
         const isDone = su.state === "DONE";
         const isError = su.status === "ERROR" || Boolean(su.error);
         const params = su.tool_info?.parameters;
+        const durationMs =
+          typeof su.duration_seconds === "number" && su.duration_seconds > 0
+            ? Math.round(su.duration_seconds * 1000)
+            : undefined;
 
-        let title = "";
-        if (params && typeof params === "object") {
-          if (params.toolSummary && typeof params.toolSummary === "string") {
-            title = params.toolSummary;
-          } else if (params.CommandLine && typeof params.CommandLine === "string") {
-            title = params.CommandLine;
-          } else if (params.TargetFile && typeof params.TargetFile === "string") {
-            title = basename(params.TargetFile);
-          } else if (params.AbsolutePath && typeof params.AbsolutePath === "string") {
-            title = basename(params.AbsolutePath);
-          } else if (params.toolAction && typeof params.toolAction === "string") {
-            title = params.toolAction;
-          } else if (params.query && typeof params.query === "string") {
-            title = params.query;
+        // Intercept ask_question tool calls so the user can answer interactively in the chat UI
+        if (toolName === "ask_question" || toolName === "question") {
+          const questions = this.parseAntigravityQuestions(params);
+          const qSummary =
+            questions[0]?.question || this.plugin.t("Agent question");
+          const stepKey = String(stepIndex ?? qSummary);
+          if (!streamState.emittedQuestionSteps) {
+            streamState.emittedQuestionSteps = new Set<string>();
           }
+          if (questions.length > 0 && !streamState.emittedQuestionSteps.has(stepKey)) {
+            streamState.emittedQuestionSteps.add(stepKey);
+            cb.onQuestion?.(questions);
+          }
+          cb.onActivity?.(this.plugin.t("Waiting for your answer..."));
+          cb.onStep({
+            id: `step-${stepIndex ?? Date.now()}-${toolName}`,
+            tool: toolName,
+            title: qSummary,
+            state: "completed",
+            input: params,
+            output: su.tool_info?.output,
+            durationMs,
+          });
+          return;
         }
-        if (!title) {
-          title = toolName;
+
+        const title = this.extractAntigravityToolTitle(toolName, params);
+        if (!isDone) {
+          cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
+        } else {
+          cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
         }
 
         cb.onStep({
@@ -466,6 +496,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
           state: isDone ? (isError ? "error" : "completed") : "running",
           input: params,
           output: su.tool_info?.output,
+          durationMs,
         });
       }
 
@@ -497,6 +528,95 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       const msg = ev.error?.message || JSON.stringify(ev.error || ev);
       cb.onError(String(msg));
     }
+  }
+
+  private extractAntigravityToolTitle(
+    toolName: string,
+    params: Record<string, unknown> | undefined
+  ): string {
+    if (params && typeof params === "object") {
+      if (typeof params.toolSummary === "string" && params.toolSummary.trim()) {
+        return params.toolSummary.trim();
+      }
+      if (typeof params.TargetFile === "string" && params.TargetFile.trim()) {
+        return basename(params.TargetFile.trim());
+      }
+      if (typeof params.AbsolutePath === "string" && params.AbsolutePath.trim()) {
+        return basename(params.AbsolutePath.trim());
+      }
+      if (typeof params.Path === "string" && params.Path.trim()) {
+        return basename(params.Path.trim());
+      }
+      if (typeof params.DirectoryPath === "string" && params.DirectoryPath.trim()) {
+        return basename(params.DirectoryPath.trim()) || params.DirectoryPath.trim();
+      }
+      if (typeof params.SearchDirectory === "string" && params.SearchDirectory.trim()) {
+        const q = typeof params.Query === "string" ? params.Query.trim() : "";
+        return q ? `"${q}" in ${basename(params.SearchDirectory.trim())}` : basename(params.SearchDirectory.trim());
+      }
+      if (typeof params.Query === "string" && params.Query.trim()) {
+        return `"${params.Query.trim()}"`;
+      }
+      if (typeof params.query === "string" && params.query.trim()) {
+        return params.query.trim();
+      }
+      if (typeof params.Pattern === "string" && params.Pattern.trim()) {
+        return params.Pattern.trim();
+      }
+      if (typeof params.CommandLine === "string" && params.CommandLine.trim()) {
+        return params.CommandLine.trim();
+      }
+      if (typeof params.Role === "string" && params.Role.trim()) {
+        return params.Role.trim();
+      }
+      if (typeof params.toolAction === "string" && params.toolAction.trim()) {
+        return params.toolAction.trim();
+      }
+    }
+    return toolName;
+  }
+
+  private parseAntigravityQuestions(
+    params: Record<string, unknown> | undefined
+  ): AgentQuestion[] {
+    if (!params || typeof params !== "object") return [];
+    let rawQuestions: unknown = params.questions;
+    if (typeof rawQuestions === "string") {
+      try {
+        rawQuestions = JSON.parse(rawQuestions);
+      } catch {
+        return [];
+      }
+    }
+    if (!Array.isArray(rawQuestions)) return [];
+
+    const result: AgentQuestion[] = [];
+    for (const item of rawQuestions) {
+      if (!item || typeof item !== "object") continue;
+      const qObj = item as Record<string, unknown>;
+      const question = typeof qObj.question === "string" ? qObj.question.trim() : "";
+      if (!question) continue;
+      const header = typeof qObj.header === "string" ? qObj.header.trim() : undefined;
+      const multiple = Boolean(qObj.is_multi_select ?? qObj.multiple);
+      const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
+      const options: AgentQuestionOption[] = [];
+      for (const opt of rawOpts) {
+        if (typeof opt === "string" && opt.trim()) {
+          options.push({ label: opt.trim() });
+        } else if (opt && typeof opt === "object") {
+          const o = opt as Record<string, unknown>;
+          const label = typeof o.label === "string" ? o.label.trim() : "";
+          if (label) {
+            options.push({
+              label,
+              description: typeof o.description === "string" ? o.description.trim() : undefined,
+            });
+          }
+        }
+      }
+      result.push({ header, question, options, multiple });
+    }
+    return result;
   }
 
   private execSqlite(dbPath: string, query: string): Promise<string> {

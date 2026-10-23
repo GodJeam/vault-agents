@@ -16,6 +16,7 @@ export interface AntigravityStepUpdate {
   error?: unknown;
   tool_name?: string;
   tool_info?: AntigravityToolInfo;
+  duration_seconds?: number;
 }
 
 export interface AntigravityResultUsage {

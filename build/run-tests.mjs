@@ -16,6 +16,35 @@ try {
     format: "cjs",
     target: "node20",
     external: [...builtins, ...builtins.map((b) => `node:${b}`)],
+    plugins: [
+      {
+        name: "obsidian-mock",
+        setup(build) {
+          build.onResolve({ filter: /^obsidian$/ }, () => ({
+            path: "obsidian",
+            namespace: "obsidian-mock",
+          }));
+          build.onLoad({ filter: /.*/, namespace: "obsidian-mock" }, () => ({
+            contents: `
+              module.exports = {
+                Notice: class Notice {},
+                setIcon: () => {},
+                App: class App {},
+                Component: class Component {},
+                MarkdownRenderer: { render: () => Promise.resolve() },
+                Modal: class Modal {},
+                SuggestModal: class SuggestModal {},
+                ItemView: class ItemView {},
+                Plugin: class Plugin {},
+                PluginSettingTab: class PluginSettingTab {},
+                Setting: class Setting {},
+              };
+            `,
+            loader: "js",
+          }));
+        },
+      },
+    ],
     outfile,
     logLevel: "warning",
   });
