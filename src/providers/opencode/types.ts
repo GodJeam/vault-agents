@@ -3,6 +3,11 @@ export interface OpencodePartState {
   title?: string;
   input?: unknown;
   output?: unknown;
+  error?: string;
+  time?: {
+    start?: number;
+    end?: number;
+  };
 }
 
 export interface OpencodePart {

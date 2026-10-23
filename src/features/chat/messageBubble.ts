@@ -1,6 +1,7 @@
 import { App, Component, MarkdownRenderer, setIcon } from "obsidian";
-import type { FinishInfo, StepInfo } from "../../core/types";
+import type { AgentQuestion, FinishInfo, StepInfo } from "../../core/types";
 import { StepManager } from "./stepWidget";
+import { renderQuestionCard } from "./questionCard";
 
 export function metaWithCopy(
   row: HTMLElement,
@@ -57,8 +58,13 @@ export class AssistantBubble {
   private reasoningEl: HTMLDetailsElement;
   private reasoningContent: HTMLElement;
   private contentEl: HTMLElement;
+  private questionsEl: HTMLElement;
   private statsEl: HTMLElement;
-  status: HTMLElement;
+  private activityBarEl: HTMLElement;
+  private activityTextEl: HTMLElement;
+  private activityTimerEl: HTMLElement;
+  /** Backwards-compatible status accessor that updates the live activity bar. */
+  status: { setText: (text: string) => void };
   private stepManager: StepManager;
   private rawText = "";
   private rawReasoning = "";
@@ -66,6 +72,9 @@ export class AssistantBubble {
   private lastCost?: number;
   private renderTimer: number | null = null;
   private reasoningTimer: number | null = null;
+  private elapsedTimer: number | null = null;
+  private startedAtMs = Date.now();
+  private isFinalized = false;
 
   constructor(
     private row: HTMLElement,
@@ -76,7 +85,8 @@ export class AssistantBubble {
     private showIO: boolean,
     private onScrollRequest: () => void,
     private onCopy: (text: string) => void,
-    private fmtTokens: (total: number, input: number, output: number, cost?: number) => string
+    private fmtTokens: (total: number, input: number, output: number, cost?: number) => string,
+    private onAnswerQuestion?: (formattedAnswer: string) => void
   ) {
     metaWithCopy(this.row, this.assistantLabel, () => this.rawText, this.onCopy, this.t("Copy text"));
     this.reasoningEl = this.row.createEl("details", { cls: "opencode-reasoning hidden" });
@@ -87,13 +97,62 @@ export class AssistantBubble {
     const stepsEl = this.row.createDiv({ cls: "opencode-steps" });
     this.stepManager = new StepManager(stepsEl, this.t, this.showIO, this.onScrollRequest);
 
-    this.contentEl = this.row.createDiv({ cls: "opencode-bubble opencode-bubble--assistant" });
+    this.contentEl = this.row.createDiv({ cls: "opencode-bubble opencode-bubble--assistant hidden" });
+    this.questionsEl = this.row.createDiv({ cls: "opencode-questions-container" });
     this.statsEl = this.row.createDiv({ cls: "opencode-msg-stats hidden" });
-    this.status = this.row.createDiv({ cls: "opencode-status" });
+
+    this.activityBarEl = this.row.createDiv({ cls: "opencode-activity-bar hidden" });
+    this.activityBarEl.createSpan({ cls: "opencode-activity-spinner" });
+    this.activityTextEl = this.activityBarEl.createSpan({ cls: "opencode-activity-text" });
+    this.activityTimerEl = this.activityBarEl.createSpan({ cls: "opencode-activity-timer" });
+
+    this.status = {
+      setText: (text: string) => this.setActivity(text),
+    };
+  }
+
+  setActivity(text: string, warning = false): void {
+    if (this.isFinalized) return;
+    const clean = text.trim();
+    if (!clean) {
+      this.activityBarEl.addClass("hidden");
+      return;
+    }
+    this.activityBarEl.removeClass("hidden");
+    this.activityBarEl.toggleClass("is-warning", warning);
+    this.activityTextEl.setText(clean);
+    this.startElapsedClock();
+  }
+
+  private startElapsedClock(): void {
+    if (this.elapsedTimer !== null) return;
+    this.startedAtMs = Date.now();
+    this.updateElapsedDisplay();
+    this.elapsedTimer = window.setInterval(() => {
+      this.updateElapsedDisplay();
+    }, 1000);
+  }
+
+  private stopElapsedClock(): void {
+    if (this.elapsedTimer !== null) {
+      clearInterval(this.elapsedTimer);
+      this.elapsedTimer = null;
+    }
+  }
+
+  private updateElapsedDisplay(): void {
+    const totalSec = Math.max(0, Math.floor((Date.now() - this.startedAtMs) / 1000));
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    const formatted = mins > 0 ? `${mins}:${secs < 10 ? "0" : ""}${secs}` : `${secs}s`;
+    this.activityTimerEl.setText(formatted);
   }
 
   setText(text: string): void {
     this.rawText = text;
+    if (text.trim()) {
+      this.contentEl.removeClass("hidden");
+    }
     if (text.length <= 30000) {
       this.scheduleRender();
     } else {
@@ -157,6 +216,16 @@ export class AssistantBubble {
     this.stepManager.addStep(step);
   }
 
+  addQuestions(questions: AgentQuestion[]): void {
+    renderQuestionCard(
+      this.questionsEl,
+      questions,
+      this.t,
+      (answer) => this.onAnswerQuestion?.(answer),
+      this.onScrollRequest
+    );
+  }
+
   setFinish(info: FinishInfo): void {
     this.lastTokens = info.tokens;
     this.lastCost = info.cost;
@@ -180,17 +249,25 @@ export class AssistantBubble {
   }
 
   finalize(): void {
+    this.isFinalized = true;
+    this.stopElapsedClock();
+    this.activityBarEl.addClass("hidden");
     this.contentEl.empty();
-    if (this.rawText.trim() && this.rawText.length <= 30000) {
-      MarkdownRenderer.render(this.app, this.rawText, this.contentEl, "", this.component);
-    } else if (this.rawText.trim()) {
-      this.contentEl.textContent = this.rawText;
+    if (this.rawText.trim()) {
+      this.contentEl.removeClass("hidden");
+      if (this.rawText.length <= 30000) {
+        MarkdownRenderer.render(this.app, this.rawText, this.contentEl, "", this.component);
+      } else {
+        this.contentEl.textContent = this.rawText;
+      }
+    } else {
+      this.contentEl.addClass("hidden");
     }
-    this.status.setText("");
     this.stepManager.finalize();
   }
 
   dispose(): void {
+    this.stopElapsedClock();
     if (this.renderTimer !== null) {
       clearTimeout(this.renderTimer);
       this.renderTimer = null;

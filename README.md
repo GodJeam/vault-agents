@@ -8,6 +8,8 @@ An **Obsidian** plugin that integrates local AI agents into your vault: chat wit
 
 - **Multi-Agent Architecture**: Support for multiple local AI agents, easily switchable directly from the interface and designed to accommodate additional CLI agents in the future.
 - **Fast Model Switcher**: Native modal dialog (`/model` or the model button) with real-time fuzzy search to quickly find and switch models across all available engines.
+- **Interactive Agent Questions**: When an agent asks clarifying questions (`question` in OpenCode or `ask_question` in Antigravity), an interactive card is rendered directly in the chat with single/multi-select options and custom answer inputs.
+- **Live Activity & Human-Readable Tool Steps**: Animated live status pill with phase descriptions, elapsed timer, and human-friendly tool badges (with target file/command, duration, and visual task checklists) instead of raw CLI tool keywords.
 - **Tool Inspection**: Interactive display of tool and command executions directly in the chat with expandable input/output details.
 - **Chat in Obsidian**: Fast pane chat with streaming responses and reasoning indicators.
 - **Identical UX & Workflow**: The exact same UI, shortcuts, attachments, session controls, and tool inspection work seamlessly across all supported agents.
@@ -98,7 +100,7 @@ src/
 │   ├── opencode/                # OpenCode CLI descriptor, runner & stream parser
 │   └── base.ts                  # Shared process execution, JSONL stream loop & CLI utilities
 ├── features/
-│   ├── chat/                    # Chat view, streaming bubbles, step widgets, suggest popup & attachments
+│   ├── chat/                    # Chat view, streaming bubbles, question cards, step widgets & attachments
 │   └── settings/                # Data-driven settings tab rendered from provider descriptors
 ├── shared/                      # Reusable UI modals (file suggest, model switcher, stats)
 ├── i18n/                        # Internationalization (English, Italian)

@@ -256,6 +256,37 @@ const IT: Record<string, string> = {
   "Search models... (e.g. gemini, claude, flash, deepseek)":
     "Cerca modelli... (es. gemini, claude, flash, deepseek)",
   "select": "seleziona",
+
+  // --- live activity, human-friendly tools & interactive questions ---
+  "Read file": "Lettura file",
+  "Write file": "Scrittura file",
+  "Edit file": "Modifica file",
+  "Run command": "Esecuzione comando",
+  "Search text": "Ricerca nel testo",
+  "Find files": "Ricerca file",
+  "List folder": "Esplorazione cartella",
+  "Web search": "Ricerca web",
+  "Task list": "Lista attività",
+  "Subagent": "Sotto-agente",
+  "Question": "Domanda",
+  "tasks": "attività",
+  "done": "completate",
+  "Connecting to agent...": "Connessione all'agente in corso...",
+  "Thinking...": "Ragionamento in corso...",
+  "Analyzing and planning...": "Analisi e pianificazione in corso...",
+  "Writing response...": "Scrittura della risposta...",
+  "Running: $1": "In esecuzione: $1",
+  "Waiting for your answer...": "In attesa della tua risposta...",
+  "Working...": "Elaborazione in corso...",
+  "Agent question": "Domanda dall'agente",
+  "Select one or more options": "Seleziona una o più opzioni",
+  "Select an option": "Seleziona un'opzione",
+  "Other / custom answer...": "Altro / risposta personalizzata...",
+  "Send answer": "Invia risposta",
+  "Answer sent": "Risposta inviata",
+  "Please select or type an answer before sending.":
+    "Seleziona o scrivi almeno una risposta prima di inviare.",
+  "Here are my answers to your questions:": "Ecco le mie risposte alle tue domande:",
 };
 
 export function translate(lang: Language, text: string): string {
