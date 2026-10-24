@@ -125,7 +125,7 @@ export interface PromptTemplate {
 export interface PluginSettings {
   language: Language;
   engine: EngineType;
-  /** Per-engine configuration map (Fase 1 multi-agent architecture) */
+  /** Per-engine configuration map (Phase 1 multi-agent architecture) */
   engines: Record<string, EngineConfig>;
   // Legacy OpenCode settings (kept synced for backward compatibility)
   binaryPath: string;
