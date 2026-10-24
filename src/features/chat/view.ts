@@ -459,9 +459,17 @@ export class ChatView extends ItemView {
 
   private addStats(info: FinishInfo): void {
     if (info.tokens) {
-      this.stats.input += info.tokens.input ?? 0;
-      this.stats.output += info.tokens.output ?? 0;
-      this.stats.total += info.tokens.total ?? 0;
+      const input = info.tokens.input ?? 0;
+      const output = info.tokens.output ?? 0;
+      const reasoning = info.tokens.reasoning ?? 0;
+      const cacheRead = info.tokens.cache?.read ?? 0;
+      const cacheWrite = info.tokens.cache?.write ?? 0;
+      const rawTotal = info.tokens.total ?? 0;
+      const total =
+        rawTotal > 0 ? rawTotal : input + output + reasoning + cacheRead + cacheWrite;
+      this.stats.input += input;
+      this.stats.output += output;
+      this.stats.total += total;
     }
     this.stats.cost += info.cost ?? 0;
     this.updateStatsBar();
@@ -890,10 +898,16 @@ export class ChatView extends ItemView {
           lastEventTime = Date.now();
           bubble.setFinish(info);
           this.addStats(info);
-          if (info.tokens?.input) {
-            this.contextRunInput = info.tokens.input;
-            this.contextUsed = Math.max(this.contextBaseInput, this.contextRunInput);
-            this.updateContextUsage();
+          if (info.tokens) {
+            const stepContextTokens =
+              (info.tokens.input ?? 0) +
+              (info.tokens.cache?.read ?? 0) +
+              (info.tokens.cache?.write ?? 0);
+            if (stepContextTokens > 0) {
+              this.contextRunInput = stepContextTokens;
+              this.contextUsed = Math.max(this.contextBaseInput, this.contextRunInput);
+              this.updateContextUsage();
+            }
           }
         },
         onError: (err) => {
@@ -1099,17 +1113,24 @@ export class ChatView extends ItemView {
           bubble.textContent = rec.text;
         }
         if (rec.tokens) {
+          const inp = rec.tokens.input ?? 0;
+          const out = rec.tokens.output ?? 0;
+          const reas = rec.tokens.reasoning ?? 0;
+          const cRead = rec.tokens.cache?.read ?? 0;
+          const cWrite = rec.tokens.cache?.write ?? 0;
+          const rawTot = rec.tokens.total ?? 0;
+          const tot = rawTot > 0 ? rawTot : inp + out + reas + cRead + cWrite;
           const stats = row.createDiv({ cls: "opencode-msg-stats" });
           stats.setText(
             this.fmtTokens(
-              rec.tokens.total ?? 0,
-              rec.tokens.input ?? 0,
-              rec.tokens.output ?? 0,
+              tot,
+              inp,
+              out,
               rec.cost,
               this.sessionEngine()
             )
           );
-          this.addStats({ tokens: rec.tokens, cost: rec.cost });
+          this.addStats({ tokens: { ...rec.tokens, total: tot }, cost: rec.cost });
         }
       }
     }

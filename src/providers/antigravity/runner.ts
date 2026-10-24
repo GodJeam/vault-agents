@@ -511,12 +511,19 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
         cb.onText(streamState.accumulatedText, "final");
       }
       const u = res.usage ?? {};
+      const inputTokens = u.input_tokens ?? 0;
+      const outputTokens = u.output_tokens ?? 0;
+      const reasoningTokens = u.thinking_tokens ?? 0;
+      const totalTokens =
+        u.total_tokens && u.total_tokens > 0
+          ? u.total_tokens
+          : inputTokens + outputTokens + reasoningTokens;
       cb.onFinish({
         tokens: {
-          total: u.total_tokens ?? 0,
-          input: u.input_tokens ?? 0,
-          output: u.output_tokens ?? 0,
-          reasoning: u.thinking_tokens ?? 0,
+          total: totalTokens,
+          input: inputTokens,
+          output: outputTokens,
+          reasoning: reasoningTokens,
         },
         cost: 0, // Included with Google AI Pro!
       });
