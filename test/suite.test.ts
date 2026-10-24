@@ -88,7 +88,7 @@ test("migrateSettings migrates legacy flat fields into engines map", () => {
     antigravityEffort: "max",
     autoApprove: false,
     histories: {
-      ses_1: [{ role: "user", text: "Ciao" }],
+      ses_1: [{ role: "user", text: "Hello" }],
     },
   };
 
@@ -138,18 +138,18 @@ test("AntigravityRunner parses sample-stream.ndjson fixture accurately", () => {
 
   assert.equal(col.sessions[0], "0da89d6e-47ea-4d39-aa41-2bd0aa103371");
   assert.equal(col.reasonings.length, 1);
-  assert.equal(col.reasonings[0].text, "Analizzo la struttura del vault...");
+  assert.equal(col.reasonings[0].text, "Analyzing vault structure...");
   assert.equal(col.steps.length, 2);
   assert.equal(col.steps[0].state, "running");
-  assert.equal(col.steps[0].title, "Read Nota.md");
+  assert.equal(col.steps[0].title, "Read Note.md");
   assert.equal(col.steps[1].state, "completed");
-  assert.equal(col.steps[1].output, "Contenuto della nota");
+  assert.equal(col.steps[1].output, "Note content");
 
   // Incremental delta + final synchronized response
   assert.equal(col.texts.length, 3);
-  assert.equal(col.texts[0].text, "Ecco il riassunto ");
-  assert.equal(col.texts[1].text, "Ecco il riassunto della nota.");
-  assert.equal(col.texts[2].text, "Ecco il riassunto completo della nota.");
+  assert.equal(col.texts[0].text, "Here is the summary ");
+  assert.equal(col.texts[1].text, "Here is the summary of the note.");
+  assert.equal(col.texts[2].text, "Here is the complete summary of the note.");
 
   assert.equal(col.finishes.length, 1);
   assert.deepEqual(col.finishes[0].tokens, {
@@ -175,12 +175,12 @@ test("OpencodeRunner parses sample-stream.ndjson fixture accurately", () => {
 
   assert.equal(col.sessions[0], "ses_abc12345");
   assert.equal(col.reasonings.length, 1);
-  assert.equal(col.reasonings[0].text, "Pianifico i passaggi...");
+  assert.equal(col.reasonings[0].text, "Planning the steps...");
   assert.equal(col.steps.length, 2);
   assert.equal(col.steps[0].state, "running");
   assert.equal(col.steps[1].state, "completed");
   assert.equal(col.texts.length, 1);
-  assert.equal(col.texts[0].text, "Operazione completata con successo.");
+  assert.equal(col.texts[0].text, "Operation completed successfully.");
   assert.equal(col.finishes.length, 1);
   assert.equal(col.finishes[0].tokens?.total, 850);
   assert.equal(col.finishes[0].cost, 0.0025);
@@ -275,19 +275,19 @@ test("OpencodeRunner.buildArgs resolves relative fileAttachments against vault p
   const host = createMockHost();
   const oc = new OpencodeRunner(host);
   const args = oc.buildArgs({
-    prompt: "Riassumi",
-    fileAttachments: ["PDF APA/Lezione 1.pdf", "/tmp/already-abs.md"],
+    prompt: "Summarize",
+    fileAttachments: ["Docs/Lecture 1.pdf", "/tmp/already-abs.md"],
   });
   const firstFileIdx = args.indexOf("--file");
   assert.ok(firstFileIdx >= 0);
-  assert.equal(args[firstFileIdx + 1], "/mock/vault/PDF APA/Lezione 1.pdf");
+  assert.equal(args[firstFileIdx + 1], "/mock/vault/Docs/Lecture 1.pdf");
   const secondFileIdx = args.indexOf("--file", firstFileIdx + 1);
   assert.ok(secondFileIdx >= 0);
   assert.equal(args[secondFileIdx + 1], "/tmp/already-abs.md");
 });
 
 test("OpencodeRunner intercepts failed question tool_use and extracts human-friendly tool titles", () => {
-  const host = createMockHost({ language: "it" });
+  const host = createMockHost({ language: "en" });
   const oc = new OpencodeRunner(host);
   const col = createCollector();
 
@@ -300,7 +300,7 @@ test("OpencodeRunner intercepts failed question tool_use and extracts human-frie
     }),
     col.cb
   );
-  assert.equal(col.activities.at(-1), "Analisi e pianificazione in corso...");
+  assert.equal(col.activities.at(-1), "Analyzing and planning...");
 
   // 2. read tool_use with raw title "read" extracts basename from input.filePath
   oc.handleLine(
@@ -315,7 +315,7 @@ test("OpencodeRunner intercepts failed question tool_use and extracts human-frie
         state: {
           status: "completed",
           title: "read",
-          input: { filePath: "/mock/vault/Appunti/Architettura.md" },
+          input: { filePath: "/mock/vault/Notes/Architecture.md" },
           time: { start: 1000, end: 1250 },
         },
       },
@@ -323,7 +323,7 @@ test("OpencodeRunner intercepts failed question tool_use and extracts human-frie
     col.cb
   );
   assert.equal(col.steps.length, 1);
-  assert.equal(col.steps[0].title, "Architettura.md");
+  assert.equal(col.steps[0].title, "Architecture.md");
   assert.equal(col.steps[0].durationMs, 250);
 
   // 3. question tool_use (cancelled by opencode run CLI with status "error") is intercepted cleanly
@@ -341,11 +341,11 @@ test("OpencodeRunner intercepts failed question tool_use and extracts human-frie
           input: {
             questions: [
               {
-                header: "Formato",
-                question: "Come preferisci il riassunto?",
+                header: "Format",
+                question: "How would you like the summary formatted?",
                 options: [
-                  { label: "Elenco puntato", description: "Sintetico e rapido" },
-                  { label: " Discorsivo ", description: "Approfondito" },
+                  { label: "Bullet points", description: "Concise and quick" },
+                  { label: " Narrative ", description: "Detailed explanation" },
                 ],
                 multiple: false,
               },
@@ -360,16 +360,16 @@ test("OpencodeRunner intercepts failed question tool_use and extracts human-frie
 
   assert.equal(col.questions.length, 1);
   assert.equal(col.questions[0].length, 1);
-  assert.equal(col.questions[0][0].header, "Formato");
-  assert.equal(col.questions[0][0].question, "Come preferisci il riassunto?");
+  assert.equal(col.questions[0][0].header, "Format");
+  assert.equal(col.questions[0][0].question, "How would you like the summary formatted?");
   assert.equal(col.questions[0][0].options.length, 2);
-  assert.equal(col.questions[0][0].options[0].label, "Elenco puntato");
+  assert.equal(col.questions[0][0].options[0].label, "Bullet points");
   assert.equal(col.steps.at(-1)?.state, "completed"); // error suppressed!
-  assert.equal(col.activities.at(-1), "In attesa della tua risposta...");
+  assert.equal(col.activities.at(-1), "Waiting for your answer...");
 });
 
 test("AntigravityRunner intercepts ask_question tool and deduplicates across step updates", () => {
-  const host = createMockHost({ language: "it" });
+  const host = createMockHost({ language: "en" });
   const agy = new AntigravityRunner(host);
   const col = createCollector();
   const streamState = { accumulatedText: "" };
@@ -388,8 +388,8 @@ test("AntigravityRunner intercepts ask_question tool and deduplicates across ste
           parameters: {
             questions: [
               {
-                question: "Quali sezioni vuoi includere?",
-                options: ["Introduzione", "Esempi pratici"],
+                question: "Which sections should be included?",
+                options: ["Introduction", "Practical examples"],
                 is_multi_select: true,
               },
             ],
@@ -402,48 +402,48 @@ test("AntigravityRunner intercepts ask_question tool and deduplicates across ste
   agy.handleLine(askEvent("DONE"), col.cb, streamState);
 
   assert.equal(col.questions.length, 1); // deduplicated!
-  assert.equal(col.questions[0][0].question, "Quali sezioni vuoi includere?");
+  assert.equal(col.questions[0][0].question, "Which sections should be included?");
   assert.equal(col.questions[0][0].multiple, true);
   assert.deepEqual(
     col.questions[0][0].options.map((o) => o.label),
-    ["Introduzione", "Esempi pratici"]
+    ["Introduction", "Practical examples"]
   );
   assert.equal(col.steps.at(-1)?.state, "completed");
 });
 
-test("formatToolAction and formatQuestionAnswers produce human-readable localized output", () => {
-  const tIt = (s: string) => translate("it", s);
+test("formatToolAction and formatQuestionAnswers produce human-readable output", () => {
+  const tEn = (s: string) => translate("en", s);
 
-  const readFmt = formatToolAction("read", "Nota.md", tIt);
-  assert.equal(readFmt.label, "Lettura file");
-  assert.equal(readFmt.target, "Nota.md");
+  const readFmt = formatToolAction("read", "Note.md", tEn);
+  assert.equal(readFmt.label, "Read file");
+  assert.equal(readFmt.target, "Note.md");
   assert.equal(readFmt.icon, "file-text");
 
-  const dupFmt = formatToolAction("bash", "bash", tIt);
-  assert.equal(dupFmt.label, "Esecuzione comando");
+  const dupFmt = formatToolAction("bash", "bash", tEn);
+  assert.equal(dupFmt.label, "Run command");
   assert.equal(dupFmt.target, "");
 
   const questions: AgentQuestion[] = [
     {
-      header: "Stile",
-      question: "Quale tono usare?",
-      options: [{ label: "Formale" }, { label: "Informale" }],
+      header: "Style",
+      question: "Which tone should be used?",
+      options: [{ label: "Formal" }, { label: "Informal" }],
     },
     {
-      header: "Lingua",
-      question: "In che lingua?",
-      options: [{ label: "Italiano" }, { label: "Inglese" }],
+      header: "Language",
+      question: "Which language?",
+      options: [{ label: "English" }, { label: "Italian" }],
     },
   ];
   const selected = new Map<number, Set<string>>([
-    [0, new Set(["Formale"])],
-    [1, new Set(["Italiano"])],
+    [0, new Set(["Formal"])],
+    [1, new Set(["English"])],
   ]);
-  const custom = new Map<number, string>([[0, "con riferimenti accademici"]]);
-  const formatted = formatQuestionAnswers(questions, selected, custom, tIt);
-  assert.match(formatted, /Ecco le mie risposte alle tue domande:/);
-  assert.match(formatted, /\*\*Stile — Quale tono usare\?\*\*: Formale, con riferimenti accademici/);
-  assert.match(formatted, /\*\*Lingua — In che lingua\?\*\*: Italiano/);
+  const custom = new Map<number, string>([[0, "with academic references"]]);
+  const formatted = formatQuestionAnswers(questions, selected, custom, tEn);
+  assert.match(formatted, /Here are my answers to your questions:/);
+  assert.match(formatted, /\*\*Style — Which tone should be used\?\*\*: Formal, with academic references/);
+  assert.match(formatted, /\*\*Language — Which language\?\*\*: English/);
 });
 
 test("OpencodeRunner and AntigravityRunner compute total tokens when CLI omits total and getSessionTokens reads history fallback", async () => {
@@ -451,7 +451,7 @@ test("OpencodeRunner and AntigravityRunner compute total tokens when CLI omits t
     ses_hist_ctx: [
       {
         role: "assistant",
-        text: "Risposta salvata",
+        text: "Saved response",
         tokens: {
           input: 2400,
           output: 120,
@@ -509,4 +509,3 @@ test("OpencodeRunner and AntigravityRunner compute total tokens when CLI omits t
   assert.equal(ctxTokens.input, 152400);
   assert.equal(ctxTokens.output, 120);
 });
-

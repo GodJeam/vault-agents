@@ -1,7 +1,7 @@
 {"event":"init","conversation_id":"0da89d6e-47ea-4d39-aa41-2bd0aa103371"}
-{"event":"step_update","step_update":{"conversation_id":"0da89d6e-47ea-4d39-aa41-2bd0aa103371","step_index":1,"thought":"Analizzo la struttura del vault..."}}
-{"event":"step_update","step_update":{"conversation_id":"0da89d6e-47ea-4d39-aa41-2bd0aa103371","step_index":2,"step_type":"tool","tool_name":"view_file","state":"RUNNING","tool_info":{"name":"view_file","parameters":{"AbsolutePath":"/vault/Nota.md","toolSummary":"Read Nota.md"}}}}
-{"event":"step_update","step_update":{"conversation_id":"0da89d6e-47ea-4d39-aa41-2bd0aa103371","step_index":2,"step_type":"tool","tool_name":"view_file","state":"DONE","status":"OK","tool_info":{"name":"view_file","parameters":{"AbsolutePath":"/vault/Nota.md","toolSummary":"Read Nota.md"},"output":"Contenuto della nota"}}}
-{"event":"step_update","step_update":{"conversation_id":"0da89d6e-47ea-4d39-aa41-2bd0aa103371","step_index":3,"text_delta":"Ecco il riassunto "}}
-{"event":"step_update","step_update":{"conversation_id":"0da89d6e-47ea-4d39-aa41-2bd0aa103371","step_index":3,"text_delta":"della nota."}}
-{"event":"result","result":{"response":"Ecco il riassunto completo della nota.","usage":{"total_tokens":1500,"input_tokens":1200,"output_tokens":200,"thinking_tokens":100}}}
+{"event":"step_update","step_update":{"conversation_id":"0da89d6e-47ea-4d39-aa41-2bd0aa103371","step_index":1,"thought":"Analyzing vault structure..."}}
+{"event":"step_update","step_update":{"conversation_id":"0da89d6e-47ea-4d39-aa41-2bd0aa103371","step_index":2,"step_type":"tool","tool_name":"view_file","state":"RUNNING","tool_info":{"name":"view_file","parameters":{"AbsolutePath":"/vault/Note.md","toolSummary":"Read Note.md"}}}}
+{"event":"step_update","step_update":{"conversation_id":"0da89d6e-47ea-4d39-aa41-2bd0aa103371","step_index":2,"step_type":"tool","tool_name":"view_file","state":"DONE","status":"OK","tool_info":{"name":"view_file","parameters":{"AbsolutePath":"/vault/Note.md","toolSummary":"Read Note.md"},"output":"Note content"}}}
+{"event":"step_update","step_update":{"conversation_id":"0da89d6e-47ea-4d39-aa41-2bd0aa103371","step_index":3,"text_delta":"Here is the summary "}}
+{"event":"step_update","step_update":{"conversation_id":"0da89d6e-47ea-4d39-aa41-2bd0aa103371","step_index":3,"text_delta":"of the note."}}
+{"event":"result","result":{"response":"Here is the complete summary of the note.","usage":{"total_tokens":1500,"input_tokens":1200,"output_tokens":200,"thinking_tokens":100}}}
