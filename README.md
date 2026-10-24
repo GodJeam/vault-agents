@@ -36,8 +36,8 @@ An **Obsidian** plugin that integrates local AI agents into your vault: chat wit
 | --- | --- | --- | --- |
 | Obsidian | 1.5.7 | 1.5.0 | Desktop only (`isDesktopOnly: true`). |
 | Antigravity CLI (`agy`) | 1.3.5 | 1.3.x | Runs `agy --print --output-format stream-json --model … --effort …`. Model ids already embed the reasoning effort (e.g. `gemini-3.8-flash-low`), so `--effort` is only sent for models without a suffix. |
-| OpenCode CLI (`opencode`) | 2.0.29 | 2.x | Uses `opencode run --format json`, `opencode models`, `opencode session …`, `opencode debug paths`, and the local API (`opencode api GET /api/model`, `/api/session/{id}`, `/api/experimental/session/stats`). |
-| sqlite3 | 3.51.2 | any recent | Session management for Antigravity and database cleanup for OpenCode. |
+| OpenCode CLI (`opencode`) | 2.0.29 | 2.x | Uses `opencode run --format json`, `opencode models`, `opencode session …`, `opencode debug paths`, `sqlite3` on `opencode.db` for fast session context token lookups, and the local API (`opencode api GET /api/model`, `/api/experimental/session/stats`). |
+| sqlite3 | 3.51.2 | any recent | Session management for Antigravity, context token lookups and database cleanup for OpenCode. |
 | anydoc (optional) | 0.2.4 | 0.2.x | Document → Markdown conversion for attachments. |
 
 > **OpenCode 1.x is not supported.** The integration relies on the local API introduced in OpenCode 2.x (`opencode api …`) for model context limits and token/usage statistics; older releases exposed a different CLI surface (e.g. `opencode db`) that has since been removed.

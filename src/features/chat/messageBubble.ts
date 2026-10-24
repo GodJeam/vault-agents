@@ -68,7 +68,7 @@ export class AssistantBubble {
   private stepManager: StepManager;
   private rawText = "";
   private rawReasoning = "";
-  private lastTokens?: { total?: number; input?: number; output?: number };
+  private lastTokens?: FinishInfo["tokens"];
   private lastCost?: number;
   private renderTimer: number | null = null;
   private reasoningTimer: number | null = null;
@@ -230,9 +230,14 @@ export class AssistantBubble {
     this.lastTokens = info.tokens;
     this.lastCost = info.cost;
     if (info.tokens) {
-      const total = info.tokens.total ?? 0;
       const input = info.tokens.input ?? 0;
       const output = info.tokens.output ?? 0;
+      const reasoning = info.tokens.reasoning ?? 0;
+      const cacheRead = info.tokens.cache?.read ?? 0;
+      const cacheWrite = info.tokens.cache?.write ?? 0;
+      const rawTotal = info.tokens.total ?? 0;
+      const total =
+        rawTotal > 0 ? rawTotal : input + output + reasoning + cacheRead + cacheWrite;
       const cost = info.cost ?? 0;
       this.statsEl.removeClass("hidden");
       this.statsEl.setText(this.fmtTokens(total, input, output, cost));

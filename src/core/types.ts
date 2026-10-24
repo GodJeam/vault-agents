@@ -59,6 +59,10 @@ export interface FinishInfo {
     input?: number;
     output?: number;
     reasoning?: number;
+    cache?: {
+      read?: number;
+      write?: number;
+    };
   };
   cost?: number;
 }
@@ -99,7 +103,13 @@ export interface HistoryAssistant {
   role: "assistant";
   text: string;
   reasoning?: string;
-  tokens?: { total?: number; input?: number; output?: number };
+  tokens?: {
+    total?: number;
+    input?: number;
+    output?: number;
+    reasoning?: number;
+    cache?: { read?: number; write?: number };
+  };
   cost?: number;
   timestamp?: number;
 }

@@ -22,6 +22,7 @@ export interface OpencodePart {
     input?: number;
     output?: number;
     reasoning?: number;
+    cache?: { read?: number; write?: number };
   };
   cost?: number;
 }

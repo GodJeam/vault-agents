@@ -446,3 +446,67 @@ test("formatToolAction and formatQuestionAnswers produce human-readable localize
   assert.match(formatted, /\*\*Lingua — In che lingua\?\*\*: Italiano/);
 });
 
+test("OpencodeRunner and AntigravityRunner compute total tokens when CLI omits total and getSessionTokens reads history fallback", async () => {
+  const histories: HistoryMap = {
+    ses_hist_ctx: [
+      {
+        role: "assistant",
+        text: "Risposta salvata",
+        tokens: {
+          input: 2400,
+          output: 120,
+          reasoning: 50,
+          cache: { read: 150000, write: 0 },
+        },
+        cost: 0.0012,
+      },
+    ],
+  };
+  const host = createMockHost({ binaryPath: "/nonexistent/opencode" }, histories);
+  const oc = new OpencodeRunner(host);
+  const agy = new AntigravityRunner(host);
+  const col = createCollector();
+
+  // OpenCode step_finish without tokens.total
+  oc.handleLine(
+    JSON.stringify({
+      type: "step_finish",
+      sessionID: "ses_hist_ctx",
+      part: {
+        type: "step-finish",
+        tokens: {
+          input: 300,
+          output: 100,
+          reasoning: 50,
+          cache: { read: 1000, write: 0 },
+        },
+        cost: 0.0005,
+      },
+    }),
+    col.cb
+  );
+  assert.equal(col.finishes.at(-1)?.tokens?.total, 1450);
+
+  // Antigravity result without usage.total_tokens
+  agy.handleLine(
+    JSON.stringify({
+      event: "result",
+      result: {
+        response: "Ok",
+        usage: {
+          input_tokens: 500,
+          output_tokens: 150,
+          thinking_tokens: 50,
+        },
+      },
+    }),
+    col.cb
+  );
+  assert.equal(col.finishes.at(-1)?.tokens?.total, 700);
+
+  // getSessionTokens falls back to saved history (including cache.read) when CLI/db is unavailable
+  const ctxTokens = await oc.getSessionTokens("ses_hist_ctx");
+  assert.equal(ctxTokens.input, 152400);
+  assert.equal(ctxTokens.output, 120);
+});
+

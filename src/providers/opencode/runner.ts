@@ -4,6 +4,7 @@ import type {
   AgentQuestion,
   AgentQuestionOption,
   EngineType,
+  FinishInfo,
   RunHandle,
   RunRequest,
   SessionInfo,
@@ -148,6 +149,61 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async getSessionTokens(sessionId: string): Promise<{ input: number; output: number }> {
+    // 1. Query sqlite3 directly for the latest assistant message's token breakdown
+    // (avoids OpenCode's CLI stdout truncation on large /api/session/{id}/message payloads)
+    const dbPath = await this.getDbPath();
+    if (dbPath) {
+      for (const table of ["session_message", "message"]) {
+        try {
+          const safeId = sessionId.replace(/'/g, "''");
+          const whereClause =
+            table === "session_message"
+              ? `session_id = '${safeId}' AND type = 'assistant'`
+              : `session_id = '${safeId}'`;
+          const orderCol = table === "session_message" ? "seq DESC" : "time_created DESC";
+          const out = await this.execSqlite(
+            dbPath,
+            `SELECT json_extract(data, '$.tokens') FROM ${table} WHERE ${whereClause} ORDER BY ${orderCol} LIMIT 5`
+          );
+          for (const line of out.split(/\r?\n/)) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed === "null") continue;
+            const tk = JSON.parse(trimmed) as OpencodeMessageInfo["tokens"];
+            if (tk) {
+              const input =
+                Number(tk.input ?? 0) +
+                Number(tk.cache?.read ?? 0) +
+                Number(tk.cache?.write ?? 0);
+              const output = Number(tk.output ?? 0);
+              if (input > 0 || output > 0) {
+                return { input, output };
+              }
+            }
+          }
+        } catch {
+          // Try next table or fallback
+        }
+      }
+    }
+
+    // 2. Fallback to saved Obsidian history for this session
+    const history = this.plugin.getHistory(sessionId);
+    for (let i = history.length - 1; i >= 0; i--) {
+      const msg = history[i];
+      if (msg.role === "assistant" && msg.tokens) {
+        const tk = msg.tokens;
+        const input =
+          Number(tk.input ?? 0) +
+          Number(tk.cache?.read ?? 0) +
+          Number(tk.cache?.write ?? 0);
+        const output = Number(tk.output ?? 0);
+        if (input > 0 || output > 0) {
+          return { input, output };
+        }
+      }
+    }
+
+    // 3. Final fallback: small /api/session/{id}/message response
     try {
       const out = await this.execCli(this.getBin(), [
         "api",
@@ -166,10 +222,10 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
           return { input, output: Number(tk.output ?? 0) };
         }
       }
-      return { input: 0, output: 0 };
     } catch {
-      return { input: 0, output: 0 };
+      // Ignore
     }
+    return { input: 0, output: 0 };
   }
 
   async pruneOversizedParts(force = false, ignoreAge = false): Promise<void> {
@@ -374,12 +430,32 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
           });
         }
         break;
-      case "step_finish":
+      case "step_finish": {
+        const tk = part?.tokens;
+        let normalizedTokens: FinishInfo["tokens"] | undefined;
+        if (tk) {
+          const input = Number(tk.input ?? 0);
+          const output = Number(tk.output ?? 0);
+          const reasoning = Number(tk.reasoning ?? 0);
+          const cacheRead = Number(tk.cache?.read ?? 0);
+          const cacheWrite = Number(tk.cache?.write ?? 0);
+          const rawTotal = Number(tk.total ?? 0);
+          const total =
+            rawTotal > 0 ? rawTotal : input + output + reasoning + cacheRead + cacheWrite;
+          normalizedTokens = {
+            ...tk,
+            input,
+            output,
+            reasoning,
+            total,
+          };
+        }
         cb.onFinish({
-          tokens: part?.tokens,
+          tokens: normalizedTokens,
           cost: typeof part?.cost === "number" ? part.cost : undefined,
         });
         break;
+      }
       case "error":
         cb.onError(this.errorMessage(ev.error));
         break;
