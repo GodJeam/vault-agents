@@ -438,7 +438,7 @@ export class ChatView extends ItemView {
         o.value = s.id;
         const title = s.title || s.id;
         const mark = pinnedSet.has(s.id) ? "● " : "";
-        const short = title.length > 40 ? title.slice(0, 37) + "⬦" : title;
+        const short = title.length > 40 ? title.slice(0, 37) + "…" : title;
         o.textContent = mark + short;
         o.title = title;
       }
@@ -518,6 +518,18 @@ export class ChatView extends ItemView {
       const tokens = await runner.getSessionTokens(sid);
       this.contextBaseInput = tokens.input;
       this.contextUsed = tokens.input;
+      if (
+        typeof tokens.totalTokens === "number" &&
+        tokens.totalTokens > this.stats.total
+      ) {
+        this.stats.input = tokens.totalInput ?? this.stats.input;
+        this.stats.output = tokens.totalOutput ?? this.stats.output;
+        this.stats.total = tokens.totalTokens;
+        if (typeof tokens.totalCost === "number" && tokens.totalCost > 0) {
+          this.stats.cost = tokens.totalCost;
+        }
+        this.updateStatsBar();
+      }
       if (!this.contextLimit) {
         const activeMod = this.activeModelFor(runner.id);
         this.contextLimit = await runner.getModelContextLimit(activeMod);
@@ -637,7 +649,7 @@ export class ChatView extends ItemView {
     if (!this.modelBtn) return;
     const engine = this.sessionEngine();
     const m = this.activeModelFor(engine);
-    this.modelBtn.setText(m.length > 30 ? m.slice(0, 27) + "⬦" : m);
+    this.modelBtn.setText(m.length > 30 ? m.slice(0, 27) + "…" : m);
     this.modelBtn.setAttribute("title", `${m} (${this.engineLabel(engine)})`);
   }
 
@@ -835,7 +847,7 @@ export class ChatView extends ItemView {
     for (const rec of recent) {
       const who = rec.role === "user" ? this.plugin.t("User") : assistantWho;
       const text =
-        rec.text.length > 800 ? rec.text.slice(0, 800) + "⬦" : rec.text;
+        rec.text.length > 800 ? rec.text.slice(0, 800) + "…" : rec.text;
       lines.push(`${who}: ${text}`);
     }
     return (

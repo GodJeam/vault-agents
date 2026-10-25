@@ -100,10 +100,15 @@ export interface AgentProvider {
   /** Get context token limit for a specific model */
   getModelContextLimit(model: string): Promise<number>;
 
-  /** Get token usage for a session (last turn prompt size) */
-  getSessionTokens(
-    sessionId: string
-  ): Promise<{ input: number; output: number }>;
+  /** Get token usage for a session (last turn prompt size + session totals) */
+  getSessionTokens(sessionId: string): Promise<{
+    input: number;
+    output: number;
+    totalInput?: number;
+    totalOutput?: number;
+    totalTokens?: number;
+    totalCost?: number;
+  }>;
 
   /** Get global usage statistics if supported */
   getUsageStats(): Promise<UsageStats>;

@@ -274,11 +274,24 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     return typeof ctx === "number" && ctx > 0 ? ctx : 0;
   }
 
-  async getSessionTokens(
-    sessionId: string
-  ): Promise<{ input: number; output: number }> {
-    // 1. Query sqlite3 directly for the latest assistant message's token
-    // breakdown (avoids CLI stdout truncation on large /message payloads)
+  async getSessionTokens(sessionId: string): Promise<{
+    input: number;
+    output: number;
+    totalInput?: number;
+    totalOutput?: number;
+    totalTokens?: number;
+    totalCost?: number;
+  }> {
+    let ctxInput = 0;
+    let ctxOutput = 0;
+    let totalInput = 0;
+    let totalOutput = 0;
+    let totalReasoning = 0;
+    let totalCost = 0;
+    let foundDb = false;
+
+    // 1. Query sqlite3 directly for the latest assistant message's context
+    // breakdown AND the cumulative session totals across all steps
     const dbPath = await this.getDbPath();
     if (dbPath) {
       for (const table of ["session_message", "message"]) {
@@ -287,28 +300,58 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
           const whereClause =
             table === "session_message"
               ? `session_id = '${safeId}' AND type = 'assistant'`
-              : `session_id = '${safeId}'`;
+              : [
+                  `session_id = '${safeId}'`,
+                  "AND json_extract(data, '$.role') = 'assistant'",
+                ].join(" ");
           const orderCol =
             table === "session_message" ? "seq DESC" : "time_created DESC";
-          const query = [
+          const latestQuery = [
             `SELECT json_extract(data, '$.tokens') FROM ${table}`,
             `WHERE ${whereClause} ORDER BY ${orderCol} LIMIT 5`,
           ].join(" ");
-          const out = await this.execSqlite(dbPath, query);
+          const out = await this.execSqlite(dbPath, latestQuery);
           for (const line of out.split(/\r?\n/)) {
             const trimmed = line.trim();
             if (!trimmed || trimmed === "null") continue;
             const tk = JSON.parse(trimmed) as OpencodeMessageInfo["tokens"];
             if (tk) {
-              const input =
+              const inp =
                 Number(tk.input ?? 0) +
                 Number(tk.cache?.read ?? 0) +
                 Number(tk.cache?.write ?? 0);
-              const output = Number(tk.output ?? 0);
-              if (input > 0 || output > 0) {
-                return { input, output };
+              const outTok = Number(tk.output ?? 0);
+              if (inp > 0 || outTok > 0) {
+                ctxInput = inp;
+                ctxOutput = outTok;
+                foundDb = true;
+                break;
               }
             }
+          }
+          if (foundDb) {
+            const sumQuery = [
+              "SELECT",
+              "COALESCE(SUM(json_extract(data, '$.tokens.input')), 0),",
+              "COALESCE(SUM(json_extract(data, '$.tokens.output')), 0),",
+              "COALESCE(SUM(json_extract(data, '$.tokens.reasoning')), 0),",
+              "COALESCE(SUM(json_extract(data, '$.cost')), 0)",
+              `FROM ${table} WHERE ${whereClause}`,
+            ].join(" ");
+            const sumOut = await this.execSqlite(dbPath, sumQuery);
+            const parts = sumOut.trim().split("|");
+            totalInput = Number(parts[0] || 0);
+            totalOutput = Number(parts[1] || 0);
+            totalReasoning = Number(parts[2] || 0);
+            totalCost = Number(parts[3] || 0);
+            return {
+              input: ctxInput,
+              output: ctxOutput,
+              totalInput,
+              totalOutput,
+              totalTokens: totalInput + totalOutput + totalReasoning,
+              totalCost,
+            };
           }
         } catch {
           // Try next table or fallback
