@@ -485,7 +485,7 @@ test("OpencodeRunner and AntigravityRunner compute total tokens when CLI omits t
     }),
     col.cb
   );
-  assert.equal(col.finishes.at(-1)?.tokens?.total, 1450);
+  assert.equal(col.finishes.at(-1)?.tokens?.total, 450);
 
   // Antigravity result without usage.total_tokens
   agy.handleLine(

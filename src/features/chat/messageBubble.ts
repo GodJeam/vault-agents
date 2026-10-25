@@ -68,6 +68,12 @@ export class AssistantBubble {
   private stepManager: StepManager;
   private rawText = "";
   private rawReasoning = "";
+  private turnInput = 0;
+  private turnOutput = 0;
+  private turnReasoning = 0;
+  private turnCost = 0;
+  private lastCacheRead = 0;
+  private lastCacheWrite = 0;
   private lastTokens?: FinishInfo["tokens"];
   private lastCost?: number;
   private renderTimer: number | null = null;
@@ -227,20 +233,36 @@ export class AssistantBubble {
   }
 
   setFinish(info: FinishInfo): void {
-    this.lastTokens = info.tokens;
-    this.lastCost = info.cost;
     if (info.tokens) {
-      const input = info.tokens.input ?? 0;
-      const output = info.tokens.output ?? 0;
-      const reasoning = info.tokens.reasoning ?? 0;
-      const cacheRead = info.tokens.cache?.read ?? 0;
-      const cacheWrite = info.tokens.cache?.write ?? 0;
-      const rawTotal = info.tokens.total ?? 0;
-      const total =
-        rawTotal > 0 ? rawTotal : input + output + reasoning + cacheRead + cacheWrite;
-      const cost = info.cost ?? 0;
+      this.turnInput += info.tokens.input ?? 0;
+      this.turnOutput += info.tokens.output ?? 0;
+      this.turnReasoning += info.tokens.reasoning ?? 0;
+      if (info.tokens.cache?.read !== undefined) {
+        this.lastCacheRead = info.tokens.cache.read;
+      }
+      if (info.tokens.cache?.write !== undefined) {
+        this.lastCacheWrite = info.tokens.cache.write;
+      }
+    }
+    this.turnCost += info.cost ?? 0;
+
+    if (info.tokens) {
+      const total = this.turnInput + this.turnOutput + this.turnReasoning;
+      this.lastTokens = {
+        total,
+        input: this.turnInput,
+        output: this.turnOutput,
+        reasoning: this.turnReasoning,
+        cache:
+          this.lastCacheRead > 0 || this.lastCacheWrite > 0
+            ? { read: this.lastCacheRead, write: this.lastCacheWrite }
+            : undefined,
+      };
+      this.lastCost = this.turnCost;
       this.statsEl.removeClass("hidden");
-      this.statsEl.setText(this.fmtTokens(total, input, output, cost));
+      this.statsEl.setText(
+        this.fmtTokens(total, this.turnInput, this.turnOutput, this.turnCost)
+      );
     }
   }
 
