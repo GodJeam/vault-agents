@@ -45,7 +45,7 @@ function tokenizeJSLine(line) {
 
 function splitLongString(strLit, indentStr, maxCols) {
   const q = strLit[0];
-  if (q !== '"' && q !== "'") return strLit;
+  if (q !== '"' && q !== "'") return [indentStr + strLit];
   const inner = strLit.slice(1, -1);
   const words = [];
   let cur = "";
@@ -69,7 +69,6 @@ function splitLongString(strLit, indentStr, maxCols) {
         c === "/" ||
         c === "-" ||
         c === "," ||
-        c === "." ||
         c === "|" ||
         c === ";";
       if (isBreakChar) {
@@ -80,7 +79,7 @@ function splitLongString(strLit, indentStr, maxCols) {
   }
   if (cur) words.push(cur);
 
-  const budget = Math.max(20, maxCols - indentStr.length - 6);
+  const budget = Math.max(20, maxCols - indentStr.length - 5);
   const chunks = [];
   let line = "";
   for (const w of words) {
@@ -105,38 +104,127 @@ function splitLongString(strLit, indentStr, maxCols) {
     }
   }
   if (line) chunks.push(line);
-  if (chunks.length <= 1) return strLit;
-  return chunks
-    .map((c, idx) => {
-      const prefix = idx === 0 ? "" : indentStr;
-      const suffix = idx < chunks.length - 1 ? " +" : "";
-      return `${prefix}${q}${c}${q}${suffix}`;
-    })
-    .join("\n");
+  return chunks.map((c, idx) => {
+    const suffix = idx < chunks.length - 1 ? " +" : "";
+    return `${indentStr}${q}${c}${q}${suffix}`;
+  });
+}
+
+function formatObjectEntryLine(line, maxCols = MAX_COLS) {
+  const indentMatch = line.match(/^(\s*)/);
+  const baseIndent = indentMatch ? indentMatch[1] : "";
+  const contIndent = baseIndent + "  ";
+  const tks = tokenizeJSLine(line);
+
+  // Case A: ["long key"]: "long val",
+  if (
+    tks.length >= 4 &&
+    tks[0].type === "code" &&
+    /^\s*\[\s*$/.test(tks[0].text) &&
+    tks[1].type === "string" &&
+    tks[2].type === "code" &&
+    /^\s*\]\s*:\s*$/.test(tks[2].text) &&
+    tks[3].type === "string"
+  ) {
+    const keyStr = tks[1].text;
+    const valStr = tks[3].text;
+    const tail = tks
+      .slice(4)
+      .map((t) => t.text)
+      .join("");
+    const keyLines = splitLongString(keyStr, contIndent, maxCols - 2);
+    const valLines = splitLongString(
+      valStr,
+      contIndent,
+      maxCols - tail.length
+    );
+    const out = [];
+    const singleKeyLen = keyLines[0].trim().length + baseIndent.length + 3;
+    if (keyLines.length === 1 && singleKeyLen <= maxCols) {
+      out.push(`${baseIndent}[${keyLines[0].trim()}]:`);
+    } else {
+      keyLines[0] = `${baseIndent}[${keyLines[0].trim()}`;
+      keyLines[keyLines.length - 1] += "]:";
+      out.push(...keyLines);
+    }
+    valLines[valLines.length - 1] += tail;
+    out.push(...valLines);
+    return out;
+  }
+
+  // Case B: "key": "val",
+  if (
+    tks.length >= 4 &&
+    tks[0].type === "code" &&
+    /^\s+$/.test(tks[0].text) &&
+    tks[1].type === "string" &&
+    tks[2].type === "code" &&
+    /^\s*:\s*$/.test(tks[2].text) &&
+    tks[3].type === "string"
+  ) {
+    const keyStr = tks[1].text;
+    const valStr = tks[3].text;
+    const tail = tks
+      .slice(4)
+      .map((t) => t.text)
+      .join("");
+    const valLines = splitLongString(
+      valStr,
+      contIndent,
+      maxCols - tail.length
+    );
+    valLines[valLines.length - 1] += tail;
+    if (baseIndent.length + keyStr.length + 1 <= maxCols) {
+      return [`${baseIndent}${keyStr}:`, ...valLines];
+    }
+    const keyLines = splitLongString(keyStr, contIndent, maxCols - 2);
+    keyLines[0] = `${baseIndent}[${keyLines[0].trim()}`;
+    keyLines[keyLines.length - 1] += "]:";
+    return [...keyLines, ...valLines];
+  }
+
+  // Case C: ident: "val",
+  if (
+    tks.length >= 2 &&
+    tks[0].type === "code" &&
+    /^\s*[a-zA-Z0-9_$]+\s*:\s*$/.test(tks[0].text) &&
+    tks[1].type === "string"
+  ) {
+    const propPrefix = tks[0].text.trimEnd();
+    const valStr = tks[1].text;
+    const tail = tks
+      .slice(2)
+      .map((t) => t.text)
+      .join("");
+    const valLines = splitLongString(
+      valStr,
+      contIndent,
+      maxCols - tail.length
+    );
+    valLines[valLines.length - 1] += tail;
+    return [propPrefix, ...valLines];
+  }
+
+  return null;
 }
 
 function wrapLine(line, maxCols = MAX_COLS) {
   if (line.length <= maxCols) return [line];
+
+  const objFormatted = formatObjectEntryLine(line, maxCols);
+  if (objFormatted) return objFormatted;
+
   const indentMatch = line.match(/^(\s*)/);
   const baseIndent = indentMatch ? indentMatch[1] : "";
   const contIndent = baseIndent + "  ";
 
   const tokens = tokenizeJSLine(line);
   let rebuilt = "";
-  for (let idx = 0; idx < tokens.length; idx++) {
-    const tk = tokens[idx];
+  for (const tk of tokens) {
     const isQuoted = tk.text[0] === '"' || tk.text[0] === "'";
-    if (tk.type === "string" && isQuoted && tk.text.length > 42) {
-      const prevCode = idx > 0 ? tokens[idx - 1].text : "";
-      const nextCode = idx + 1 < tokens.length ? tokens[idx + 1].text : "";
-      const isPlainPropKey =
-        /^\s*:/.test(nextCode) && !/\[\s*$/.test(prevCode);
-      const split = splitLongString(tk.text, contIndent, maxCols);
-      if (isPlainPropKey && split.includes("\n")) {
-        rebuilt += "[\n" + contIndent + split + "\n" + baseIndent + "]";
-      } else {
-        rebuilt += "\n" + contIndent + split;
-      }
+    if (tk.type === "string" && isQuoted && tk.text.length > 48) {
+      const splitLines = splitLongString(tk.text, contIndent, maxCols);
+      rebuilt += "\n" + splitLines.join("\n");
     } else {
       rebuilt += tk.text;
     }
@@ -164,41 +252,69 @@ function wrapLine(line, maxCols = MAX_COLS) {
     const tks = tokenizeJSLine(cur);
     let pos = 0;
     let bestSplit = -1;
+    let bestScore = -1;
     let fallbackSplit = -1;
+
+    const recordCandidate = (splitPos, priority) => {
+      if (splitPos <= ind.length + 5 || splitPos >= cur.length) return;
+      if (splitPos <= maxCols) {
+        // Prefer higher priority; on tie, prefer closer to maxCols
+        const score = priority * 1000 + splitPos;
+        if (score > bestScore) {
+          bestScore = score;
+          bestSplit = splitPos;
+        }
+      } else if (fallbackSplit === -1) {
+        fallbackSplit = splitPos;
+      }
+    };
 
     for (const tk of tks) {
       if (tk.type === "code") {
         const text = tk.text;
         for (let k = 0; k < text.length; k++) {
           const absPos = pos + k;
-          if (absPos <= ind.length + 5) continue;
           const two = text.slice(k, k + 2);
           const three = text.slice(k, k + 3);
-          let splitAfter = -1;
+
+          // Priority 4: binary / ternary / assignment operators
           if (three === " ? " || three === " : " || three === " = ") {
-            splitAfter = absPos + 3;
+            recordCandidate(absPos + 3, 4);
           } else if (two === "||" || two === "&&" || two === "??") {
-            splitAfter = text[k + 2] === " " ? absPos + 3 : absPos + 2;
-          } else if (two === ", " || two === "; " || two === "+ ") {
-            splitAfter = absPos + 2;
+            recordCandidate(text[k + 2] === " " ? absPos + 3 : absPos + 2, 4);
           } else if (two === "=>" && text[k + 2] === " ") {
-            splitAfter = absPos + 3;
-          } else if (text[k] === "(" || text[k] === "{") {
-            splitAfter = absPos + 1;
-          } else if (
+            recordCandidate(absPos + 3, 4);
+          } else if (two === "+ ") {
+            recordCandidate(absPos + 2, 4);
+          }
+          // Priority 3: comma / semicolon separators
+          else if (two === ", " || two === "; ") {
+            recordCandidate(absPos + 2, 3);
+          }
+          // Priority 2: opening brace or paren (not inside `((x) =>`)
+          else if (
+            (text[k] === "{" || text[k] === "(") &&
+            text[k + 1] !== ")" &&
+            text[k + 1] !== "}" &&
+            !/^\([a-zA-Z0-9_$,\s]*\)\s*=>/.test(text.slice(k))
+          ) {
+            recordCandidate(absPos + 1, 2);
+          }
+          // Priority 1: method chain dot `.method(` (only after `)` or `]`)
+          else if (
             text[k] === "." &&
             k > 0 &&
-            /[a-zA-Z0-9_)\]]/.test(text[k - 1])
+            (text[k - 1] === ")" || text[k - 1] === "]")
           ) {
-            splitAfter = absPos;
+            recordCandidate(absPos, 2);
           }
-
-          if (splitAfter > ind.length + 5) {
-            if (splitAfter <= maxCols) {
-              bestSplit = splitAfter;
-            } else if (fallbackSplit === -1) {
-              fallbackSplit = splitAfter;
-            }
+          // Priority 0: property dot on long identifier chains
+          else if (
+            text[k] === "." &&
+            k > 0 &&
+            /[a-zA-Z0-9_]/.test(text[k - 1])
+          ) {
+            recordCandidate(absPos, 0);
           }
         }
       } else if (
@@ -210,11 +326,15 @@ function wrapLine(line, maxCols = MAX_COLS) {
           const prefix = cur.slice(0, pos);
           const suffix = cur.slice(pos + tk.text.length);
           if (prefix.trim().length > 0) {
-            bestSplit = pos;
+            recordCandidate(pos, 3);
           } else {
-            const splitStr = splitLongString(tk.text, ind, maxCols) + suffix;
-            const subLines = splitStr.split("\n");
+            const subLines = splitLongString(
+              tk.text,
+              ind,
+              maxCols - suffix.length
+            );
             if (subLines.length > 1) {
+              subLines[subLines.length - 1] += suffix;
               queue.unshift(...subLines);
               bestSplit = -2;
               break;
@@ -278,7 +398,8 @@ const context = await esbuild.context({
     ...builtins,
   ],
   format: "cjs",
-  target: "es2018",
+  target: "es2022",
+  charset: "utf8",
   logLevel: "info",
   sourcemap: false,
   treeShaking: true,
