@@ -6,6 +6,8 @@ import { substitute } from "../../i18n";
 import { FileSuggestModal } from "../../shared/modals";
 import type { AttachmentItem } from "./types";
 
+const DOC_RE = /\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|epub|html?)$/i;
+
 export class AttachmentManager {
   private attachmentsBar: HTMLElement;
   private attachments: AttachmentItem[] = [];
@@ -15,12 +17,16 @@ export class AttachmentManager {
     private app: App,
     private plugin: OpencodePlugin
   ) {
-    this.attachmentsBar = container.createDiv({ cls: "opencode-attachments-bar hidden" });
+    this.attachmentsBar = container.createDiv({
+      cls: "opencode-attachments-bar hidden",
+    });
     this.updateBar();
   }
 
   openFilePicker(): void {
-    new FileSuggestModal(this.app, this.plugin, (file) => this.addAttachment(file.path)).open();
+    new FileSuggestModal(this.app, this.plugin, (file) =>
+      this.addAttachment(file.path)
+    ).open();
   }
 
   addAttachment(path: string): void {
@@ -30,7 +36,10 @@ export class AttachmentManager {
     this.updateBar();
     if (isImage) {
       new Notice(
-        this.plugin.t("Image attached: check that the selected model supports images (vision).")
+        this.plugin.t(
+          "Image attached: check that the selected model " +
+            "supports images (vision)."
+        )
       );
     }
   }
@@ -42,28 +51,24 @@ export class AttachmentManager {
       const resolvedPath = abs || a.path;
       if (a.image) return resolvedPath;
       if (!useAnydoc) return resolvedPath;
-      const isDoc = /\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|epub|html?)$/i.test(a.path);
+      const isDoc = DOC_RE.test(a.path);
       if (!isDoc) return resolvedPath;
       try {
         if (!abs) return a.path;
         return await runner.convertDocument(abs);
       } catch (e) {
-        new Notice(
-          `${this.plugin.t("anydoc conversion failed")}: ${a.label} (${(e as Error).message})`
-        );
+        const errMsg = (e as Error).message;
+        const failLabel = this.plugin.t("anydoc conversion failed");
+        new Notice(`${failLabel}: ${a.label} (${errMsg})`);
         const maxMB = this.plugin.settings.maxAttachMB || 20;
         try {
           if (abs) {
             const st = await stat(abs);
             if (st.size > maxMB * 1024 * 1024) {
-              new Notice(
-                substitute(
-                  this.plugin.t(
-                    "Attachment skipped: the file is larger than $1 MB and could not be converted, so it was not attached."
-                  ),
-                  maxMB
-                )
-              );
+              const skipKey =
+                "Attachment skipped: the file is larger than $1 MB and " +
+                "could not be converted, so it was not attached.";
+              new Notice(substitute(this.plugin.t(skipKey), maxMB));
               return null;
             }
           }
@@ -94,7 +99,9 @@ export class AttachmentManager {
     }
     this.attachmentsBar.removeClass("hidden");
     for (const a of this.attachments) {
-      const chip = this.attachmentsBar.createSpan({ cls: "opencode-attachment-chip" });
+      const chip = this.attachmentsBar.createSpan({
+        cls: "opencode-attachment-chip",
+      });
       const icon = chip.createSpan({ cls: "opencode-attachment-icon" });
       setIcon(icon, a.image ? "image" : "file-text");
       chip.createSpan({ text: a.label, cls: "opencode-attachment-label" });

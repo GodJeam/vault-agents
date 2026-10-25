@@ -40,7 +40,8 @@ export class ProviderRegistry {
     sessionId?: string,
     sessionEngines?: Record<string, EngineType>
   ): AgentProvider {
-    const targetEngine = (sessionId && sessionEngines?.[sessionId]) || activeEngine;
+    const targetEngine =
+      (sessionId && sessionEngines?.[sessionId]) || activeEngine;
     const provider = this.get(targetEngine);
     if (provider) return provider;
 

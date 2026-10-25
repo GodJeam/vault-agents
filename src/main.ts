@@ -62,7 +62,8 @@ export default class OpencodePlugin extends Plugin implements RunnerHost {
     this.registry.register(this.opencodeRunner);
     this.registry.register(this.antigravityRunner);
 
-    // Best-effort opencode database cleanup on load (no-op if opencode is absent).
+    // Best-effort opencode database cleanup on load (no-op if opencode is
+    // absent).
     void this.opencodeRunner.pruneOversizedParts();
     const t = this.t.bind(this);
 
@@ -140,7 +141,9 @@ export default class OpencodePlugin extends Plugin implements RunnerHost {
         chat.setContext({ label: file.path, content });
         chat.sendText(
           t(
-            "Analyze the content of the attached note below: provide a summary, key points, possible links with other vault notes and suggestions to develop it."
+            "Analyze the content of the attached note below: provide a " +
+              "summary, key points, possible links with other vault notes " +
+              "and suggestions to develop it."
           )
         );
       },
@@ -175,7 +178,8 @@ export default class OpencodePlugin extends Plugin implements RunnerHost {
 
   async openNewChatView(resetSession = true): Promise<ChatView> {
     const { workspace } = this.app;
-    const hadExistingChat = workspace.getLeavesOfType(CHAT_VIEW_TYPE).length > 0;
+    const hadExistingChat =
+      workspace.getLeavesOfType(CHAT_VIEW_TYPE).length > 0;
     let leaf: WorkspaceLeaf;
     try {
       leaf = workspace.getLeaf("split", "vertical");

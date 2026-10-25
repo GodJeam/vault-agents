@@ -49,7 +49,8 @@ export class SuggestPopup {
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      this.suggestIndex = Math.min(this.suggestIndex + 1, this.suggestItems.length - 1);
+      const maxIdx = this.suggestItems.length - 1;
+      this.suggestIndex = Math.min(this.suggestIndex + 1, maxIdx);
       this.highlightSuggest();
       return true;
     }
@@ -103,13 +104,19 @@ export class SuggestPopup {
     this.suggestEl.empty();
   }
 
-  private detectTrigger(): { char: string; start: number; query: string } | null {
+  private detectTrigger(): {
+    char: string;
+    start: number;
+    query: string;
+  } | null {
     const v = this.inputEl.value;
     const pos = this.inputEl.selectionStart ?? v.length;
 
     // Special case: `/prompt <filter>` allows a space after `/prompt`
     const beforeCursor = v.slice(0, pos);
-    const promptMatch = beforeCursor.match(/(?:^|\s)(\/prompt(?::|\s+)([^\n]*))$/i);
+    const promptMatch = beforeCursor.match(
+      /(?:^|\s)(\/prompt(?::|\s+)([^\n]*))$/i
+    );
     if (promptMatch && promptMatch.index !== undefined) {
       const fullMatch = promptMatch[0];
       const leadingWs = fullMatch.length - promptMatch[1].length;
@@ -134,8 +141,12 @@ export class SuggestPopup {
   private buildSuggestItems(char: string, query: string): SuggestItem[] {
     const q = query.toLowerCase();
     if (char === "/") {
-      if (q === "prompt" || q.startsWith("prompt:") || q.startsWith("prompt ")) {
-        const sub = q.startsWith("prompt") ? query.slice(6).replace(/^[:\s]+/, "") : "";
+      const isPrompt =
+        q === "prompt" || q.startsWith("prompt:") || q.startsWith("prompt ");
+      if (isPrompt) {
+        const sub = q.startsWith("prompt")
+          ? query.slice(6).replace(/^[:\s]+/, "")
+          : "";
         return this.promptItems(sub);
       }
       return this.filterItems(this.commandItems(), q);
@@ -149,7 +160,9 @@ export class SuggestPopup {
   private filterItems(items: SuggestItem[], q: string): SuggestItem[] {
     if (!q) return items;
     return items.filter(
-      (x) => x.label.toLowerCase().includes(q) || (x.desc ?? "").toLowerCase().includes(q)
+      (x) =>
+        x.label.toLowerCase().includes(q) ||
+        (x.desc ?? "").toLowerCase().includes(q)
     );
   }
 
@@ -165,7 +178,9 @@ export class SuggestPopup {
       ];
     }
     const q = sub.trim().toLowerCase();
-    const list = q ? prompts.filter((p) => p.name.toLowerCase().includes(q)) : prompts;
+    const list = q
+      ? prompts.filter((p) => p.name.toLowerCase().includes(q))
+      : prompts;
     return list.map((p) => ({
       label: p.name,
       desc: p.text.length > 80 ? p.text.slice(0, 77) + "…" : p.text,
@@ -197,7 +212,8 @@ export class SuggestPopup {
       this.inputEl.setSelectionRange(pos, pos);
     } else {
       this.inputEl.value = "/prompt:";
-      this.inputEl.setSelectionRange(this.inputEl.value.length, this.inputEl.value.length);
+      const len = this.inputEl.value.length;
+      this.inputEl.setSelectionRange(len, len);
     }
     this.inputEl.focus();
     this.onInputChange();

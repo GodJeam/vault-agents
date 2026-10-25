@@ -1,7 +1,18 @@
-import { ItemView, MarkdownRenderer, Notice, WorkspaceLeaf, setIcon } from "obsidian";
+import {
+  ItemView,
+  MarkdownRenderer,
+  Notice,
+  WorkspaceLeaf,
+  setIcon,
+} from "obsidian";
 import type OpencodePlugin from "../../main";
 import type { AgentProvider } from "../../core/provider";
-import type { FinishInfo, RunHandle, SessionInfo, EngineType } from "../../core/types";
+import type {
+  FinishInfo,
+  RunHandle,
+  SessionInfo,
+  EngineType,
+} from "../../core/types";
 import { substitute } from "../../i18n";
 import {
   ConfirmModal,
@@ -69,10 +80,11 @@ export class ChatView extends ItemView {
     return this.plugin.getRunnerForSession(this.viewSession);
   }
 
-  /** Engine associated with the session currently shown (falls back to the global engine). */
+  /** Engine for the shown session (falls back to the global engine). */
   private sessionEngine(): EngineType {
     const id = this.viewSession;
-    return (id && this.plugin.settings.sessionEngines?.[id]) || this.plugin.settings.engine;
+    const map = this.plugin.settings.sessionEngines;
+    return (id && map?.[id]) || this.plugin.settings.engine;
   }
 
   /** Active model id for the given engine via its EngineConfig. */
@@ -82,7 +94,7 @@ export class ChatView extends ItemView {
     return cfg.model || provider?.descriptor.defaultModel || "";
   }
 
-  /** Human-readable label for an engine, driven by the provider descriptor. */
+  /** Human-readable label for an engine from the provider descriptor. */
   private engineLabel(engine: EngineType): string {
     const provider = this.plugin.registry.get(engine);
     return provider?.costNote || provider?.displayName || engine;
@@ -90,7 +102,9 @@ export class ChatView extends ItemView {
 
   assistantLabel(): string {
     const desc = this.getRunner().descriptor;
-    return desc.id === "opencode" ? this.plugin.t(desc.shortName) : desc.shortName;
+    return desc.id === "opencode"
+      ? this.plugin.t(desc.shortName)
+      : desc.shortName;
   }
 
   getViewType(): string {
@@ -112,20 +126,19 @@ export class ChatView extends ItemView {
 
     this.messagesEl = container.createDiv({ cls: "opencode-messages" });
     this.buildContextBar(container);
-    this.attachmentManager = new AttachmentManager(container, this.app, this.plugin);
+    this.attachmentManager = new AttachmentManager(
+      container,
+      this.app,
+      this.plugin
+    );
     this.buildStatsBar(container);
     this.buildInputArea(container);
 
     // Keep @ file suggestions reactive when vault files change
-    this.registerEvent(
-      this.app.vault.on("create", () => this.suggestPopup?.invalidateVaultCache())
-    );
-    this.registerEvent(
-      this.app.vault.on("delete", () => this.suggestPopup?.invalidateVaultCache())
-    );
-    this.registerEvent(
-      this.app.vault.on("rename", () => this.suggestPopup?.invalidateVaultCache())
-    );
+    const inv = () => this.suggestPopup?.invalidateVaultCache();
+    this.registerEvent(this.app.vault.on("create", inv));
+    this.registerEvent(this.app.vault.on("delete", inv));
+    this.registerEvent(this.app.vault.on("rename", inv));
 
     void this.populateSessionSelect().then(() => {
       this.loadHistoryForSession(this.viewSession);
@@ -169,14 +182,18 @@ export class ChatView extends ItemView {
     void this.populateSessionSelect();
     this.loadHistoryForSession("");
     if (!silent) {
-      new Notice(this.plugin.t("New session: the next message will start from scratch."));
+      new Notice(
+        this.plugin.t("New session: the next message will start from scratch.")
+      );
     }
   }
 
   private buildContextBar(container: HTMLElement): void {
     this.contextBar = container.createDiv({ cls: "opencode-context-bar" });
 
-    this.contextLabelEl = this.contextBar.createSpan({ cls: "opencode-context-label" });
+    this.contextLabelEl = this.contextBar.createSpan({
+      cls: "opencode-context-label",
+    });
     this.contextClearBtn = this.contextBar.createEl("button", {
       cls: "opencode-icon-btn hidden",
       attr: { title: this.plugin.t("Remove the attached context") },
@@ -215,30 +232,39 @@ export class ChatView extends ItemView {
       attr: { title: this.plugin.t("Rename session") },
     });
     setIcon(this.renameBtn, "pencil");
-    this.renameBtn.addEventListener("click", () => this.renameCurrentSession());
+    this.renameBtn.addEventListener("click", () =>
+      this.renameCurrentSession()
+    );
 
     this.deleteBtn = this.contextBar.createEl("button", {
       cls: "opencode-icon-btn",
       attr: { title: this.plugin.t("Delete session") },
     });
     setIcon(this.deleteBtn, "trash");
-    this.deleteBtn.addEventListener("click", () => this.deleteCurrentSession());
+    this.deleteBtn.addEventListener("click", () =>
+      this.deleteCurrentSession()
+    );
 
     const statsBtn = this.contextBar.createEl("button", {
       cls: "opencode-icon-btn",
       attr: { title: this.plugin.t("Token and cost statistics") },
     });
     setIcon(statsBtn, "bar-chart-3");
-    statsBtn.addEventListener(
-      "click",
-      () => new StatsModal(this.app, this.plugin, this.sessionEngine()).open()
+    statsBtn.addEventListener("click", () =>
+      new StatsModal(this.app, this.plugin, this.sessionEngine()).open()
     );
 
-    const attachBtn = this.contextBar.createEl("button", { cls: "opencode-add-note-btn" });
+    const attachBtn = this.contextBar.createEl("button", {
+      cls: "opencode-add-note-btn",
+    });
     attachBtn.setText("＋ " + this.plugin.t("Attach file"));
-    attachBtn.addEventListener("click", () => this.attachmentManager.openFilePicker());
+    attachBtn.addEventListener("click", () =>
+      this.attachmentManager.openFilePicker()
+    );
 
-    const add = this.contextBar.createEl("button", { cls: "opencode-add-note-btn" });
+    const add = this.contextBar.createEl("button", {
+      cls: "opencode-add-note-btn",
+    });
     add.setText("+ " + this.plugin.t("Current note"));
     add.addEventListener("click", () => this.attachCurrentNote());
 
@@ -258,7 +284,11 @@ export class ChatView extends ItemView {
     this.plugin.settings.pinned = pinned;
     void this.plugin.saveSettings();
     void this.populateSessionSelect();
-    new Notice(idx >= 0 ? this.plugin.t("Session unpinned.") : this.plugin.t("Session pinned."));
+    const msg =
+      idx >= 0
+        ? this.plugin.t("Session unpinned.")
+        : this.plugin.t("Session pinned.");
+    new Notice(msg);
   }
 
   private renameCurrentSession(): void {
@@ -275,7 +305,9 @@ export class ChatView extends ItemView {
           void this.populateSessionSelect();
           new Notice(this.plugin.t("Session renamed."));
         })
-        .catch((e) => new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`));
+        .catch((e) =>
+          new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`)
+        );
     }).open();
   }
 
@@ -286,15 +318,15 @@ export class ChatView extends ItemView {
       return;
     }
     const title = this.sessionSelect.selectedOptions[0]?.textContent ?? id;
+    const confirmTpl = this.plugin.t(
+      'Do you want to delete the session "$1"? ' +
+        "The history saved in Obsidian will also be removed."
+    );
     new ConfirmModal(
       this.app,
       this.plugin,
       this.plugin.t("Delete session"),
-      this.plugin
-        .t(
-          'Do you want to delete the session "$1"? The history saved in Obsidian will also be removed.'
-        )
-        .replace("$1", title),
+      confirmTpl.replace("$1", title),
       this.plugin.t("Delete"),
       () => {
         this.getRunner()
@@ -317,14 +349,18 @@ export class ChatView extends ItemView {
             this.loadHistoryForSession(this.viewSession);
             new Notice(this.plugin.t("Session deleted."));
           })
-          .catch((e) => new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`));
+          .catch((e) =>
+            new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`)
+          );
       }
     ).open();
   }
 
   private updateContextBar(): void {
     if (this.context) {
-      this.contextLabelEl.setText(`${this.plugin.t("Context:")} ${this.context.label}`);
+      this.contextLabelEl.setText(
+        `${this.plugin.t("Context:")} ${this.context.label}`
+      );
       this.contextLabelEl.show();
       this.contextClearBtn.removeClass("hidden");
     } else {
@@ -343,7 +379,9 @@ export class ChatView extends ItemView {
     newOpt.textContent = "＋ " + this.plugin.t("New session");
     try {
       const providers = this.plugin.registry.getAll();
-      const results = await Promise.allSettled(providers.map((p) => p.listSessions()));
+      const results = await Promise.allSettled(
+        providers.map((p) => p.listSessions())
+      );
       const all: SessionInfo[] = [];
       const seen = new Set<string>();
 
@@ -355,7 +393,9 @@ export class ChatView extends ItemView {
               seen.add(s.id);
               const engine = s.engine || providerId;
               all.push({ ...s, engine });
-              if (!this.plugin.settings.sessionEngines) this.plugin.settings.sessionEngines = {};
+              if (!this.plugin.settings.sessionEngines) {
+                this.plugin.settings.sessionEngines = {};
+              }
               if (!this.plugin.settings.sessionEngines[s.id]) {
                 this.plugin.settings.sessionEngines[s.id] = engine;
               }
@@ -370,14 +410,17 @@ export class ChatView extends ItemView {
       const recent = all.filter((s) => !pinnedSet.has(s.id)).slice(0, 20);
       const displayed = [...pinned, ...recent];
 
-      // Always include the currently active session so its name is shown in the dropdown
-      if (this.viewSession && !displayed.some((s) => s.id === this.viewSession)) {
+      // Always include the currently active session so its name is shown
+      const hasActive = displayed.some((s) => s.id === this.viewSession);
+      if (this.viewSession && !hasActive) {
         const found = all.find((s) => s.id === this.viewSession);
         if (found) {
           displayed.push(found);
         } else {
           const hist = this.plugin.getHistory(this.viewSession);
-          const firstUser = hist.find((m) => m.role === "user" && m.text.trim());
+          const firstUser = hist.find(
+            (m) => m.role === "user" && m.text.trim()
+          );
           const fallbackTitle = firstUser
             ? firstUser.text.trim().replace(/\s+/g, " ").slice(0, 40)
             : this.viewSession;
@@ -395,7 +438,8 @@ export class ChatView extends ItemView {
         o.value = s.id;
         const title = s.title || s.id;
         const mark = pinnedSet.has(s.id) ? "● " : "";
-        o.textContent = mark + (title.length > 40 ? title.slice(0, 37) + "⬦" : title);
+        const short = title.length > 40 ? title.slice(0, 37) + "⬦" : title;
+        o.textContent = mark + short;
         o.title = title;
       }
     } catch {
@@ -407,11 +451,13 @@ export class ChatView extends ItemView {
 
   private updateSessionBtnStates(): void {
     const hasSession = !!this.viewSession;
-    const supportsSessions = this.getRunner().descriptor.supportsSessions !== "none";
+    const sessionMode = this.getRunner().descriptor.supportsSessions;
+    const supportsSessions = sessionMode !== "none";
     this.renameBtn.disabled = !hasSession || !supportsSessions;
     this.deleteBtn.disabled = !hasSession || !supportsSessions;
     this.pinBtn.disabled = !hasSession || !supportsSessions;
-    const pinned = (this.plugin.settings.pinned ?? []).includes(this.viewSession);
+    const pinnedList = this.plugin.settings.pinned ?? [];
+    const pinned = pinnedList.includes(this.viewSession);
     this.pinBtn.toggleClass("is-active", pinned);
   }
 
@@ -452,8 +498,10 @@ export class ChatView extends ItemView {
     }
     const pct = Math.min(100, Math.round((used / limit) * 100));
     this.contextFillEl.style.width = pct + "%";
+    const usedK = Math.round(used / 1000);
+    const limitK = Math.round(limit / 1000);
     this.contextEl.setText(
-      `${this.plugin.t("Context:")} ${pct}% (${Math.round(used / 1000)}K / ${Math.round(limit / 1000)}K)`
+      `${this.plugin.t("Context:")} ${pct}% (${usedK}K / ${limitK}K)`
     );
   }
 
@@ -471,7 +519,8 @@ export class ChatView extends ItemView {
       this.contextBaseInput = tokens.input;
       this.contextUsed = tokens.input;
       if (!this.contextLimit) {
-        this.contextLimit = await runner.getModelContextLimit(this.activeModelFor(runner.id));
+        const activeMod = this.activeModelFor(runner.id);
+        this.contextLimit = await runner.getModelContextLimit(activeMod);
       }
     } catch (e) {
       console.error("[vault-agents] refreshContext error:", e);
@@ -513,25 +562,33 @@ export class ChatView extends ItemView {
   private buildInputArea(container: HTMLElement): void {
     const inputArea = container.createDiv({ cls: "opencode-input-area" });
 
+    const placeholderKey =
+      "Type a message for the agent... " +
+      "(Enter to send, Shift+Enter for a new line)";
     this.inputEl = inputArea.createEl("textarea", {
       cls: "opencode-input",
       attr: {
-        placeholder: this.plugin.t(
-          "Type a message for the agent... (Enter to send, Shift+Enter for a new line)"
-        ),
+        placeholder: this.plugin.t(placeholderKey),
       },
     });
 
-    this.suggestPopup = new SuggestPopup(inputArea, this.inputEl, this.app, this.plugin, {
-      onOpenModelList: () => void this.openModelList(),
-      onStartNewSession: () => this.startNewSession(),
-      onAttachCurrentNote: () => void this.attachCurrentNote(),
-      onOpenFilePicker: () => this.attachmentManager.openFilePicker(),
-      onOpenStats: () => new StatsModal(this.app, this.plugin, this.sessionEngine()).open(),
-      onTogglePin: () => this.togglePin(),
-      onRenameSession: () => this.renameCurrentSession(),
-      onAddAttachment: (path) => this.attachmentManager.addAttachment(path),
-    });
+    this.suggestPopup = new SuggestPopup(
+      inputArea,
+      this.inputEl,
+      this.app,
+      this.plugin,
+      {
+        onOpenModelList: () => void this.openModelList(),
+        onStartNewSession: () => this.startNewSession(),
+        onAttachCurrentNote: () => void this.attachCurrentNote(),
+        onOpenFilePicker: () => this.attachmentManager.openFilePicker(),
+        onOpenStats: () =>
+          new StatsModal(this.app, this.plugin, this.sessionEngine()).open(),
+        onTogglePin: () => this.togglePin(),
+        onRenameSession: () => this.renameCurrentSession(),
+        onAddAttachment: (path) => this.attachmentManager.addAttachment(path),
+      }
+    );
 
     this.inputEl.addEventListener("keydown", (e) => {
       if (this.suggestPopup.handleKeydown(e)) return;
@@ -540,7 +597,9 @@ export class ChatView extends ItemView {
         void this.send();
       }
     });
-    this.inputEl.addEventListener("input", () => this.suggestPopup.onInputChange());
+    this.inputEl.addEventListener("input", () =>
+      this.suggestPopup.onInputChange()
+    );
 
     const buttons = inputArea.createDiv({ cls: "opencode-buttons" });
 
@@ -594,13 +653,16 @@ export class ChatView extends ItemView {
         ...providers.filter((p) => p.id !== activeEngine),
       ];
 
-      const results = await Promise.allSettled(orderedProviders.map((p) => p.listModels()));
+      const results = await Promise.allSettled(
+        orderedProviders.map((p) => p.listModels())
+      );
       const items: ModelItem[] = [];
 
       orderedProviders.forEach((provider, idx) => {
         const res = results[idx];
         const models = res.status === "fulfilled" ? res.value : [];
-        const providerLabel = provider.costNote || provider.descriptor.shortName;
+        const providerLabel =
+          provider.costNote || provider.descriptor.shortName;
         for (const m of models) {
           items.push({
             id: m,
@@ -617,18 +679,20 @@ export class ChatView extends ItemView {
         const cfg = this.plugin.getEngineConfig(item.engine);
         cfg.model = item.id;
 
+        const setPrefix = this.plugin.t("Model set:");
         if (this.viewSession && engineChanged) {
-          // The open session belongs to another engine: its id cannot be reused,
-          // so start a fresh session for the newly selected engine.
+          // The open session belongs to another engine: start a fresh session
           this.viewSession = "";
           this.plugin.settings.sessionId = "";
           void this.plugin.saveSettings();
           this.loadHistoryForSession("");
-          new Notice(`${this.plugin.t("Model set:")} ${item.id} (${item.provider})`);
+          new Notice(`${setPrefix} ${item.id} (${item.provider})`);
           return;
         }
         if (this.viewSession) {
-          if (!this.plugin.settings.sessionEngines) this.plugin.settings.sessionEngines = {};
+          if (!this.plugin.settings.sessionEngines) {
+            this.plugin.settings.sessionEngines = {};
+          }
           this.plugin.settings.sessionEngines[this.viewSession] = item.engine;
         }
         void this.plugin.saveSettings();
@@ -636,7 +700,7 @@ export class ChatView extends ItemView {
         this.updateStatsBar();
         this.contextLimit = 0;
         void this.refreshContext();
-        new Notice(`${this.plugin.t("Model set:")} ${item.id} (${item.provider})`);
+        new Notice(`${setPrefix} ${item.id} (${item.provider})`);
       }).open();
     } catch (e) {
       new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`);
@@ -663,7 +727,9 @@ export class ChatView extends ItemView {
     this.setRunningUI(true);
 
     const promptText = this.plugin.t(
-      "Summarize in detail this conversation: goals, decisions made, work done, current state and next steps. Write the summary so the work can continue in a new session without losing context."
+      "Summarize in detail this conversation: goals, decisions made, " +
+        "work done, current state and next steps. Write the summary so " +
+        "the work can continue in a new session without losing context."
     );
 
     const runner = this.getRunner();
@@ -677,7 +743,9 @@ export class ChatView extends ItemView {
         onSession: (id) => {
           this.viewSession = id;
           this.plugin.settings.sessionId = id;
-          if (!this.plugin.settings.sessionEngines) this.plugin.settings.sessionEngines = {};
+          if (!this.plugin.settings.sessionEngines) {
+            this.plugin.settings.sessionEngines = {};
+          }
           this.plugin.settings.sessionEngines[id] = runner.id;
           void this.plugin.saveSettings();
         },
@@ -704,28 +772,38 @@ export class ChatView extends ItemView {
           const failed = code !== 0 || this.hadStreamError;
           if (failed && !this.stoppedByUser) {
             if (!this.hadStreamError) {
-              const detail = this.lastStderr.trim().replace(/\s+/g, " ").slice(0, 300);
-              const base = `${this.plugin.t("The session summary could not be generated.")} (${code}).`;
+              const detail = this.lastStderr
+                .trim()
+                .replace(/\s+/g, " ")
+                .slice(0, 300);
+              const failMsg = this.plugin.t(
+                "The session summary could not be generated."
+              );
+              const base = `${failMsg} (${code}).`;
               this.addErrorBubble(detail ? `${base} ${detail}` : base);
             }
+            const limitNotice = this.plugin.t(
+              "Session at the limit: new session created " +
+                "with the recent history."
+            );
             this.finishContinuation(
               this.buildLocalContinuation(oldSession),
-              this.plugin.t("Session at the limit: new session created with the recent history.")
+              limitNotice
             );
             return;
           }
           const summary = bubble.getSnapshot().text.trim();
-          const prompt = summary
-            ? this.plugin.t("[SUMMARY OF THE PREVIOUS SESSION]") +
-              "\n" +
-              summary +
-              "\n\n---\n\n" +
-              this.plugin.t("Continue the work from here.")
-            : this.plugin.t("Continue the work from the previous session.");
-          this.finishContinuation(
-            prompt,
-            this.plugin.t("New session created with the summary of the previous one.")
+          const sumHeader = this.plugin.t(
+            "[SUMMARY OF THE PREVIOUS SESSION]"
           );
+          const contFooter = this.plugin.t("Continue the work from here.");
+          const prompt = summary
+            ? [sumHeader, summary, "---", contFooter].join("\n\n")
+            : this.plugin.t("Continue the work from the previous session.");
+          const okNotice = this.plugin.t(
+            "New session created with the summary of the previous one."
+          );
+          this.finishContinuation(prompt, okNotice);
         },
       }
     );
@@ -748,14 +826,16 @@ export class ChatView extends ItemView {
     const recent = history.slice(-24);
     if (recent.length === 0) {
       return this.plugin.t(
-        "The previous session has no saved history. Continue the work from here."
+        "The previous session has no saved history. " +
+          "Continue the work from here."
       );
     }
     const assistantWho = this.assistantLabel();
     const lines: string[] = [];
     for (const rec of recent) {
       const who = rec.role === "user" ? this.plugin.t("User") : assistantWho;
-      const text = rec.text.length > 800 ? rec.text.slice(0, 800) + "⬦" : rec.text;
+      const text =
+        rec.text.length > 800 ? rec.text.slice(0, 800) + "⬦" : rec.text;
       lines.push(`${who}: ${text}`);
     }
     return (
@@ -763,7 +843,9 @@ export class ChatView extends ItemView {
       "\n" +
       lines.join("\n\n") +
       "\n\n---\n\n" +
-      this.plugin.t("Continue the work from here, keeping the context above in mind.")
+      this.plugin.t(
+        "Continue the work from here, keeping the context above in mind."
+      )
     );
   }
 
@@ -772,7 +854,9 @@ export class ChatView extends ItemView {
       cls: "opencode-message opencode-message--assistant",
     });
     const text = this.plugin.t(
-      "Hi! I am Vault Agents, connecting AI agents directly to your notes. Write a message below. Try the commands: / for commands, @ to attach a file, ! for quick actions."
+      "Hi! I am Vault Agents, connecting AI agents directly to your " +
+        "notes. Write a message below. Try the commands: / for commands, " +
+        "@ to attach a file, ! for quick actions."
     );
     metaWithCopy(
       row,
@@ -791,8 +875,8 @@ export class ChatView extends ItemView {
     let prompt = raw;
     const ctxLabel = this.context?.label;
     if (this.context) {
-      prompt =
-        `[CONTEXT FROM OBSIDIAN - ${this.context.label}]\n${this.context.content}\n\n---\n\n` + raw;
+      const header = `[CONTEXT FROM OBSIDIAN - ${this.context.label}]`;
+      prompt = `${header}\n${this.context.content}\n\n---\n\n` + raw;
       this.context = null;
       this.updateContextBar();
     }
@@ -813,7 +897,9 @@ export class ChatView extends ItemView {
 
     this.dispatching = true;
     try {
-      const filePaths = await this.attachmentManager.prepareAttachments(this.getRunner());
+      const filePaths = await this.attachmentManager.prepareAttachments(
+        this.getRunner()
+      );
       this.dispatching = false;
       this.doRun(prompt, filePaths);
     } catch (e) {
@@ -845,15 +931,15 @@ export class ChatView extends ItemView {
         return;
       }
       const idleSec = Math.floor((Date.now() - lastEventTime) / 1000);
+      const agoLabel = substitute(
+        this.plugin.t("last update $1s ago"),
+        idleSec
+      );
       if (idleSec >= 20) {
-        bubble.setActivity(
-          `${currentActivity} · ${substitute(this.plugin.t("last update $1s ago"), idleSec)} (${this.plugin.t("Possibly stuck")})`,
-          true
-        );
+        const stuck = this.plugin.t("Possibly stuck");
+        bubble.setActivity(`${currentActivity} · ${agoLabel} (${stuck})`, true);
       } else if (idleSec >= 6) {
-        bubble.setActivity(
-          `${currentActivity} · ${substitute(this.plugin.t("last update $1s ago"), idleSec)}`
-        );
+        bubble.setActivity(`${currentActivity} · ${agoLabel}`);
       }
     }, 2000);
 
@@ -871,7 +957,9 @@ export class ChatView extends ItemView {
           if (prev !== id) {
             this.viewSession = id;
             this.plugin.settings.sessionId = id;
-            if (!this.plugin.settings.sessionEngines) this.plugin.settings.sessionEngines = {};
+            if (!this.plugin.settings.sessionEngines) {
+              this.plugin.settings.sessionEngines = {};
+            }
             this.plugin.settings.sessionEngines[id] = runner.id;
             void this.plugin.saveSettings();
             void this.populateSessionSelect();
@@ -923,7 +1011,10 @@ export class ChatView extends ItemView {
               (info.tokens.cache?.write ?? 0);
             if (stepContextTokens > 0) {
               this.contextRunInput = stepContextTokens;
-              this.contextUsed = Math.max(this.contextBaseInput, this.contextRunInput);
+              this.contextUsed = Math.max(
+                this.contextBaseInput,
+                this.contextRunInput
+              );
               this.updateContextUsage();
             }
           }
@@ -1045,7 +1136,9 @@ export class ChatView extends ItemView {
     if (isImageError) {
       this.addErrorBubble(
         this.plugin.t(
-          "The selected model does not support images. Remove the attached image or choose a multimodal (vision) model from the Model menu."
+          "The selected model does not support images. Remove the " +
+            "attached image or choose a multimodal (vision) model " +
+            "from the Model menu."
         )
       );
       return;
@@ -1057,7 +1150,8 @@ export class ChatView extends ItemView {
     if (isSessionMissing) {
       this.addErrorBubble(
         this.plugin.t(
-          "The saved session no longer exists: a new one will be created, resend the message."
+          "The saved session no longer exists: a new one will be " +
+            "created, resend the message."
         )
       );
       if (this.viewSession && this.plugin.settings.sessionEngines) {
@@ -1075,12 +1169,10 @@ export class ChatView extends ItemView {
   private handleProcessFailure(code: number): void {
     if (this.hadStreamError) return;
     const detail = this.lastStderr.trim().replace(/\s+/g, " ").slice(0, 300);
-    const base = substitute(
-      this.plugin.t(
-        "The agent process exited with code $1. Check the binary path and the model in the settings."
-      ),
-      code
-    );
+    const exitKey =
+      "The agent process exited with code $1. Check the binary path " +
+      "and the model in the settings.";
+    const base = substitute(this.plugin.t(exitKey), code);
     this.addErrorBubble(detail ? `${base} (${detail})` : base);
   }
 
@@ -1123,9 +1215,14 @@ export class ChatView extends ItemView {
         if (rec.reasoning) {
           const det = row.createEl("details", { cls: "opencode-reasoning" });
           det.createEl("summary", { text: this.plugin.t("Reasoning") });
-          det.createDiv({ cls: "opencode-reasoning-content", text: rec.reasoning });
+          det.createDiv({
+            cls: "opencode-reasoning-content",
+            text: rec.reasoning,
+          });
         }
-        const bubble = row.createDiv({ cls: "opencode-bubble opencode-bubble--assistant" });
+        const bubble = row.createDiv({
+          cls: "opencode-bubble opencode-bubble--assistant",
+        });
         if (rec.text.length <= 30000) {
           MarkdownRenderer.render(this.app, rec.text, bubble, "", this);
         } else {
@@ -1138,15 +1235,12 @@ export class ChatView extends ItemView {
           const tot = inp + out + reas;
           const stats = row.createDiv({ cls: "opencode-msg-stats" });
           stats.setText(
-            this.fmtTokens(
-              tot,
-              inp,
-              out,
-              rec.cost,
-              this.sessionEngine()
-            )
+            this.fmtTokens(tot, inp, out, rec.cost, this.sessionEngine())
           );
-          this.addStats({ tokens: { ...rec.tokens, total: tot }, cost: rec.cost });
+          this.addStats({
+            tokens: { ...rec.tokens, total: tot },
+            cost: rec.cost,
+          });
         }
       }
     }
@@ -1162,14 +1256,19 @@ export class ChatView extends ItemView {
     engine?: EngineType
   ): string {
     const locale = this.plugin.settings.language === "it" ? "it-IT" : "en-US";
+    const tokLbl = this.plugin.t("Token:");
+    const inLbl = this.plugin.t("in");
+    const outLbl = this.plugin.t("out");
+    const totStr = total.toLocaleString(locale);
+    const inStr = input.toLocaleString(locale);
+    const outStr = output.toLocaleString(locale);
     const parts = [
-      `${this.plugin.t("Token:")} ${total.toLocaleString(locale)} (${input.toLocaleString(locale)} ${this.plugin.t("in")} / ${output.toLocaleString(locale)} ${this.plugin.t("out")})`,
+      `${tokLbl} ${totStr} (${inStr} ${inLbl} / ${outStr} ${outLbl})`,
     ];
     const provider = this.plugin.registry.get(engine ?? this.sessionEngine());
     if (provider?.included) {
-      parts.push(
-        provider.costNote ? `(${provider.costNote})` : `(${this.plugin.t("included")})`
-      );
+      const inc = this.plugin.t("included");
+      parts.push(provider.costNote ? `(${provider.costNote})` : `(${inc})`);
     } else if (typeof cost === "number" && cost > 0) {
       parts.push(`${this.plugin.t("Cost:")} ${cost.toFixed(4)} $`);
     }

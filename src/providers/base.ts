@@ -60,7 +60,11 @@ export abstract class BaseCliRunner {
     if (!watch) return;
     const deadline = Date.now() + 6000;
     const timer = setInterval(() => {
-      if (child.exitCode !== null || child.signalCode !== null || Date.now() > deadline) {
+      if (
+        child.exitCode !== null ||
+        child.signalCode !== null ||
+        Date.now() > deadline
+      ) {
         clearInterval(timer);
         return;
       }
@@ -89,7 +93,12 @@ export abstract class BaseCliRunner {
     const isWin = process.platform === "win32";
     const env: NodeJS.ProcessEnv =
       cwd || extraEnv
-        ? Object.assign({}, process.env, cwd ? { PWD: cwd } : undefined, extraEnv)
+        ? Object.assign(
+            {},
+            process.env,
+            cwd ? { PWD: cwd } : undefined,
+            extraEnv
+          )
         : process.env;
     const options: SpawnOptions = {
       cwd,
@@ -104,7 +113,8 @@ export abstract class BaseCliRunner {
   }
 
   /**
-   * Normalize both `runStream(req, cb)` and legacy `runStream(prompt, files, cb)` signatures
+   * Normalize both `runStream(req, cb)` and legacy
+   * `runStream(prompt, files, cb)`
    */
   protected normalizeRunArgs(
     reqOrPrompt: RunRequest | string,
@@ -115,7 +125,9 @@ export abstract class BaseCliRunner {
       return {
         req: {
           prompt: reqOrPrompt,
-          fileAttachments: Array.isArray(fileAttachmentsOrCb) ? fileAttachmentsOrCb : [],
+          fileAttachments: Array.isArray(fileAttachmentsOrCb)
+            ? fileAttachmentsOrCb
+            : [],
         },
         cb: maybeCb as StreamCallbacks,
       };
@@ -197,15 +209,20 @@ export abstract class BaseCliRunner {
       child.on("error", (e) => reject(e));
       child.on("close", (code) => {
         if (code === 0) resolve(out);
-        else reject(new Error(err.trim() || out.trim() || `exit code ${code}`));
+        else {
+          reject(new Error(err.trim() || out.trim() || `exit code ${code}`));
+        }
       });
     });
   }
 
   /**
-   * Resolve full path to a CLI executable, checking PATH and common candidate directories
+   * Resolve full path to a CLI executable, checking PATH and candidate folders
    */
-  protected resolveBinaryPath(bin: string, candidatePaths: string[] = []): string {
+  protected resolveBinaryPath(
+    bin: string,
+    candidatePaths: string[] = []
+  ): string {
     const cached = this.resolvedBinaries.get(bin);
     if (cached !== undefined && cached !== null) return cached;
 
@@ -290,7 +307,10 @@ export abstract class BaseCliRunner {
    * Convert a document (PDF, Word, Excel, etc.) to Markdown using anydoc
    */
   async convertDocument(absPath: string): Promise<string> {
-    const hash = createHash("sha256").update(absPath).digest("hex").slice(0, 16);
+    const hash = createHash("sha256")
+      .update(absPath)
+      .digest("hex")
+      .slice(0, 16);
     const dir = join(tmpdir(), "vault-agents-anydoc");
     await mkdir(dir, { recursive: true });
     const outPath = join(dir, hash + ".md");
@@ -307,16 +327,27 @@ export abstract class BaseCliRunner {
     await copyFile(absPath, cleanInput);
     await this.cleanupTempFiles(dir);
 
-    const bin = this.resolveBinaryPath(this.plugin.settings.anydocBinary || "anydoc");
+    const bin = this.resolveBinaryPath(
+      this.plugin.settings.anydocBinary || "anydoc"
+    );
     try {
       await new Promise<void>((resolve, reject) => {
-        const child = this.spawnBinary(bin, [cleanInput, "--ocr", "hosted", "-o", outPath]);
+        const child = this.spawnBinary(bin, [
+          cleanInput,
+          "--ocr",
+          "hosted",
+          "-o",
+          outPath,
+        ]);
         let err = "";
         child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
         child.on("error", (e) => reject(e));
         child.on("close", (code) => {
           if (code === 0) resolve();
-          else reject(new Error(`anydoc exited with code ${code}: ${err.trim().slice(0, 200)}`));
+          else {
+            const detail = err.trim().slice(0, 200);
+            reject(new Error(`anydoc exited with code ${code}: ${detail}`));
+          }
         });
       });
     } finally {
@@ -329,7 +360,10 @@ export abstract class BaseCliRunner {
   /**
    * Delete stale temporary files older than maxAgeMs (default 24h)
    */
-  protected async cleanupTempFiles(dir: string, maxAgeMs = 24 * 3600 * 1000): Promise<void> {
+  protected async cleanupTempFiles(
+    dir: string,
+    maxAgeMs = 24 * 3600 * 1000
+  ): Promise<void> {
     try {
       const files = await readdir(dir);
       const now = Date.now();

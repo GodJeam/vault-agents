@@ -1,7 +1,11 @@
 import { existsSync, readFileSync, statSync } from "fs";
 import { basename, isAbsolute, join } from "path";
 import { homedir } from "os";
-import type { AgentProvider, ProviderDescriptor, RunnerHost } from "../../core/provider";
+import type {
+  AgentProvider,
+  ProviderDescriptor,
+  RunnerHost,
+} from "../../core/provider";
 import type {
   AgentQuestion,
   AgentQuestionOption,
@@ -32,9 +36,13 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   shortName: "Antigravity",
   defaultBinary: "agy",
   defaultModel: "gemini-3.8-flash-high",
-  binaryDesc: "Command or full path to the agy executable. Default is 'agy' or '~/.local/bin/agy'.",
+  binaryDesc:
+    "Command or full path to the agy executable. Default is 'agy' or " +
+    "'~/.local/bin/agy'.",
   modelDesc:
-    "Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet 5.5). The effort is part of the model name. Included with Google AI Pro.",
+    "Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet " +
+    "5.5). The effort is part of the model name. Included with Google " +
+    "AI Pro.",
   included: true,
   costNote: "Google AI Pro",
   supportsSessions: "local-db",
@@ -44,7 +52,9 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
     {
       key: "effort",
       label: "Reasoning effort",
-      desc: "Effort sent only for models whose name does not already include it. Antigravity model names usually end with -low/-medium/-high.",
+      desc:
+        "Effort sent only for models whose name does not already include it. " +
+        "Antigravity model names usually end with -low/-medium/-high.",
       type: "select",
       default: "high",
       choices: [
@@ -141,7 +151,10 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     if (existsSync(dbPath)) {
       try {
         const query =
-          "SELECT conversation_id AS id, title, CAST(strftime('%s', last_modified_time) AS INTEGER) AS sec FROM conversation_summaries ORDER BY last_modified_time DESC LIMIT 50";
+          "SELECT conversation_id AS id, title, " +
+          "CAST(strftime('%s', last_modified_time) AS INTEGER) AS sec " +
+          "FROM conversation_summaries " +
+          "ORDER BY last_modified_time DESC LIMIT 50";
         const out = await this.execCli("sqlite3", ["-json", dbPath, query]);
         const rows = JSON.parse(out.trim() || "[]") as Array<{
           id?: string;
@@ -153,7 +166,8 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
           if (!id) continue;
           const title = row.title?.trim() || id;
           const sec = Number(row.sec);
-          const updated = Number.isFinite(sec) && sec > 0 ? sec * 1000 : Date.now();
+          const updated =
+            Number.isFinite(sec) && sec > 0 ? sec * 1000 : Date.now();
           sessions.push({
             id,
             title,
@@ -166,7 +180,11 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
         // Fallback if sqlite3 is missing or older than 3.33 (no -json flag)
         try {
           const query =
-            "SELECT conversation_id, replace(replace(title, char(10), ' '), '|', ' '), strftime('%s', last_modified_time) FROM conversation_summaries ORDER BY last_modified_time DESC LIMIT 50";
+            "SELECT conversation_id, " +
+            "replace(replace(title, char(10), ' '), '|', ' '), " +
+            "strftime('%s', last_modified_time) " +
+            "FROM conversation_summaries " +
+            "ORDER BY last_modified_time DESC LIMIT 50";
           const out = await this.execSqlite(dbPath, query);
           for (const line of out.trim().split("\n")) {
             const parts = line.split("|");
@@ -194,7 +212,10 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     const sessionEngines = this.plugin.settings.sessionEngines ?? {};
     for (const [id, msgs] of Object.entries(histories)) {
       if (seenIds.has(id)) continue;
-      if (sessionEngines[id] === "antigravity" || (!sessionEngines[id] && ANTIGRAVITY_ID_HINT.test(id))) {
+      const isAgy =
+        sessionEngines[id] === "antigravity" ||
+        (!sessionEngines[id] && ANTIGRAVITY_ID_HINT.test(id));
+      if (isAgy) {
         const firstUser = msgs.find((m) => m.role === "user");
         const title = firstUser?.text ? firstUser.text.slice(0, 40) : id;
         sessions.push({
@@ -216,10 +237,12 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       try {
         const safeTitle = title.replace(/'/g, "''");
         const safeId = sessionId.replace(/'/g, "''");
-        await this.execSqlite(
-          dbPath,
-          `UPDATE conversation_summaries SET title = '${safeTitle}' WHERE conversation_id = '${safeId}'`
-        );
+        const query = [
+          "UPDATE conversation_summaries",
+          `SET title = '${safeTitle}'`,
+          `WHERE conversation_id = '${safeId}'`,
+        ].join(" ");
+        await this.execSqlite(dbPath, query);
       } catch {
         // Best effort
       }
@@ -231,10 +254,11 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     if (existsSync(dbPath)) {
       try {
         const safeId = sessionId.replace(/'/g, "''");
-        await this.execSqlite(
-          dbPath,
-          `DELETE FROM conversation_summaries WHERE conversation_id = '${safeId}'`
-        );
+        const query = [
+          "DELETE FROM conversation_summaries",
+          `WHERE conversation_id = '${safeId}'`,
+        ].join(" ");
+        await this.execSqlite(dbPath, query);
       } catch {
         // Best effort
       }
@@ -248,12 +272,17 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     return 128_000;
   }
 
-  async getSessionTokens(sessionId: string): Promise<{ input: number; output: number }> {
+  async getSessionTokens(
+    sessionId: string
+  ): Promise<{ input: number; output: number }> {
     const history = this.plugin.getHistory(sessionId);
     for (let i = history.length - 1; i >= 0; i--) {
       const msg = history[i];
       if (msg.role === "assistant" && msg.tokens) {
-        return { input: msg.tokens.input ?? 0, output: msg.tokens.output ?? 0 };
+        return {
+          input: msg.tokens.input ?? 0,
+          output: msg.tokens.output ?? 0,
+        };
       }
     }
     return { input: 0, output: 0 };
@@ -310,8 +339,11 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
 
     let finalPrompt = req.prompt;
 
-    const BINARY_EXT_REGEX =
-      /\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|7z|rar|bin|exe|dmg|iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$/i;
+    const BINARY_EXT_REGEX = new RegExp(
+      "\\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|" +
+        "7z|rar|bin|exe|dmg|iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$",
+      "i"
+    );
     const maxInlineBytes = Math.min(
       MAX_INLINE_ATTACHMENT_BYTES,
       Math.max(1, s.maxAttachMB || 20) * 1024 * 1024
@@ -325,14 +357,17 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
         try {
           const st = statSync(fullPath);
           if (st.size > maxInlineBytes) {
-            finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+            finalPrompt =
+              `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
           } else {
             const content = readFileSync(fullPath, "utf-8");
             const filename = basename(fullPath);
-            finalPrompt = `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
+            finalPrompt =
+              `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
           }
         } catch {
-          finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+          finalPrompt =
+            `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
         }
       }
     }
@@ -348,16 +383,19 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       args.push("--conversation", sid);
     }
 
-    const model = cfg.model || s.antigravityModel || ANTIGRAVITY_DESCRIPTOR.defaultModel;
+    const model =
+      cfg.model || s.antigravityModel || ANTIGRAVITY_DESCRIPTOR.defaultModel;
     if (model) {
       args.push("--model", model);
     }
 
     // Antigravity model ids already encode the reasoning effort (e.g.
-    // "gemini-3.8-flash-low"); passing --effort as well makes the CLI reject the
-    // combination. Only send --effort for models without an effort suffix.
+    // "gemini-3.8-flash-low"); passing --effort as well makes the CLI reject
+    // the combination. Only send --effort for models without an effort suffix.
     const effort = cfg.options.effort || s.antigravityEffort;
-    const modelEncodesEffort = /-(low|medium|high|xhigh|max)$/i.test(model || "");
+    const modelEncodesEffort = /-(low|medium|high|xhigh|max)$/i.test(
+      model || ""
+    );
     if (!modelEncodesEffort && effort) {
       args.push("--effort", effort);
     }
@@ -370,11 +408,18 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     fileAttachmentsOrCb?: string[] | StreamCallbacks,
     maybeCb?: StreamCallbacks
   ): RunHandle {
-    const { req, cb } = this.normalizeRunArgs(reqOrPrompt, fileAttachmentsOrCb, maybeCb);
+    const { req, cb } = this.normalizeRunArgs(
+      reqOrPrompt,
+      fileAttachmentsOrCb,
+      maybeCb
+    );
     const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
     const args = this.buildArgs({ ...req, cwd });
     const bin = this.resolveBinaryPath(this.getConfig().binary || "agy");
-    const streamState = { accumulatedText: "", emittedQuestionSteps: new Set<string>() };
+    const streamState = {
+      accumulatedText: "",
+      emittedQuestionSteps: new Set<string>(),
+    };
 
     return this.spawnJsonlStream(
       bin,
@@ -388,7 +433,10 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
   public handleLine(
     line: string,
     cb: StreamCallbacks,
-    streamState: { accumulatedText: string; emittedQuestionSteps?: Set<string> } = {
+    streamState: {
+      accumulatedText: string;
+      emittedQuestionSteps?: Set<string>;
+    } = {
       accumulatedText: "",
     }
   ): void {
@@ -456,7 +504,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
             ? Math.round(su.duration_seconds * 1000)
             : undefined;
 
-        // Intercept ask_question tool calls so the user can answer interactively in the chat UI
+        // Intercept ask_question tool calls for interactive chat answers
         if (toolName === "ask_question" || toolName === "question") {
           const questions = this.parseAntigravityQuestions(params);
           const qSummary =
@@ -465,13 +513,17 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
           if (!streamState.emittedQuestionSteps) {
             streamState.emittedQuestionSteps = new Set<string>();
           }
-          if (questions.length > 0 && !streamState.emittedQuestionSteps.has(stepKey)) {
+          if (
+            questions.length > 0 &&
+            !streamState.emittedQuestionSteps.has(stepKey)
+          ) {
             streamState.emittedQuestionSteps.add(stepKey);
             cb.onQuestion?.(questions);
           }
           cb.onActivity?.(this.plugin.t("Waiting for your answer..."));
+          const stepId = `step-${stepIndex ?? Date.now()}-${toolName}`;
           cb.onStep({
-            id: `step-${stepIndex ?? Date.now()}-${toolName}`,
+            id: stepId,
             tool: toolName,
             title: qSummary,
             state: "completed",
@@ -489,8 +541,9 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
           cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
         }
 
+        const stepId = `step-${stepIndex ?? Date.now()}-${toolName}`;
         cb.onStep({
-          id: `step-${stepIndex ?? Date.now()}-${toolName}`,
+          id: stepId,
           tool: toolName,
           title,
           state: isDone ? (isError ? "error" : "completed") : "running",
@@ -548,18 +601,29 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       if (typeof params.TargetFile === "string" && params.TargetFile.trim()) {
         return basename(params.TargetFile.trim());
       }
-      if (typeof params.AbsolutePath === "string" && params.AbsolutePath.trim()) {
+      if (
+        typeof params.AbsolutePath === "string" &&
+        params.AbsolutePath.trim()
+      ) {
         return basename(params.AbsolutePath.trim());
       }
       if (typeof params.Path === "string" && params.Path.trim()) {
         return basename(params.Path.trim());
       }
-      if (typeof params.DirectoryPath === "string" && params.DirectoryPath.trim()) {
-        return basename(params.DirectoryPath.trim()) || params.DirectoryPath.trim();
+      if (
+        typeof params.DirectoryPath === "string" &&
+        params.DirectoryPath.trim()
+      ) {
+        const dp = params.DirectoryPath.trim();
+        return basename(dp) || dp;
       }
-      if (typeof params.SearchDirectory === "string" && params.SearchDirectory.trim()) {
+      if (
+        typeof params.SearchDirectory === "string" &&
+        params.SearchDirectory.trim()
+      ) {
+        const dirName = basename(params.SearchDirectory.trim());
         const q = typeof params.Query === "string" ? params.Query.trim() : "";
-        return q ? `"${q}" in ${basename(params.SearchDirectory.trim())}` : basename(params.SearchDirectory.trim());
+        return q ? `"${q}" in ${dirName}` : dirName;
       }
       if (typeof params.Query === "string" && params.Query.trim()) {
         return `"${params.Query.trim()}"`;
@@ -601,9 +665,11 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     for (const item of rawQuestions) {
       if (!item || typeof item !== "object") continue;
       const qObj = item as Record<string, unknown>;
-      const question = typeof qObj.question === "string" ? qObj.question.trim() : "";
+      const question =
+        typeof qObj.question === "string" ? qObj.question.trim() : "";
       if (!question) continue;
-      const header = typeof qObj.header === "string" ? qObj.header.trim() : undefined;
+      const header =
+        typeof qObj.header === "string" ? qObj.header.trim() : undefined;
       const multiple = Boolean(qObj.is_multi_select ?? qObj.multiple);
       const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
       const options: AgentQuestionOption[] = [];
@@ -614,10 +680,11 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
           const o = opt as Record<string, unknown>;
           const label = typeof o.label === "string" ? o.label.trim() : "";
           if (label) {
-            options.push({
-              label,
-              description: typeof o.description === "string" ? o.description.trim() : undefined,
-            });
+            const desc =
+              typeof o.description === "string"
+                ? o.description.trim()
+                : undefined;
+            options.push({ label, description: desc });
           }
         }
       }
@@ -631,6 +698,11 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
   }
 
   private getDbPath(): string {
-    return join(homedir(), ".gemini", "antigravity-cli", "conversation_summaries.db");
+    return join(
+      homedir(),
+      ".gemini",
+      "antigravity-cli",
+      "conversation_summaries.db"
+    );
   }
 }

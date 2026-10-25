@@ -82,17 +82,28 @@ export class StepManager {
 
     if (step.state === "running") {
       if (existing) return;
-      const row = this.containerEl.createDiv({ cls: "opencode-step opencode-step--running" });
+      const row = this.containerEl.createDiv({
+        cls: "opencode-step opencode-step--running",
+      });
       const icon = row.createSpan({ cls: "opencode-step-icon" });
       icon.createDiv({ cls: "opencode-step-spinner" });
       const main = row.createDiv({ cls: "opencode-step-main" });
       const header = main.createDiv({ cls: "opencode-step-header" });
       const titleEl = header.createDiv({ cls: "opencode-step-title" });
-      const durationEl = header.createSpan({ cls: "opencode-step-duration hidden" });
+      const durationEl = header.createSpan({
+        cls: "opencode-step-duration hidden",
+      });
       this.renderStepTitle(titleEl, step);
       this.renderTodoPreview(main, step);
       if (this.showIO) this.buildStepDetails(main, step);
-      this.steps.set(step.id, { row, icon, main, titleEl, durationEl, status: "running" });
+      this.steps.set(step.id, {
+        row,
+        icon,
+        main,
+        titleEl,
+        durationEl,
+        status: "running",
+      });
       this.onScrollRequest();
       return;
     }
@@ -100,11 +111,12 @@ export class StepManager {
     const rec = existing;
     const isErr = step.state === "error";
     const { icon: toolIcon } = formatToolAction(step.tool, step.title, this.t);
+    const doneCls = isErr ? "opencode-step--error" : "opencode-step--done";
 
     if (rec) {
       rec.status = step.state;
       rec.row.removeClass("opencode-step--running");
-      rec.row.addClass(isErr ? "opencode-step--error" : "opencode-step--done");
+      rec.row.addClass(doneCls);
       rec.icon.empty();
       setIcon(rec.icon, isErr ? "x" : toolIcon);
       this.renderStepTitle(rec.titleEl, step);
@@ -118,19 +130,28 @@ export class StepManager {
       }
     } else {
       const row = this.containerEl.createDiv({
-        cls: `opencode-step ${isErr ? "opencode-step--error" : "opencode-step--done"}`,
+        cls: `opencode-step ${doneCls}`,
       });
       const icon = row.createSpan({ cls: "opencode-step-icon" });
       setIcon(icon, isErr ? "x" : toolIcon);
       const main = row.createDiv({ cls: "opencode-step-main" });
       const header = main.createDiv({ cls: "opencode-step-header" });
       const titleEl = header.createDiv({ cls: "opencode-step-title" });
-      const durationEl = header.createSpan({ cls: "opencode-step-duration hidden" });
+      const durationEl = header.createSpan({
+        cls: "opencode-step-duration hidden",
+      });
       this.renderStepTitle(titleEl, step);
       this.updateDuration(durationEl, step.durationMs);
       this.renderTodoPreview(main, step);
       if (this.showIO) this.buildStepDetails(main, step);
-      this.steps.set(step.id, { row, icon, main, titleEl, durationEl, status: step.state });
+      this.steps.set(step.id, {
+        row,
+        icon,
+        main,
+        titleEl,
+        durationEl,
+        status: step.state,
+      });
     }
     this.onScrollRequest();
   }
@@ -158,8 +179,8 @@ export class StepManager {
 
   private updateDuration(durationEl: HTMLElement, durationMs?: number): void {
     if (typeof durationMs === "number" && durationMs > 0) {
-      const label =
-        durationMs < 1000 ? `${durationMs}ms` : `${(durationMs / 1000).toFixed(1)}s`;
+      const secs = (durationMs / 1000).toFixed(1);
+      const label = durationMs < 1000 ? `${durationMs}ms` : `${secs}s`;
       durationEl.setText(label);
       durationEl.removeClass("hidden");
     }
@@ -167,7 +188,10 @@ export class StepManager {
 
   private renderTodoPreview(main: HTMLElement, step: StepInfo): void {
     if (step.tool !== "todowrite") return;
-    const inp = step.input && typeof step.input === "object" ? (step.input as Record<string, unknown>) : null;
+    const inp =
+      step.input && typeof step.input === "object"
+        ? (step.input as Record<string, unknown>)
+        : null;
     const todos = inp && Array.isArray(inp.todos) ? inp.todos : null;
     if (!todos || todos.length === 0) return;
 
@@ -179,11 +203,16 @@ export class StepManager {
       if (!rawTodo || typeof rawTodo !== "object") continue;
       const td = rawTodo as { content?: string; status?: string };
       if (!td.content) continue;
+      const status = td.status || "pending";
       const itemEl = listEl.createDiv({
-        cls: `opencode-todo-item opencode-todo-item--${td.status || "pending"}`,
+        cls: `opencode-todo-item opencode-todo-item--${status}`,
       });
       const mark =
-        td.status === "completed" ? "✓" : td.status === "in_progress" ? "▸" : "○";
+        td.status === "completed"
+          ? "✓"
+          : td.status === "in_progress"
+            ? "▸"
+            : "○";
       itemEl.createSpan({ cls: "opencode-todo-mark", text: mark });
       itemEl.createSpan({ cls: "opencode-todo-text", text: td.content });
     }

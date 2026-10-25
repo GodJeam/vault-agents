@@ -42,7 +42,10 @@ export interface OpencodeModelInfo {
   limit?: { context?: number; output?: number };
 }
 
-/** Assistant message metadata returned by `opencode api GET /api/session/{id}/message`. */
+/**
+ * Assistant message metadata returned by
+ * `opencode api GET /api/session/{id}/message`.
+ */
 export interface OpencodeMessageInfo {
   role?: string;
   type?: string;

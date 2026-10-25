@@ -63,7 +63,7 @@ export class AssistantBubble {
   private activityBarEl: HTMLElement;
   private activityTextEl: HTMLElement;
   private activityTimerEl: HTMLElement;
-  /** Backwards-compatible status accessor that updates the live activity bar. */
+  /** Backwards-compatible status accessor that updates the activity bar. */
   status: { setText: (text: string) => void };
   private stepManager: StepManager;
   private rawText = "";
@@ -91,26 +91,56 @@ export class AssistantBubble {
     private showIO: boolean,
     private onScrollRequest: () => void,
     private onCopy: (text: string) => void,
-    private fmtTokens: (total: number, input: number, output: number, cost?: number) => string,
+    private fmtTokens: (
+      total: number,
+      input: number,
+      output: number,
+      cost?: number
+    ) => string,
     private onAnswerQuestion?: (formattedAnswer: string) => void
   ) {
-    metaWithCopy(this.row, this.assistantLabel, () => this.rawText, this.onCopy, this.t("Copy text"));
-    this.reasoningEl = this.row.createEl("details", { cls: "opencode-reasoning hidden" });
+    metaWithCopy(
+      this.row,
+      this.assistantLabel,
+      () => this.rawText,
+      this.onCopy,
+      this.t("Copy text")
+    );
+    this.reasoningEl = this.row.createEl("details", {
+      cls: "opencode-reasoning hidden",
+    });
     const summary = this.reasoningEl.createEl("summary");
     summary.setText(this.t("Reasoning"));
-    this.reasoningContent = this.reasoningEl.createDiv({ cls: "opencode-reasoning-content" });
+    this.reasoningContent = this.reasoningEl.createDiv({
+      cls: "opencode-reasoning-content",
+    });
 
     const stepsEl = this.row.createDiv({ cls: "opencode-steps" });
-    this.stepManager = new StepManager(stepsEl, this.t, this.showIO, this.onScrollRequest);
+    this.stepManager = new StepManager(
+      stepsEl,
+      this.t,
+      this.showIO,
+      this.onScrollRequest
+    );
 
-    this.contentEl = this.row.createDiv({ cls: "opencode-bubble opencode-bubble--assistant hidden" });
-    this.questionsEl = this.row.createDiv({ cls: "opencode-questions-container" });
+    this.contentEl = this.row.createDiv({
+      cls: "opencode-bubble opencode-bubble--assistant hidden",
+    });
+    this.questionsEl = this.row.createDiv({
+      cls: "opencode-questions-container",
+    });
     this.statsEl = this.row.createDiv({ cls: "opencode-msg-stats hidden" });
 
-    this.activityBarEl = this.row.createDiv({ cls: "opencode-activity-bar hidden" });
+    this.activityBarEl = this.row.createDiv({
+      cls: "opencode-activity-bar hidden",
+    });
     this.activityBarEl.createSpan({ cls: "opencode-activity-spinner" });
-    this.activityTextEl = this.activityBarEl.createSpan({ cls: "opencode-activity-text" });
-    this.activityTimerEl = this.activityBarEl.createSpan({ cls: "opencode-activity-timer" });
+    this.activityTextEl = this.activityBarEl.createSpan({
+      cls: "opencode-activity-text",
+    });
+    this.activityTimerEl = this.activityBarEl.createSpan({
+      cls: "opencode-activity-timer",
+    });
 
     this.status = {
       setText: (text: string) => this.setActivity(text),
@@ -147,10 +177,12 @@ export class AssistantBubble {
   }
 
   private updateElapsedDisplay(): void {
-    const totalSec = Math.max(0, Math.floor((Date.now() - this.startedAtMs) / 1000));
+    const elapsedMs = Date.now() - this.startedAtMs;
+    const totalSec = Math.max(0, Math.floor(elapsedMs / 1000));
     const mins = Math.floor(totalSec / 60);
     const secs = totalSec % 60;
-    const formatted = mins > 0 ? `${mins}:${secs < 10 ? "0" : ""}${secs}` : `${secs}s`;
+    const pad = secs < 10 ? "0" : "";
+    const formatted = mins > 0 ? `${mins}:${pad}${secs}` : `${secs}s`;
     this.activityTimerEl.setText(formatted);
   }
 
@@ -189,7 +221,13 @@ export class AssistantBubble {
     }
     this.contentEl.empty();
     if (this.rawText.trim()) {
-      MarkdownRenderer.render(this.app, this.rawText, this.contentEl, "", this.component);
+      MarkdownRenderer.render(
+        this.app,
+        this.rawText,
+        this.contentEl,
+        "",
+        this.component
+      );
     }
   }
 
@@ -202,7 +240,10 @@ export class AssistantBubble {
 
   private scheduleReasoningRender(): void {
     if (this.reasoningTimer !== null) clearTimeout(this.reasoningTimer);
-    this.reasoningTimer = window.setTimeout(() => this.flushReasoningRender(), 120);
+    this.reasoningTimer = window.setTimeout(
+      () => this.flushReasoningRender(),
+      120
+    );
   }
 
   private flushReasoningRender(): void {
@@ -266,7 +307,12 @@ export class AssistantBubble {
     }
   }
 
-  getSnapshot(): { text: string; reasoning: string; tokens?: FinishInfo["tokens"]; cost?: number } {
+  getSnapshot(): {
+    text: string;
+    reasoning: string;
+    tokens?: FinishInfo["tokens"];
+    cost?: number;
+  } {
     return {
       text: this.rawText,
       reasoning: this.rawReasoning,
@@ -283,7 +329,13 @@ export class AssistantBubble {
     if (this.rawText.trim()) {
       this.contentEl.removeClass("hidden");
       if (this.rawText.length <= 30000) {
-        MarkdownRenderer.render(this.app, this.rawText, this.contentEl, "", this.component);
+        MarkdownRenderer.render(
+          this.app,
+          this.rawText,
+          this.contentEl,
+          "",
+          this.component
+        );
       } else {
         this.contentEl.textContent = this.rawText;
       }
