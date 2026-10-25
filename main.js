@@ -2223,7 +2223,7 @@ var ChatView = class extends import_obsidian6.ItemView {
         o.value = s.id;
         const title = s.title || s.id;
         const mark = pinnedSet.has(s.id) ? "\u25CF " : "";
-        const short = title.length > 40 ? title.slice(0, 37) + "\u2B26" : title;
+        const short = title.length > 40 ? title.slice(0, 37) + "\u2026" : title;
         o.textContent = mark + short;
         o.title = title;
       }
@@ -2286,6 +2286,7 @@ var ChatView = class extends import_obsidian6.ItemView {
     );
   }
   async refreshContext() {
+    var _a, _b;
     const sid = this.viewSession;
     if (!sid) {
       this.contextUsed = 0;
@@ -2298,6 +2299,18 @@ var ChatView = class extends import_obsidian6.ItemView {
       const tokens = await runner.getSessionTokens(sid);
       this.contextBaseInput = tokens.input;
       this.contextUsed = tokens.input;
+      if (typeof tokens.totalTokens === "number" && tokens.totalTokens > this
+        .stats.total) {
+        this.stats.input = (_a = tokens.totalInput) != null ? _a : this.stats
+          .input;
+        this.stats.output = (_b = tokens.totalOutput) != null ? _b : this.stats
+          .output;
+        this.stats.total = tokens.totalTokens;
+        if (typeof tokens.totalCost === "number" && tokens.totalCost > 0) {
+          this.stats.cost = tokens.totalCost;
+        }
+        this.updateStatsBar();
+      }
       if (!this.contextLimit) {
         const activeMod = this.activeModelFor(runner.id);
         this.contextLimit = await runner.getModelContextLimit(activeMod);
@@ -2408,7 +2421,7 @@ var ChatView = class extends import_obsidian6.ItemView {
     if (!this.modelBtn) return;
     const engine = this.sessionEngine();
     const m = this.activeModelFor(engine);
-    this.modelBtn.setText(m.length > 30 ? m.slice(0, 27) + "\u2B26" : m);
+    this.modelBtn.setText(m.length > 30 ? m.slice(0, 27) + "\u2026" : m);
     this.modelBtn.setAttribute("title", `${m} (${this.engineLabel(engine)})`);
   }
   async openModelList() {
@@ -2592,7 +2605,7 @@ var ChatView = class extends import_obsidian6.ItemView {
     const lines = [];
     for (const rec of recent) {
       const who = rec.role === "user" ? this.plugin.t("User") : assistantWho;
-      const text = rec.text.length > 800 ? rec.text.slice(0, 800) + "\u2B26" :
+      const text = rec.text.length > 800 ? rec.text.slice(0, 800) + "\u2026" :
         rec.text;
       lines.push(`${who}: ${text}`);
     }
@@ -4358,35 +4371,71 @@ var OpencodeRunner = class extends BaseCliRunner {
   async getSessionTokens(sessionId) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r,
       _s;
+    let ctxInput = 0;
+    let ctxOutput = 0;
+    let totalInput = 0;
+    let totalOutput = 0;
+    let totalReasoning = 0;
+    let totalCost = 0;
+    let foundDb = false;
     const dbPath = await this.getDbPath();
     if (dbPath) {
       for (const table of ["session_message", "message"]) {
         try {
           const safeId = sessionId.replace(/'/g, "''");
           const whereClause = table === "session_message" ?
-            `session_id = '${safeId}' AND type = 'assistant'` :
-              `session_id = '${safeId}'`;
+            `session_id = '${safeId}' AND type = 'assistant'` : [
+            `session_id = '${safeId}'`,
+            "AND json_extract(data, '$.role') = 'assistant'"
+          ].join(" ");
           const orderCol = table === "session_message" ? "seq DESC" :
             "time_created DESC";
-          const query = [
+          const latestQuery = [
             `SELECT json_extract(data, '$.tokens') FROM ${table}`,
             `WHERE ${whereClause} ORDER BY ${orderCol} LIMIT 5`
           ].join(" ");
-          const out = await this.execSqlite(dbPath, query);
+          const out = await this.execSqlite(dbPath, latestQuery);
           for (const line of out.split(/\r?\n/)) {
             const trimmed = line.trim();
             if (!trimmed || trimmed === "null") continue;
             const tk = JSON.parse(trimmed);
             if (tk) {
-              const input = Number((_a = tk.input) != null ? _a : 0) + Number((
+              const inp = Number((_a = tk.input) != null ? _a : 0) + Number((
                 _c = (_b = tk.cache) == null ? void 0 : _b.read) != null ? _c :
                   0) + Number((_e = (_d = tk.cache) == null ? void 0 : _d
                     .write) != null ? _e : 0);
-              const output = Number((_f = tk.output) != null ? _f : 0);
-              if (input > 0 || output > 0) {
-                return { input, output };
+              const outTok = Number((_f = tk.output) != null ? _f : 0);
+              if (inp > 0 || outTok > 0) {
+                ctxInput = inp;
+                ctxOutput = outTok;
+                foundDb = true;
+                break;
               }
             }
+          }
+          if (foundDb) {
+            const sumQuery = [
+              "SELECT",
+              "COALESCE(SUM(json_extract(data, '$.tokens.input')), 0),",
+              "COALESCE(SUM(json_extract(data, '$.tokens.output')), 0),",
+              "COALESCE(SUM(json_extract(data, '$.tokens.reasoning')), 0),",
+              "COALESCE(SUM(json_extract(data, '$.cost')), 0)",
+              `FROM ${table} WHERE ${whereClause}`
+            ].join(" ");
+            const sumOut = await this.execSqlite(dbPath, sumQuery);
+            const parts = sumOut.trim().split("|");
+            totalInput = Number(parts[0] || 0);
+            totalOutput = Number(parts[1] || 0);
+            totalReasoning = Number(parts[2] || 0);
+            totalCost = Number(parts[3] || 0);
+            return {
+              input: ctxInput,
+              output: ctxOutput,
+              totalInput,
+              totalOutput,
+              totalTokens: totalInput + totalOutput + totalReasoning,
+              totalCost
+            };
           }
         } catch (e) {
         }
