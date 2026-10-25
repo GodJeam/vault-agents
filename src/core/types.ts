@@ -210,7 +210,10 @@ export const DEFAULT_SETTINGS: PluginSettings = {
  * Retrieve (and initialize if missing) the EngineConfig for a given engine ID,
  * keeping legacy top-level fields synchronized.
  */
-export function getEngineConfig(settings: PluginSettings, engineId: string): EngineConfig {
+export function getEngineConfig(
+  settings: PluginSettings,
+  engineId: string
+): EngineConfig {
   if (!settings.engines) {
     settings.engines = {};
   }
@@ -235,7 +238,9 @@ export function syncSettingsFields(settings: PluginSettings): void {
 
   settings.antigravityBinary = agy.binary || DEFAULT_SETTINGS.antigravityBinary;
   settings.antigravityModel = agy.model || DEFAULT_SETTINGS.antigravityModel;
-  settings.antigravityEffort = (agy.options.effort as ReasoningEffort) || DEFAULT_SETTINGS.antigravityEffort;
+  settings.antigravityEffort =
+    (agy.options.effort as ReasoningEffort) ||
+    DEFAULT_SETTINGS.antigravityEffort;
 
   settings.binaryPath = oc.binary || DEFAULT_SETTINGS.binaryPath;
   settings.model = oc.model;
@@ -279,13 +284,22 @@ export function migrateSettings(
   );
 
   // 1. Apply legacy top-level fields if present in raw data
-  if (typeof rest.antigravityBinary === "string" && rest.antigravityBinary.trim()) {
+  if (
+    typeof rest.antigravityBinary === "string" &&
+    rest.antigravityBinary.trim()
+  ) {
     base.engines.antigravity.binary = rest.antigravityBinary.trim();
   }
-  if (typeof rest.antigravityModel === "string" && rest.antigravityModel.trim()) {
+  if (
+    typeof rest.antigravityModel === "string" &&
+    rest.antigravityModel.trim()
+  ) {
     base.engines.antigravity.model = rest.antigravityModel.trim();
   }
-  if (typeof rest.antigravityEffort === "string" && rest.antigravityEffort.trim()) {
+  if (
+    typeof rest.antigravityEffort === "string" &&
+    rest.antigravityEffort.trim()
+  ) {
     base.engines.antigravity.options.effort = rest.antigravityEffort.trim();
   }
 
@@ -299,7 +313,7 @@ export function migrateSettings(
     base.engines.opencode.options.agent = rest.agent.trim();
   }
 
-  // 2. Apply structured `engines` map if present (takes precedence over legacy flat fields)
+  // 2. Apply structured `engines` map if present (overrides legacy fields)
   if (rawEngines && typeof rawEngines === "object") {
     for (const [id, cfg] of Object.entries(rawEngines)) {
       if (!cfg || typeof cfg !== "object") continue;
@@ -309,11 +323,17 @@ export function migrateSettings(
         options: { ...(DEFAULT_ENGINE_CONFIGS[id]?.options ?? {}) },
       };
       base.engines[id] = {
-        binary: typeof cfg.binary === "string" && cfg.binary.trim() ? cfg.binary.trim() : existing.binary,
-        model: typeof cfg.model === "string" ? cfg.model.trim() : existing.model,
+        binary:
+          typeof cfg.binary === "string" && cfg.binary.trim()
+            ? cfg.binary.trim()
+            : existing.binary,
+        model:
+          typeof cfg.model === "string" ? cfg.model.trim() : existing.model,
         options: {
           ...existing.options,
-          ...(cfg.options && typeof cfg.options === "object" ? cfg.options : {}),
+          ...(cfg.options && typeof cfg.options === "object"
+            ? cfg.options
+            : {}),
         },
       };
     }

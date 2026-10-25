@@ -65,9 +65,12 @@ export function renderQuestionCard(
       block.createDiv({ cls: "opencode-question-badge", text: q.header });
     }
     block.createDiv({ cls: "opencode-question-prompt", text: q.question });
+    const hintText = q.multiple
+      ? t("Select one or more options")
+      : t("Select an option");
     block.createDiv({
       cls: "opencode-question-hint",
-      text: q.multiple ? t("Select one or more options") : t("Select an option"),
+      text: hintText,
     });
 
     const optsEl = block.createDiv({ cls: "opencode-question-options" });
@@ -82,9 +85,15 @@ export function renderQuestionCard(
       checkSpan.setText(q.multiple ? "☐" : "○");
 
       const textCol = btn.createDiv({ cls: "opencode-question-opt-content" });
-      textCol.createDiv({ cls: "opencode-question-opt-label", text: opt.label });
+      textCol.createDiv({
+        cls: "opencode-question-opt-label",
+        text: opt.label,
+      });
       if (opt.description) {
-        textCol.createDiv({ cls: "opencode-question-opt-desc", text: opt.description });
+        textCol.createDiv({
+          cls: "opencode-question-opt-desc",
+          text: opt.description,
+        });
       }
 
       btn.addEventListener("click", () => {
@@ -145,7 +154,12 @@ export function renderQuestionCard(
 
   submitBtn.addEventListener("click", () => {
     if (card.hasClass("is-submitted")) return;
-    const formatted = formatQuestionAnswers(questions, selectedByIdx, customByIdx, t);
+    const formatted = formatQuestionAnswers(
+      questions,
+      selectedByIdx,
+      customByIdx,
+      t
+    );
     if (!formatted) {
       new Notice(t("Please select or type an answer before sending."));
       return;

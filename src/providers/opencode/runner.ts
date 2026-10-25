@@ -1,5 +1,9 @@
 import { basename, isAbsolute, join } from "path";
-import type { AgentProvider, ProviderDescriptor, RunnerHost } from "../../core/provider";
+import type {
+  AgentProvider,
+  ProviderDescriptor,
+  RunnerHost,
+} from "../../core/provider";
 import type {
   AgentQuestion,
   AgentQuestionOption,
@@ -15,7 +19,11 @@ import type {
 import { DEFAULT_SETTINGS } from "../../core/types";
 import { substitute } from "../../i18n";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
-import type { OpencodeEvent, OpencodeModelInfo, OpencodeMessageInfo } from "./types";
+import type {
+  OpencodeEvent,
+  OpencodeModelInfo,
+  OpencodeMessageInfo,
+} from "./types";
 
 /** Used when the model catalogue cannot be queried. */
 const DEFAULT_CONTEXT_LIMIT = 128_000;
@@ -27,8 +35,11 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
   defaultBinary: "opencode",
   defaultModel: "opencode-go/deepseek-v4.1-flash",
   binaryDesc:
-    "Command or full path to the opencode executable. Usually 'opencode' is enough if it is on your PATH.",
-  modelDesc: "Pick a model from the opencode list. Default uses the OpenCode Go provider.",
+    "Command or full path to the opencode executable. Usually 'opencode' " +
+    "is enough if it is on your PATH.",
+  modelDesc:
+    "Pick a model from the opencode list. Default uses the OpenCode " +
+    "Go provider.",
   included: false,
   supportsSessions: "api",
   supportsUsageStats: true,
@@ -37,7 +48,9 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
     {
       key: "agent",
       label: "Agent",
-      desc: "The opencode agent to use (e.g. build, plan). Leave empty for the default.",
+      desc:
+        "The opencode agent to use (e.g. build, plan). " +
+        "Leave empty for the default.",
       type: "text",
       placeholder: "e.g. build",
       default: "",
@@ -91,13 +104,18 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     const sessions: SessionInfo[] = [];
     const seenIds = new Set<string>();
 
-    // 1. Query opencode.db directly via sqlite3 (returns all sessions regardless of process cwd
-    // and avoids CLI stdout truncation on large session lists)
+    // 1. Query opencode.db directly via sqlite3 (returns all sessions
+    // regardless of process cwd and avoids CLI stdout truncation)
     const dbPath = await this.getDbPath();
     if (dbPath) {
       for (const table of ["session_v2", "session"]) {
         try {
-          const query = `SELECT id, replace(replace(COALESCE(title, ''), char(10), ' '), '|', ' '), time_updated, time_created, project_id, directory FROM ${table} ORDER BY time_updated DESC LIMIT 60`;
+          const query = [
+            "SELECT id,",
+            "replace(replace(COALESCE(title, ''), char(10), ' '), '|', ' '),",
+            "time_updated, time_created, project_id, directory",
+            `FROM ${table} ORDER BY time_updated DESC LIMIT 60`,
+          ].join(" ");
           const out = await this.execSqlite(dbPath, query);
           for (const line of out.trim().split(/\r?\n/)) {
             if (!line.trim()) continue;
@@ -153,12 +171,15 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       }
     }
 
-    // 3. Ensure any OpenCode sessions saved in Obsidian histories are also included
+    // 3. Ensure any OpenCode sessions saved in Obsidian histories are included
     const histories = this.plugin.histories ?? {};
     const sessionEngines = this.plugin.settings.sessionEngines ?? {};
     for (const [id, msgs] of Object.entries(histories)) {
       if (seenIds.has(id)) continue;
-      if (sessionEngines[id] === "opencode" || (!sessionEngines[id] && /^ses_/.test(id))) {
+      const isOc =
+        sessionEngines[id] === "opencode" ||
+        (!sessionEngines[id] && /^ses_/.test(id));
+      if (isOc) {
         const lastTs = msgs[msgs.length - 1]?.timestamp ?? Date.now();
         sessions.push({
           id,
@@ -191,10 +212,10 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       let updatedDb = false;
       for (const table of ["session_v2", "session"]) {
         try {
-          await this.execSqlite(
-            dbPath,
-            `UPDATE ${table} SET title = '${safeTitle}' WHERE id = '${safeId}'`
-          );
+          const query =
+            `UPDATE ${table} SET title = '${safeTitle}' ` +
+            `WHERE id = '${safeId}'`;
+          await this.execSqlite(dbPath, query);
           updatedDb = true;
         } catch {
           // Ignore if table doesn't exist
@@ -232,7 +253,8 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   /**
-   * Query the local OpenCode API for the model catalogue and read `limit.context`.
+   * Query the local OpenCode API for the model catalogue and read
+   * `limit.context`.
    */
   private async fetchModelContextLimit(model: string): Promise<number> {
     const out = await this.execCli(this.getBin(), ["api", "GET", "/api/model"]);
@@ -252,9 +274,11 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     return typeof ctx === "number" && ctx > 0 ? ctx : 0;
   }
 
-  async getSessionTokens(sessionId: string): Promise<{ input: number; output: number }> {
-    // 1. Query sqlite3 directly for the latest assistant message's token breakdown
-    // (avoids OpenCode's CLI stdout truncation on large /api/session/{id}/message payloads)
+  async getSessionTokens(
+    sessionId: string
+  ): Promise<{ input: number; output: number }> {
+    // 1. Query sqlite3 directly for the latest assistant message's token
+    // breakdown (avoids CLI stdout truncation on large /message payloads)
     const dbPath = await this.getDbPath();
     if (dbPath) {
       for (const table of ["session_message", "message"]) {
@@ -264,11 +288,13 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
             table === "session_message"
               ? `session_id = '${safeId}' AND type = 'assistant'`
               : `session_id = '${safeId}'`;
-          const orderCol = table === "session_message" ? "seq DESC" : "time_created DESC";
-          const out = await this.execSqlite(
-            dbPath,
-            `SELECT json_extract(data, '$.tokens') FROM ${table} WHERE ${whereClause} ORDER BY ${orderCol} LIMIT 5`
-          );
+          const orderCol =
+            table === "session_message" ? "seq DESC" : "time_created DESC";
+          const query = [
+            `SELECT json_extract(data, '$.tokens') FROM ${table}`,
+            `WHERE ${whereClause} ORDER BY ${orderCol} LIMIT 5`,
+          ].join(" ");
+          const out = await this.execSqlite(dbPath, query);
           for (const line of out.split(/\r?\n/)) {
             const trimmed = line.trim();
             if (!trimmed || trimmed === "null") continue;
@@ -340,9 +366,13 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     const maxBytes = Math.max(1, s.dbCleanupMaxMB || 5) * 1024 * 1024;
     const ageDays = Math.max(0, s.dbCleanupAgeDays ?? 7);
     const cutoffMs = Date.now() - ageDays * 86400 * 1000;
-    const q =
-      `DELETE FROM part WHERE data LIKE '%"type":"file%' AND length(CAST(data AS BLOB)) > ${maxBytes}` +
-      (ignoreAge ? "" : ` AND time_created < ${cutoffMs}`);
+    const q = [
+      'DELETE FROM part WHERE data LIKE \'%"type":"file%\'',
+      `AND length(CAST(data AS BLOB)) > ${maxBytes}`,
+      ignoreAge ? "" : `AND time_created < ${cutoffMs}`,
+    ]
+      .filter(Boolean)
+      .join(" ");
     try {
       await this.execSqlite(dbPath, q);
     } catch {
@@ -382,7 +412,10 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     };
   }
 
-  private async fetchUsageWindow(from: number, to: number): Promise<UsageWindow | null> {
+  private async fetchUsageWindow(
+    from: number,
+    to: number
+  ): Promise<UsageWindow | null> {
     try {
       const out = await this.execCli(this.getBin(), [
         "api",
@@ -394,7 +427,10 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
         `to=${to}`,
       ]);
       const parsed = JSON.parse(out) as {
-        data?: { tokens?: { input?: number; output?: number }; cost?: number };
+        data?: {
+          tokens?: { input?: number; output?: number };
+          cost?: number;
+        };
       };
       const d = parsed.data ?? {};
       return {
@@ -443,12 +479,22 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     fileAttachmentsOrCb?: string[] | StreamCallbacks,
     maybeCb?: StreamCallbacks
   ): RunHandle {
-    const { req, cb } = this.normalizeRunArgs(reqOrPrompt, fileAttachmentsOrCb, maybeCb);
+    const { req, cb } = this.normalizeRunArgs(
+      reqOrPrompt,
+      fileAttachmentsOrCb,
+      maybeCb
+    );
     const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
     const args = this.buildArgs({ ...req, cwd });
     const bin = this.getBin();
 
-    return this.spawnJsonlStream(bin, args, cwd, (line) => this.handleLine(line, cb), cb);
+    return this.spawnJsonlStream(
+      bin,
+      args,
+      cwd,
+      (line) => this.handleLine(line, cb),
+      cb
+    );
   }
 
   public handleLine(line: string, cb: StreamCallbacks): void {
@@ -493,13 +539,16 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
           const startMs = part.state?.time?.start;
           const endMs = part.state?.time?.end;
           const durationMs =
-            typeof startMs === "number" && typeof endMs === "number" && endMs >= startMs
+            typeof startMs === "number" &&
+            typeof endMs === "number" &&
+            endMs >= startMs
               ? endMs - startMs
               : undefined;
 
           if (toolName === "question" || toolName === "ask_question") {
             const questions = this.parseOpencodeQuestions(input);
-            const qTitle = questions[0]?.question || this.plugin.t("Agent question");
+            const qTitle =
+              questions[0]?.question || this.plugin.t("Agent question");
             if (questions.length > 0) {
               cb.onQuestion?.(questions);
             }
@@ -516,7 +565,11 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
             break;
           }
 
-          const title = this.extractOpencodeToolTitle(toolName, input, part.state?.title);
+          const title = this.extractOpencodeToolTitle(
+            toolName,
+            input,
+            part.state?.title
+          );
           if (rawState === "running") {
             cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
           } else {
@@ -565,7 +618,11 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     }
 
     // Fallback: reasoning part inside other event types
-    if (type !== "reasoning" && part?.type === "reasoning" && typeof part?.text === "string") {
+    if (
+      type !== "reasoning" &&
+      part?.type === "reasoning" &&
+      typeof part?.text === "string"
+    ) {
       cb.onActivity?.(this.plugin.t("Thinking..."));
       cb.onReasoning(part.text, String(part.id));
     }
@@ -576,7 +633,10 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     input: unknown,
     stateTitle?: string
   ): string {
-    const inp = input && typeof input === "object" ? (input as Record<string, unknown>) : null;
+    const inp =
+      input && typeof input === "object"
+        ? (input as Record<string, unknown>)
+        : null;
     if (inp) {
       if (typeof inp.filePath === "string" && inp.filePath.trim()) {
         return basename(inp.filePath.trim());
@@ -601,12 +661,21 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       }
       if (Array.isArray(inp.todos) && inp.todos.length > 0) {
         const doneCount = inp.todos.filter(
-          (t) => t && typeof t === "object" && (t as { status?: string }).status === "completed"
+          (t) =>
+            t &&
+            typeof t === "object" &&
+            (t as { status?: string }).status === "completed"
         ).length;
-        return `${inp.todos.length} ${this.plugin.t("tasks")} (${doneCount} ${this.plugin.t("done")})`;
+        const tasksWord = this.plugin.t("tasks");
+        const doneWord = this.plugin.t("done");
+        return `${inp.todos.length} ${tasksWord} (${doneCount} ${doneWord})`;
       }
     }
-    if (stateTitle && stateTitle.trim() && stateTitle.trim().toLowerCase() !== toolName.toLowerCase()) {
+    if (
+      stateTitle &&
+      stateTitle.trim() &&
+      stateTitle.trim().toLowerCase() !== toolName.toLowerCase()
+    ) {
       return stateTitle.trim();
     }
     return toolName;
@@ -622,9 +691,11 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     for (const item of rawQuestions) {
       if (!item || typeof item !== "object") continue;
       const qObj = item as Record<string, unknown>;
-      const question = typeof qObj.question === "string" ? qObj.question.trim() : "";
+      const question =
+        typeof qObj.question === "string" ? qObj.question.trim() : "";
       if (!question) continue;
-      const header = typeof qObj.header === "string" ? qObj.header.trim() : undefined;
+      const header =
+        typeof qObj.header === "string" ? qObj.header.trim() : undefined;
       const multiple = Boolean(qObj.multiple ?? qObj.is_multi_select);
       const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
       const options: AgentQuestionOption[] = [];
@@ -635,10 +706,11 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
           const o = opt as Record<string, unknown>;
           const label = typeof o.label === "string" ? o.label.trim() : "";
           if (label) {
-            options.push({
-              label,
-              description: typeof o.description === "string" ? o.description.trim() : undefined,
-            });
+            const desc =
+              typeof o.description === "string"
+                ? o.description.trim()
+                : undefined;
+            options.push({ label, description: desc });
           }
         }
       }

@@ -109,10 +109,16 @@
   appearance: none;
   -webkit-appearance: none;
   background-color: var(--background-primary);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
   background-repeat: no-repeat;
-  background-position: right 8px center;
-  background-size: 14px 14px;
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 9px) 50%;
+  background-size:
+    5px 5px,
+    5px 5px;
   padding-right: 28px;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
@@ -274,7 +280,11 @@
 }
 
 .opencode-message--user .opencode-bubble {
-  background: linear-gradient(135deg, var(--interactive-accent), var(--interactive-accent-hover));
+  background: linear-gradient(
+    135deg,
+    var(--interactive-accent),
+    var(--interactive-accent-hover)
+  );
   color: var(--text-on-accent);
   border-bottom-right-radius: 4px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
@@ -335,7 +345,11 @@
   font-size: var(--font-smaller);
   color: var(--text-muted);
   border-left: 3px solid var(--interactive-accent);
-  background: color-mix(in srgb, var(--interactive-accent) 6%, var(--background-secondary));
+  background: color-mix(
+    in srgb,
+    var(--interactive-accent) 6%,
+    var(--background-secondary)
+  );
   padding: 6px 10px;
   border-radius: 0 8px 8px 0;
   max-width: 88%;
@@ -460,7 +474,11 @@
   border-radius: 999px;
   font-size: 0.9em;
   font-weight: 600;
-  background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-primary));
+  background: color-mix(
+    in srgb,
+    var(--interactive-accent) 14%,
+    var(--background-primary)
+  );
   color: var(--text-normal);
 }
 
@@ -562,8 +580,17 @@
   gap: 8px;
   padding: 5px 12px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
-  border: 1px solid color-mix(in srgb, var(--interactive-accent) 30%, var(--background-modifier-border));
+  background: color-mix(
+    in srgb,
+    var(--interactive-accent) 10%,
+    var(--background-secondary)
+  );
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--interactive-accent) 30%,
+      var(--background-modifier-border)
+    );
   font-size: var(--font-smaller);
   color: var(--text-normal);
   max-width: 88%;
@@ -571,8 +598,16 @@
 }
 
 .opencode-activity-bar.is-warning {
-  background: color-mix(in srgb, var(--color-orange, #f59e0b) 14%, var(--background-secondary));
-  border-color: color-mix(in srgb, var(--color-orange, #f59e0b) 40%, var(--background-modifier-border));
+  background: color-mix(
+    in srgb,
+    var(--color-orange, #f59e0b) 14%,
+    var(--background-secondary)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--color-orange, #f59e0b) 40%,
+    var(--background-modifier-border)
+  );
 }
 
 .opencode-activity-bar.hidden {
@@ -580,7 +615,8 @@
 }
 
 @keyframes opencode-pulse-bg {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -633,7 +669,12 @@
   padding: 12px 14px;
   border-radius: var(--radius-m);
   background: var(--background-secondary);
-  border: 1px solid color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--interactive-accent) 45%,
+      var(--background-modifier-border)
+    );
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -673,7 +714,11 @@
   border-radius: 999px;
   font-size: var(--font-smaller);
   font-weight: 600;
-  background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+  background: color-mix(
+    in srgb,
+    var(--interactive-accent) 15%,
+    var(--background-primary)
+  );
   color: var(--text-normal);
 }
 
@@ -719,7 +764,11 @@
 
 .opencode-question-opt.is-selected {
   border-color: var(--interactive-accent);
-  background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-primary));
+  background: color-mix(
+    in srgb,
+    var(--interactive-accent) 14%,
+    var(--background-primary)
+  );
 }
 
 .opencode-question-opt-check {
@@ -886,7 +935,8 @@
 .opencode-input:focus {
   outline: none;
   border-color: var(--interactive-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--interactive-accent) 20%, transparent);
 }
 
 .opencode-input::placeholder {
@@ -994,7 +1044,11 @@
 }
 
 .opencode-send-btn {
-  background: linear-gradient(135deg, var(--interactive-accent), var(--interactive-accent-hover));
+  background: linear-gradient(
+    135deg,
+    var(--interactive-accent),
+    var(--interactive-accent-hover)
+  );
   color: var(--text-on-accent);
 }
 

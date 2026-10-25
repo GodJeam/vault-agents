@@ -22,7 +22,7 @@ export interface ProviderOptionDescriptor {
 }
 
 export interface ProviderDescriptor {
-  /** Unique engine identifier (e.g. 'antigravity', 'opencode', 'pi', 'hermes') */
+  /** Unique engine identifier (e.g. 'antigravity', 'opencode') */
   id: EngineType;
   /** Full human-readable name for settings and dropdowns */
   displayName: string;
@@ -36,7 +36,7 @@ export interface ProviderDescriptor {
   modelDesc: string;
   /** Description shown under the binary path field in Settings */
   binaryDesc: string;
-  /** True when usage is included in a subscription (no per-token cost is shown) */
+  /** True when usage is included in a subscription (no per-token cost) */
   included: boolean;
   /** Human-readable note about cost/inclusion (e.g. "Google AI Pro") */
   costNote?: string;
@@ -76,7 +76,7 @@ export interface AgentProvider {
   /** Compatibility alias for legacy runner interface */
   readonly engine: EngineType;
 
-  /** True when usage is included in a subscription (no per-token cost is shown) */
+  /** True when usage is included in a subscription (no per-token cost) */
   readonly included: boolean;
 
   /** Human-readable note about cost/inclusion (e.g. "Google AI Pro") */
@@ -101,18 +101,24 @@ export interface AgentProvider {
   getModelContextLimit(model: string): Promise<number>;
 
   /** Get token usage for a session (last turn prompt size) */
-  getSessionTokens(sessionId: string): Promise<{ input: number; output: number }>;
+  getSessionTokens(
+    sessionId: string
+  ): Promise<{ input: number; output: number }>;
 
   /** Get global usage statistics if supported */
   getUsageStats(): Promise<UsageStats>;
 
   /** Run a streaming execution with real-time callbacks */
-  runStream(req: RunRequest | string, fileAttachmentsOrCb?: string[] | StreamCallbacks, maybeCb?: StreamCallbacks): RunHandle;
+  runStream(
+    req: RunRequest | string,
+    fileAttachmentsOrCb?: string[] | StreamCallbacks,
+    maybeCb?: StreamCallbacks
+  ): RunHandle;
 
   /** Convert documents (PDF, DOCX, XLSX) to Markdown via anydoc */
   convertDocument(absPath: string): Promise<string>;
 
-  /** Optional database self-cleanup for engines that store file blobs in SQLite */
+  /** Optional database cleanup for engines storing file blobs in SQLite */
   pruneOversizedParts?(force?: boolean, ignoreAge?: boolean): Promise<void>;
 
   /** Abort and kill all running child processes for this provider */

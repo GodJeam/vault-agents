@@ -3,7 +3,6 @@ import * as assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  DEFAULT_SETTINGS,
   getEngineConfig,
   migrateSettings,
   type AgentQuestion,
@@ -106,7 +105,7 @@ test("migrateSettings migrates legacy flat fields into engines map", () => {
   assert.equal(histories.ses_1.length, 1);
 });
 
-test("ProviderRegistry resolves session-specific provider and falls back cleanly", () => {
+test("ProviderRegistry resolves session-specific provider cleanly", () => {
   const host = createMockHost();
   const agy = new AntigravityRunner(host);
   const oc = new OpencodeRunner(host);
@@ -129,7 +128,10 @@ test("AntigravityRunner parses sample-stream.ndjson fixture accurately", () => {
   const col = createCollector();
   const streamState = { accumulatedText: "" };
 
-  const fixturePath = join(process.cwd(), "test/fixtures/antigravity/sample-stream.ndjson");
+  const fixturePath = join(
+    process.cwd(),
+    "test/fixtures/antigravity/sample-stream.ndjson"
+  );
   const lines = readFileSync(fixturePath, "utf-8").split("\n").filter(Boolean);
 
   for (const line of lines) {
@@ -166,7 +168,10 @@ test("OpencodeRunner parses sample-stream.ndjson fixture accurately", () => {
   const runner = new OpencodeRunner(host);
   const col = createCollector();
 
-  const fixturePath = join(process.cwd(), "test/fixtures/opencode/sample-stream.ndjson");
+  const fixturePath = join(
+    process.cwd(),
+    "test/fixtures/opencode/sample-stream.ndjson"
+  );
   const lines = readFileSync(fixturePath, "utf-8").split("\n").filter(Boolean);
 
   for (const line of lines) {
@@ -186,7 +191,7 @@ test("OpencodeRunner parses sample-stream.ndjson fixture accurately", () => {
   assert.equal(col.finishes[0].cost, 0.0025);
 });
 
-test("AntigravityRunner and OpencodeRunner handle non-JSON, errors, and oversized lines safely", () => {
+test("Runners handle non-JSON, errors, and oversized lines safely", () => {
   const host = createMockHost();
   const agy = new AntigravityRunner(host);
   const oc = new OpencodeRunner(host);
@@ -196,10 +201,18 @@ test("AntigravityRunner and OpencodeRunner handle non-JSON, errors, and oversize
   assert.equal(col.raws.length, 1);
   assert.match(col.raws[0], /plain stderr\/stdout warning/);
 
-  agy.handleLine(JSON.stringify({ event: "error", error: { message: "Quota exceeded" } }), col.cb);
+  const agyErr = JSON.stringify({
+    event: "error",
+    error: { message: "Quota exceeded" },
+  });
+  agy.handleLine(agyErr, col.cb);
   assert.equal(col.errors.at(-1), "Quota exceeded");
 
-  oc.handleLine(JSON.stringify({ type: "error", error: { data: { message: "Invalid model" } } }), col.cb);
+  const ocErr = JSON.stringify({
+    type: "error",
+    error: { data: { message: "Invalid model" } },
+  });
+  oc.handleLine(ocErr, col.cb);
   assert.equal(col.errors.at(-1), "Invalid model");
 
   const huge = "x".repeat(20_000_005);
@@ -207,7 +220,7 @@ test("AntigravityRunner and OpencodeRunner handle non-JSON, errors, and oversize
   assert.match(col.raws.at(-1) ?? "", /\[omitted event of 20000005 bytes\]/);
 });
 
-test("AntigravityRunner respects autoApprove toggle, effort suffix, and explicit sessionId", () => {
+test("AntigravityRunner respects autoApprove, effort, and sessionId", () => {
   const hostSafe = createMockHost({
     autoApprove: false,
     sessionId: "global-uuid-1111",
@@ -219,11 +232,13 @@ test("AntigravityRunner respects autoApprove toggle, effort suffix, and explicit
   const argsNoApprove = agySafe.buildArgs({
     prompt: "Hello",
     fileAttachments: [],
-    sessionId: "", // Empty per-view session should NOT inherit global sessionId
+    // Empty per-view session should NOT inherit global sessionId
+    sessionId: "",
   });
   assert.equal(argsNoApprove.includes("--dangerously-skip-permissions"), false);
   assert.equal(argsNoApprove.includes("--conversation"), false);
-  assert.equal(argsNoApprove.includes("--effort"), false); // model already ends with -high
+  // Model already ends with -high
+  assert.equal(argsNoApprove.includes("--effort"), false);
 
   const hostAuto = createMockHost({
     autoApprove: true,
@@ -245,7 +260,7 @@ test("AntigravityRunner respects autoApprove toggle, effort suffix, and explicit
   assert.equal(argsAuto[effortIdx + 1], "xhigh");
 });
 
-test("AntigravityRunner.getUsageStats filters untagged sessions and time windows", async () => {
+test("AntigravityRunner.getUsageStats filters time windows", async () => {
   const now = Date.now();
   const twoHoursAgo = now - 2 * 3600 * 1000;
   const threeDaysAgo = now - 3 * 24 * 3600 * 1000;
@@ -253,12 +268,32 @@ test("AntigravityRunner.getUsageStats filters untagged sessions and time windows
 
   const histories: HistoryMap = {
     "uuid-agy-1": [
-      { role: "assistant", text: "a", tokens: { input: 100, output: 50 }, timestamp: twoHoursAgo },
-      { role: "assistant", text: "b", tokens: { input: 200, output: 100 }, timestamp: threeDaysAgo },
-      { role: "assistant", text: "c", tokens: { input: 400, output: 200 }, timestamp: twentyDaysAgo },
+      {
+        role: "assistant",
+        text: "a",
+        tokens: { input: 100, output: 50 },
+        timestamp: twoHoursAgo,
+      },
+      {
+        role: "assistant",
+        text: "b",
+        tokens: { input: 200, output: 100 },
+        timestamp: threeDaysAgo,
+      },
+      {
+        role: "assistant",
+        text: "c",
+        tokens: { input: 400, output: 200 },
+        timestamp: twentyDaysAgo,
+      },
     ],
     ses_opencode_untagged: [
-      { role: "assistant", text: "oc", tokens: { input: 9999, output: 9999 }, timestamp: twoHoursAgo },
+      {
+        role: "assistant",
+        text: "oc",
+        tokens: { input: 9999, output: 9999 },
+        timestamp: twoHoursAgo,
+      },
     ],
   };
 
@@ -271,7 +306,7 @@ test("AntigravityRunner.getUsageStats filters untagged sessions and time windows
   assert.equal(stats.month.input, 700);
 });
 
-test("OpencodeRunner.buildArgs resolves relative fileAttachments against vault path", () => {
+test("OpencodeRunner.buildArgs resolves relative fileAttachments", () => {
   const host = createMockHost();
   const oc = new OpencodeRunner(host);
   const args = oc.buildArgs({
@@ -286,7 +321,7 @@ test("OpencodeRunner.buildArgs resolves relative fileAttachments against vault p
   assert.equal(args[secondFileIdx + 1], "/tmp/already-abs.md");
 });
 
-test("OpencodeRunner intercepts failed question tool_use and extracts human-friendly tool titles", () => {
+test("OpencodeRunner intercepts question tool and extracts tool titles", () => {
   const host = createMockHost({ language: "en" });
   const oc = new OpencodeRunner(host);
   const col = createCollector();
@@ -302,7 +337,7 @@ test("OpencodeRunner intercepts failed question tool_use and extracts human-frie
   );
   assert.equal(col.activities.at(-1), "Analyzing and planning...");
 
-  // 2. read tool_use with raw title "read" extracts basename from input.filePath
+  // 2. read tool_use with raw title "read" extracts basename from filePath
   oc.handleLine(
     JSON.stringify({
       type: "tool_use",
@@ -326,7 +361,7 @@ test("OpencodeRunner intercepts failed question tool_use and extracts human-frie
   assert.equal(col.steps[0].title, "Architecture.md");
   assert.equal(col.steps[0].durationMs, 250);
 
-  // 3. question tool_use (cancelled by opencode run CLI with status "error") is intercepted cleanly
+  // 3. question tool_use (cancelled by opencode run CLI) is intercepted cleanly
   oc.handleLine(
     JSON.stringify({
       type: "tool_use",
@@ -361,14 +396,17 @@ test("OpencodeRunner intercepts failed question tool_use and extracts human-frie
   assert.equal(col.questions.length, 1);
   assert.equal(col.questions[0].length, 1);
   assert.equal(col.questions[0][0].header, "Format");
-  assert.equal(col.questions[0][0].question, "How would you like the summary formatted?");
+  assert.equal(
+    col.questions[0][0].question,
+    "How would you like the summary formatted?"
+  );
   assert.equal(col.questions[0][0].options.length, 2);
   assert.equal(col.questions[0][0].options[0].label, "Bullet points");
   assert.equal(col.steps.at(-1)?.state, "completed"); // error suppressed!
   assert.equal(col.activities.at(-1), "Waiting for your answer...");
 });
 
-test("AntigravityRunner intercepts ask_question tool and deduplicates across step updates", () => {
+test("AntigravityRunner intercepts ask_question and deduplicates", () => {
   const host = createMockHost({ language: "en" });
   const agy = new AntigravityRunner(host);
   const col = createCollector();
@@ -402,7 +440,10 @@ test("AntigravityRunner intercepts ask_question tool and deduplicates across ste
   agy.handleLine(askEvent("DONE"), col.cb, streamState);
 
   assert.equal(col.questions.length, 1); // deduplicated!
-  assert.equal(col.questions[0][0].question, "Which sections should be included?");
+  assert.equal(
+    col.questions[0][0].question,
+    "Which sections should be included?"
+  );
   assert.equal(col.questions[0][0].multiple, true);
   assert.deepEqual(
     col.questions[0][0].options.map((o) => o.label),
@@ -411,7 +452,7 @@ test("AntigravityRunner intercepts ask_question tool and deduplicates across ste
   assert.equal(col.steps.at(-1)?.state, "completed");
 });
 
-test("formatToolAction and formatQuestionAnswers produce human-readable output", () => {
+test("formatToolAction and formatQuestionAnswers format output", () => {
   const tEn = (s: string) => translate("en", s);
 
   const readFmt = formatToolAction("read", "Note.md", tEn);
@@ -442,11 +483,14 @@ test("formatToolAction and formatQuestionAnswers produce human-readable output",
   const custom = new Map<number, string>([[0, "with academic references"]]);
   const formatted = formatQuestionAnswers(questions, selected, custom, tEn);
   assert.match(formatted, /Here are my answers to your questions:/);
-  assert.match(formatted, /\*\*Style — Which tone should be used\?\*\*: Formal, with academic references/);
+  assert.match(
+    formatted,
+    /\*\*Style — Which tone should be used\?\*\*: Formal, with academic/
+  );
   assert.match(formatted, /\*\*Language — Which language\?\*\*: English/);
 });
 
-test("OpencodeRunner and AntigravityRunner compute total tokens when CLI omits total and getSessionTokens reads history fallback", async () => {
+test("Runners compute total tokens and read history fallback", async () => {
   const histories: HistoryMap = {
     ses_hist_ctx: [
       {
@@ -462,7 +506,10 @@ test("OpencodeRunner and AntigravityRunner compute total tokens when CLI omits t
       },
     ],
   };
-  const host = createMockHost({ binaryPath: "/nonexistent/opencode" }, histories);
+  const host = createMockHost(
+    { binaryPath: "/nonexistent/opencode" },
+    histories
+  );
   const oc = new OpencodeRunner(host);
   const agy = new AntigravityRunner(host);
   const col = createCollector();
@@ -504,7 +551,7 @@ test("OpencodeRunner and AntigravityRunner compute total tokens when CLI omits t
   );
   assert.equal(col.finishes.at(-1)?.tokens?.total, 700);
 
-  // getSessionTokens falls back to saved history (including cache.read) when CLI/db is unavailable
+  // getSessionTokens falls back to saved history (including cache.read)
   const ctxTokens = await oc.getSessionTokens("ses_hist_ctx");
   assert.equal(ctxTokens.input, 152400);
   assert.equal(ctxTokens.output, 120);

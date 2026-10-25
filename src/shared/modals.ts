@@ -29,18 +29,23 @@ export class RenameModal extends Modal {
 
     new Setting(contentEl)
       .addButton((b) =>
-        b.setButtonText(t("Save")).setCta().onClick(() => {
-          if (!input) return;
-          const v = input.value.trim();
-          if (!v) {
-            new Notice(t("The title cannot be empty."));
-            return;
-          }
-          this.onSubmit(v);
-          this.close();
-        })
+        b
+          .setButtonText(t("Save"))
+          .setCta()
+          .onClick(() => {
+            if (!input) return;
+            const v = input.value.trim();
+            if (!v) {
+              new Notice(t("The title cannot be empty."));
+              return;
+            }
+            this.onSubmit(v);
+            this.close();
+          })
       )
-      .addButton((b) => b.setButtonText(t("Cancel")).onClick(() => this.close()));
+      .addButton((b) =>
+        b.setButtonText(t("Cancel")).onClick(() => this.close())
+      );
   }
 
   onClose(): void {
@@ -62,7 +67,10 @@ export class StatsModal extends Modal {
     const t = (s: string) => this.plugin.t(s);
     contentEl.empty();
     contentEl.createEl("h3", { text: t("Token usage and costs") });
-    const status = contentEl.createDiv({ cls: "opencode-stats-loading", text: t("Loading...") });
+    const status = contentEl.createDiv({
+      cls: "opencode-stats-loading",
+      text: t("Loading..."),
+    });
 
     this.plugin.registry
       .resolveProvider(this.engine)
@@ -78,21 +86,29 @@ export class StatsModal extends Modal {
       });
   }
 
-  private renderWindow(container: HTMLElement, label: string, w: UsageWindow): void {
+  private renderWindow(
+    container: HTMLElement,
+    label: string,
+    w: UsageWindow
+  ): void {
     const locale = this.plugin.settings.language === "it" ? "it-IT" : "en-US";
     const t = (s: string) => this.plugin.t(s);
     container.createEl("h4", { text: label });
-    new Setting(container).setName(t("Input tokens")).setDesc(w.input.toLocaleString(locale));
-    new Setting(container).setName(t("Output tokens")).setDesc(w.output.toLocaleString(locale));
+    new Setting(container)
+      .setName(t("Input tokens"))
+      .setDesc(w.input.toLocaleString(locale));
+    new Setting(container)
+      .setName(t("Output tokens"))
+      .setDesc(w.output.toLocaleString(locale));
     new Setting(container)
       .setName(t("Total tokens"))
       .setDesc((w.input + w.output).toLocaleString(locale));
     const provider = this.plugin.registry.resolveProvider(this.engine);
+    const incKey = provider.costNote
+      ? t("Included with $1 ($0.00)")
+      : t("Included ($0.00)");
     const costDesc = provider.included
-      ? substitute(
-          provider.costNote ? t("Included with $1 ($0.00)") : t("Included ($0.00)"),
-          provider.costNote ?? ""
-        )
+      ? substitute(incKey, provider.costNote ?? "")
       : `${w.cost.toFixed(4)} $`;
     new Setting(container).setName(t("Cost")).setDesc(costDesc);
   }
@@ -119,7 +135,10 @@ export class ConfirmModal extends Modal {
     const t = (s: string) => this.plugin.t(s);
     contentEl.empty();
     contentEl.createEl("h3", { text: this.title });
-    contentEl.createDiv({ cls: "opencode-confirm-message", text: this.message });
+    contentEl.createDiv({
+      cls: "opencode-confirm-message",
+      text: this.message,
+    });
     new Setting(contentEl)
       .addButton((b) =>
         b
@@ -130,7 +149,9 @@ export class ConfirmModal extends Modal {
             this.close();
           })
       )
-      .addButton((b) => b.setButtonText(t("Cancel")).onClick(() => this.close()));
+      .addButton((b) =>
+        b.setButtonText(t("Cancel")).onClick(() => this.close())
+      );
   }
 
   onClose(): void {
@@ -169,19 +190,24 @@ export class PromptModal extends Modal {
 
     new Setting(contentEl)
       .addButton((b) =>
-        b.setButtonText(t("Save")).setCta().onClick(() => {
-          if (!nameInput || !textArea) return;
-          const name = nameInput.value.trim();
-          const text = textArea.value;
-          if (!name || !text) {
-            new Notice(t("The prompt cannot be empty."));
-            return;
-          }
-          this.onSave(name, text);
-          this.close();
-        })
+        b
+          .setButtonText(t("Save"))
+          .setCta()
+          .onClick(() => {
+            if (!nameInput || !textArea) return;
+            const name = nameInput.value.trim();
+            const text = textArea.value;
+            if (!name || !text) {
+              new Notice(t("The prompt cannot be empty."));
+              return;
+            }
+            this.onSave(name, text);
+            this.close();
+          })
       )
-      .addButton((b) => b.setButtonText(t("Cancel")).onClick(() => this.close()));
+      .addButton((b) =>
+        b.setButtonText(t("Cancel")).onClick(() => this.close())
+      );
   }
 
   onClose(): void {
@@ -192,7 +218,11 @@ export class PromptModal extends Modal {
 export class FileSuggestModal extends SuggestModal<TFile> {
   private items: TFile[] | null = null;
 
-  constructor(app: App, private plugin: OpencodePlugin, private onPick: (file: TFile) => void) {
+  constructor(
+    app: App,
+    private plugin: OpencodePlugin,
+    private onPick: (file: TFile) => void
+  ) {
     super(app);
     const t = (s: string) => this.plugin.t(s);
     this.setPlaceholder(t("Search a vault file to attach..."));
@@ -205,7 +235,9 @@ export class FileSuggestModal extends SuggestModal<TFile> {
 
   getItems(): TFile[] {
     if (!this.items) {
-      this.items = this.app.vault.getFiles().sort((a, b) => a.path.localeCompare(b.path));
+      this.items = this.app.vault
+        .getFiles()
+        .sort((a, b) => a.path.localeCompare(b.path));
     }
     return this.items;
   }
@@ -242,7 +274,9 @@ export class ModelSuggestModal extends SuggestModal<ModelItem> {
   ) {
     super(app);
     const t = (s: string) => this.plugin.t(s);
-    this.setPlaceholder(t("Search models... (e.g. gemini, claude, flash, deepseek)"));
+    this.setPlaceholder(
+      t("Search models... (e.g. gemini, claude, flash, deepseek)")
+    );
     this.setInstructions([
       { command: "↑↓", purpose: t("navigate") },
       { command: "↵", purpose: t("select") },
@@ -259,10 +293,11 @@ export class ModelSuggestModal extends SuggestModal<ModelItem> {
     if (!q) {
       return this.items.slice(0, 30);
     }
-    const filtered = this.items.filter((item) =>
-      item.id.toLowerCase().includes(q) ||
-      item.provider.toLowerCase().includes(q) ||
-      item.engine.toLowerCase().includes(q)
+    const filtered = this.items.filter(
+      (item) =>
+        item.id.toLowerCase().includes(q) ||
+        item.provider.toLowerCase().includes(q) ||
+        item.engine.toLowerCase().includes(q)
     );
     return filtered.slice(0, 30);
   }
@@ -274,9 +309,15 @@ export class ModelSuggestModal extends SuggestModal<ModelItem> {
     if (item.isActive) {
       titleEl.createSpan({ text: "  ✓", cls: "opencode-model-suggest-check" });
     }
+    const activeSuffix = item.isActive
+      ? ` · ${this.plugin.t("active model")}`
+      : "";
+    const descCls =
+      "opencode-model-suggest-desc " +
+      `opencode-model-suggest-desc--${item.engine}`;
     el.createDiv({
-      cls: `opencode-model-suggest-desc opencode-model-suggest-desc--${item.engine}`,
-      text: item.provider + (item.isActive ? ` · ${this.plugin.t("active model")}` : ""),
+      cls: descCls,
+      text: item.provider + activeSuffix,
     });
   }
 
