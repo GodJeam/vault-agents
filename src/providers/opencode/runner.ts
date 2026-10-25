@@ -88,16 +88,120 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async listSessions(): Promise<SessionInfo[]> {
-    try {
-      const out = await this.execCli(this.getBin(), ["session", "list", "--format", "json"]);
-      const arr = JSON.parse(out);
-      return Array.isArray(arr) ? (arr as SessionInfo[]) : [];
-    } catch {
-      return [];
+    const sessions: SessionInfo[] = [];
+    const seenIds = new Set<string>();
+
+    // 1. Query opencode.db directly via sqlite3 (returns all sessions regardless of process cwd
+    // and avoids CLI stdout truncation on large session lists)
+    const dbPath = await this.getDbPath();
+    if (dbPath) {
+      for (const table of ["session_v2", "session"]) {
+        try {
+          const query = `SELECT id, replace(replace(COALESCE(title, ''), char(10), ' '), '|', ' '), time_updated, time_created, project_id, directory FROM ${table} ORDER BY time_updated DESC LIMIT 60`;
+          const out = await this.execSqlite(dbPath, query);
+          for (const line of out.trim().split(/\r?\n/)) {
+            if (!line.trim()) continue;
+            const parts = line.split("|");
+            const id = parts[0]?.trim();
+            if (!id || seenIds.has(id)) continue;
+            const rawTitle = parts[1]?.trim() || "";
+            const updated = parseInt(parts[2]?.trim() || "", 10);
+            const created = parseInt(parts[3]?.trim() || "", 10);
+            const projectId = parts[4]?.trim() || undefined;
+            const directory = parts[5]?.trim() || undefined;
+            sessions.push({
+              id,
+              title: rawTitle || this.fallbackSessionTitle(id),
+              updated: !isNaN(updated) && updated > 0 ? updated : Date.now(),
+              created: !isNaN(created) && created > 0 ? created : undefined,
+              projectId,
+              directory,
+              engine: "opencode",
+            });
+            seenIds.add(id);
+          }
+          if (sessions.length > 0) break;
+        } catch {
+          // Try next table or fallback
+        }
+      }
     }
+
+    // 2. Fallback to CLI `opencode session list --format json` (with vault cwd)
+    if (sessions.length === 0) {
+      try {
+        const cwd = this.getVaultPath() ?? undefined;
+        const out = await this.execCli(
+          this.getBin(),
+          ["session", "list", "--format", "json"],
+          cwd
+        );
+        const arr = JSON.parse(out);
+        if (Array.isArray(arr)) {
+          for (const item of arr as SessionInfo[]) {
+            if (!item?.id || seenIds.has(item.id)) continue;
+            sessions.push({
+              ...item,
+              title: item.title?.trim() || this.fallbackSessionTitle(item.id),
+              engine: "opencode",
+            });
+            seenIds.add(item.id);
+          }
+        }
+      } catch {
+        // Ignore and fall through to Obsidian history
+      }
+    }
+
+    // 3. Ensure any OpenCode sessions saved in Obsidian histories are also included
+    const histories = this.plugin.histories ?? {};
+    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
+    for (const [id, msgs] of Object.entries(histories)) {
+      if (seenIds.has(id)) continue;
+      if (sessionEngines[id] === "opencode" || (!sessionEngines[id] && /^ses_/.test(id))) {
+        const lastTs = msgs[msgs.length - 1]?.timestamp ?? Date.now();
+        sessions.push({
+          id,
+          title: this.fallbackSessionTitle(id),
+          updated: lastTs,
+          engine: "opencode",
+        });
+        seenIds.add(id);
+      }
+    }
+
+    return sessions;
+  }
+
+  private fallbackSessionTitle(sessionId: string): string {
+    const msgs = this.plugin.getHistory(sessionId);
+    const firstUser = msgs.find((m) => m.role === "user" && m.text.trim());
+    if (firstUser) {
+      const clean = firstUser.text.trim().replace(/\s+/g, " ");
+      return clean.length > 48 ? clean.slice(0, 45) + "…" : clean;
+    }
+    return sessionId;
   }
 
   async renameSession(sessionId: string, title: string): Promise<void> {
+    const dbPath = await this.getDbPath();
+    if (dbPath) {
+      const safeTitle = title.replace(/'/g, "''");
+      const safeId = sessionId.replace(/'/g, "''");
+      let updatedDb = false;
+      for (const table of ["session_v2", "session"]) {
+        try {
+          await this.execSqlite(
+            dbPath,
+            `UPDATE ${table} SET title = '${safeTitle}' WHERE id = '${safeId}'`
+          );
+          updatedDb = true;
+        } catch {
+          // Ignore if table doesn't exist
+        }
+      }
+      if (updatedDb) return;
+    }
     await this.execCli(this.getBin(), [
       "api",
       "PATCH",
@@ -437,11 +541,8 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
           const input = Number(tk.input ?? 0);
           const output = Number(tk.output ?? 0);
           const reasoning = Number(tk.reasoning ?? 0);
-          const cacheRead = Number(tk.cache?.read ?? 0);
-          const cacheWrite = Number(tk.cache?.write ?? 0);
           const rawTotal = Number(tk.total ?? 0);
-          const total =
-            rawTotal > 0 ? rawTotal : input + output + reasoning + cacheRead + cacheWrite;
+          const total = rawTotal > 0 ? rawTotal : input + output + reasoning;
           normalizedTokens = {
             ...tk,
             input,

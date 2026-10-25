@@ -367,8 +367,30 @@ export class ChatView extends ItemView {
       all.sort((a, b) => (b.updated ?? 0) - (a.updated ?? 0));
       const pinnedSet = new Set(this.plugin.settings.pinned ?? []);
       const pinned = all.filter((s) => pinnedSet.has(s.id));
-      const recent = all.filter((s) => !pinnedSet.has(s.id)).slice(0, 15);
-      for (const s of [...pinned, ...recent]) {
+      const recent = all.filter((s) => !pinnedSet.has(s.id)).slice(0, 20);
+      const displayed = [...pinned, ...recent];
+
+      // Always include the currently active session so its name is shown in the dropdown
+      if (this.viewSession && !displayed.some((s) => s.id === this.viewSession)) {
+        const found = all.find((s) => s.id === this.viewSession);
+        if (found) {
+          displayed.push(found);
+        } else {
+          const hist = this.plugin.getHistory(this.viewSession);
+          const firstUser = hist.find((m) => m.role === "user" && m.text.trim());
+          const fallbackTitle = firstUser
+            ? firstUser.text.trim().replace(/\s+/g, " ").slice(0, 40)
+            : this.viewSession;
+          displayed.push({
+            id: this.viewSession,
+            title: fallbackTitle,
+            updated: Date.now(),
+            engine: this.sessionEngine(),
+          });
+        }
+      }
+
+      for (const s of displayed) {
         const o = sel.createEl("option");
         o.value = s.id;
         const title = s.title || s.id;
@@ -462,11 +484,7 @@ export class ChatView extends ItemView {
       const input = info.tokens.input ?? 0;
       const output = info.tokens.output ?? 0;
       const reasoning = info.tokens.reasoning ?? 0;
-      const cacheRead = info.tokens.cache?.read ?? 0;
-      const cacheWrite = info.tokens.cache?.write ?? 0;
-      const rawTotal = info.tokens.total ?? 0;
-      const total =
-        rawTotal > 0 ? rawTotal : input + output + reasoning + cacheRead + cacheWrite;
+      const total = input + output + reasoning;
       this.stats.input += input;
       this.stats.output += output;
       this.stats.total += total;
@@ -949,6 +967,7 @@ export class ChatView extends ItemView {
           }
           this.stoppedByUser = false;
           this.pendingUser = null;
+          void this.populateSessionSelect();
           void this.refreshContext();
         },
       }
@@ -1116,10 +1135,7 @@ export class ChatView extends ItemView {
           const inp = rec.tokens.input ?? 0;
           const out = rec.tokens.output ?? 0;
           const reas = rec.tokens.reasoning ?? 0;
-          const cRead = rec.tokens.cache?.read ?? 0;
-          const cWrite = rec.tokens.cache?.write ?? 0;
-          const rawTot = rec.tokens.total ?? 0;
-          const tot = rawTot > 0 ? rawTot : inp + out + reas + cRead + cWrite;
+          const tot = inp + out + reas;
           const stats = row.createDiv({ cls: "opencode-msg-stats" });
           stats.setText(
             this.fmtTokens(
