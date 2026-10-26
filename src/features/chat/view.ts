@@ -781,7 +781,8 @@ export class ChatView extends ItemView {
           if (!isCurrent) return;
           this.running = false;
           this.setRunningUI(false);
-          const failed = code !== 0 || this.hadStreamError;
+          const summary = bubble.getSnapshot().text.trim();
+          const failed = (code !== 0 && !summary) || this.hadStreamError;
           if (failed && !this.stoppedByUser) {
             if (!this.hadStreamError) {
               const detail = this.lastStderr
@@ -804,7 +805,6 @@ export class ChatView extends ItemView {
             );
             return;
           }
-          const summary = bubble.getSnapshot().text.trim();
           const sumHeader = this.plugin.t(
             "[SUMMARY OF THE PREVIOUS SESSION]"
           );
@@ -933,6 +933,7 @@ export class ChatView extends ItemView {
     this.setRunningUI(true);
 
     let lastEventTime = Date.now();
+    let hasQuestion = false;
     if (this.activityTimer !== null) clearInterval(this.activityTimer);
     this.activityTimer = window.setInterval(() => {
       if (!this.running) {
@@ -1008,6 +1009,7 @@ export class ChatView extends ItemView {
         },
         onQuestion: (questions) => {
           lastEventTime = Date.now();
+          hasQuestion = true;
           currentActivity = this.plugin.t("Waiting for your answer...");
           bubble.setActivity(currentActivity);
           bubble.addQuestions(questions);
@@ -1053,6 +1055,7 @@ export class ChatView extends ItemView {
           this.setRunningUI(false);
 
           const snap = bubble.getSnapshot();
+          const hasResponse = Boolean(snap.text.trim()) || hasQuestion;
           const currentSession = this.viewSession;
           if (currentSession && snap.text.trim()) {
             void this.plugin.appendHistory(currentSession, {
@@ -1064,7 +1067,7 @@ export class ChatView extends ItemView {
             });
           }
 
-          const failed = code !== 0 || this.hadStreamError;
+          const failed = (code !== 0 && !hasResponse) || this.hadStreamError;
           if (failed && !this.stoppedByUser) {
             this.handleProcessFailure(code);
           }
