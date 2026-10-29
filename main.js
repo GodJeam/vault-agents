@@ -339,9 +339,64 @@ var IT = {
   "Extra high": "Extra alto",
   "Max": "Massimo",
   "Antigravity found:": "Antigravity trovato:",
+  "$1 settings": "Impostazioni $1",
+  "$1 found:": "$1 trovato:",
+  "Run '$1 --version' to verify the binary is reachable.":
+    "Esegue '$1 --version' per verificare che il binario sia raggiungibile.",
   "Run 'agy --version' to verify the binary is reachable.":
     "Esegue 'agy --version' per verificare che il binario sia " +
     "raggiungibile.",
+  "Claude Code CLI": "Claude Code CLI",
+  "OpenAI Codex CLI": "OpenAI Codex CLI",
+  "Hermes Agent CLI (Nous Research)": "Hermes Agent CLI (Nous Research)",
+  "Pi Coding Agent CLI": "Pi Coding Agent CLI",
+  ["Command or full path to the claude executable. Usually 'claude' is " +
+    "enough if it is on your PATH."]:
+    "Comando o percorso completo dell'eseguibile claude. Di solito basta " +
+    "'claude' se è nel PATH.",
+  ["Pick a Claude model (e.g. claude-sonnet-4-5, claude-opus-4-5, claude-" +
+    "haiku-4-5)."]:
+    "Scegli un modello Claude (es. claude-sonnet-4-5, claude-opus-4-5, " +
+    "claude-haiku-4-5).",
+  "Reasoning effort level passed to Claude Code.":
+    "Livello di ragionamento (effort) passato a Claude Code.",
+  ["Command or full path to the codex executable. Usually 'codex' is " +
+    "enough if it is on your PATH."]:
+    "Comando o percorso completo dell'eseguibile codex. Di solito basta " +
+    "'codex' se è nel PATH.",
+  "Pick an OpenAI Codex model (e.g. gpt-5-codex, o3, o4-mini).":
+    "Scegli un modello OpenAI Codex (es. gpt-5-codex, o3, o4-mini).",
+  "Sandbox mode": "Modalità sandbox",
+  "Filesystem sandbox policy when auto-approve is disabled.":
+    "Policy della sandbox sul filesystem quando l'auto-approve è " +
+    "disattivato.",
+  "Read-only": "Sola lettura",
+  "Workspace write": "Scrittura nel workspace",
+  "Full access": "Accesso completo",
+  ["Command or full path to the hermes executable. Default is 'hermes' " +
+    "or '~/.hermes/bin/hermes'."]:
+    "Comando o percorso completo dell'eseguibile hermes. Il default è " +
+    "'hermes' o '~/.hermes/bin/hermes'.",
+  ["Pick a model for Hermes Agent (e.g. anthropic/claude-sonnet-4, nous/" +
+    "hermes-4-405b)."]:
+    "Scegli un modello per Hermes Agent (es. anthropic/claude-sonnet-4, " +
+    "nous/hermes-4-405b).",
+  "Provider": "Provider",
+  "Optional Hermes backend provider (e.g. openrouter, nous, anthropic).":
+    "Provider backend opzionale per Hermes (es. openrouter, nous, " +
+    "anthropic).",
+  "e.g. openrouter": "es. openrouter",
+  ["Command or full path to the pi executable. Usually 'pi' is enough if " +
+    "it is on your PATH."]:
+    "Comando o percorso completo dell'eseguibile pi. Di solito basta 'pi' " +
+    "se è nel PATH.",
+  ["Pick a model for the Pi coding agent (e.g. claude-sonnet-4-5, gpt-5, " +
+    "gemini-2.5-pro)."]:
+    "Scegli un modello per l'agente Pi (es. claude-sonnet-4-5, gpt-5, " +
+    "gemini-2.5-pro).",
+  "Optional model provider for Pi (e.g. anthropic, openai, google).":
+    "Provider opzionale per Pi (es. anthropic, openai, google).",
+  "e.g. anthropic": "es. anthropic",
   ["Automatically allow tool permissions (bash, file edits, etc.). Turn " +
     "it off for extra safety."]:
     "Concede automaticamente i permessi degli strumenti (bash, edit file, " +
@@ -364,6 +419,35 @@ var IT = {
   "Included ($0.00)": "Incluso ($0.00)",
   "Search models... (e.g. gemini, claude, flash, deepseek)":
     "Cerca modelli... (es. gemini, claude, flash, deepseek)",
+  "Search or type a custom model ID... (e.g. sonnet, gpt-5, gemini)":
+    "Cerca o digita un ID modello personalizzato... (es. sonnet, gpt-5, " +
+    "gemini)",
+  "Custom model ID": "ID modello personalizzato",
+  ["Type any exact model ID or alias manually. Leave empty to use the " +
+    "CLI's own configured default model."]:
+    "Digita manualmente qualsiasi ID modello o alias esatto. Lascia vuoto " +
+    "per usare il modello predefinito configurato nella CLI.",
+  "(CLI default)": "(default della CLI)",
+  "(default from $1)": "(default di $1)",
+  "(default)": "(default)",
+  "default": "default",
+  ["Leave on default to use your Claude CLI config, or pick an alias " +
+    "(sonnet, opus, haiku) / enter an exact model ID."]:
+    "Lascia su default per usare la configurazione della tua CLI Claude, " +
+    "oppure scegli un alias (sonnet, opus, haiku) o inserisci un ID " +
+    "modello.",
+  ["Leave on default to use your ~/.codex/config.toml model, or enter an " +
+    "OpenAI model ID."]:
+    "Lascia su default per usare il modello in ~/.codex/config.toml, " +
+    "oppure inserisci un ID modello OpenAI.",
+  ["Leave on default to use your ~/.hermes/config.yaml model, or enter a " +
+    "provider/model ID."]:
+    "Lascia su default per usare il modello in ~/.hermes/config.yaml, " +
+    "oppure inserisci un ID provider/modello.",
+  ["Leave on default to use your Pi config, or pick a model from 'pi --" +
+    "list-models'."]:
+    "Lascia su default per usare la configurazione di Pi, oppure scegli un " +
+    "modello da 'pi --list-models'.",
   "select": "seleziona",
   // --- live activity, human-friendly tools & interactive questions ---
   "Read file": "Lettura file",
@@ -606,14 +690,15 @@ var FileSuggestModal = class extends import_obsidian.SuggestModal {
   }
 };
 var ModelSuggestModal = class extends import_obsidian.SuggestModal {
-  constructor(app, plugin, items, onPick) {
+  constructor(app, plugin, items, activeEngine, onPick) {
     super(app);
     this.plugin = plugin;
     this.items = items;
+    this.activeEngine = activeEngine;
     this.onPick = onPick;
     const t = (s) => this.plugin.t(s);
     this.setPlaceholder(
-      t("Search models... (e.g. gemini, claude, flash, deepseek)")
+      t("Search or type a custom model ID... (e.g. sonnet, gpt-5, gemini)")
     );
     this.setInstructions([
       { command: "↑↓", purpose: t("navigate") },
@@ -625,21 +710,42 @@ var ModelSuggestModal = class extends import_obsidian.SuggestModal {
     return this.items;
   }
   getSuggestions(query) {
-    const q = query.trim().toLowerCase();
+    const raw = query.trim();
+    const q = raw.toLowerCase();
     if (!q) {
       return this.items.slice(0, 30);
     }
     const filtered = this.items.filter(
-      (item) => item.id.toLowerCase().includes(q) ||
-        item.provider.toLowerCase().includes(q) ||
-          item.engine.toLowerCase().includes(q)
+      (item) => item.id.toLowerCase().includes(q) || (item.label ??
+        "").toLowerCase().includes(q) ||
+          item.provider.toLowerCase().includes(q) ||
+            item.engine.toLowerCase().includes(q)
+    ).slice(0, 29);
+    const exactExists = this.items.some(
+      (item) => item.engine === this.activeEngine && item.id.toLowerCase() === q
     );
-    return filtered.slice(0, 30);
+    if (!exactExists && /^[a-zA-Z0-9_.:/+-]+$/.test(raw)) {
+      const provider = this.plugin.registry.get(this.activeEngine);
+      const providerLabel = provider?.costNote ||
+        provider?.descriptor.shortName || this.activeEngine;
+      filtered.push({
+        id: raw,
+        label: `${raw} ${this.plugin.t("(custom)")}`,
+        engine: this.activeEngine,
+        provider: providerLabel,
+        isActive: false,
+        isCustom: true
+      });
+    }
+    return filtered;
   }
   renderSuggestion(item, el) {
     el.addClass("opencode-model-suggest-item");
     const titleEl = el.createDiv({ cls: "opencode-model-suggest-title" });
-    titleEl.createSpan({ text: item.id, cls: "opencode-model-suggest-name" });
+    titleEl.createSpan({
+      text: item.label || item.id,
+      cls: "opencode-model-suggest-name"
+    });
     if (item.isActive) {
       titleEl.createSpan({ text: "  ✓", cls: "opencode-model-suggest-check" });
     }
@@ -671,23 +777,33 @@ var TOOL_PRESENTATION_MAP = {
   write_file: { labelKey: "Write file", icon: "file-plus" },
   edit: { labelKey: "Edit file", icon: "file-edit" },
   edit_file: { labelKey: "Edit file", icon: "file-edit" },
+  multiedit: { labelKey: "Edit file", icon: "file-edit" },
+  notebookedit: { labelKey: "Edit file", icon: "file-edit" },
   replace_file_content: { labelKey: "Edit file", icon: "file-edit" },
   multi_replace_file_content: { labelKey: "Edit file", icon: "file-edit" },
   bash: { labelKey: "Run command", icon: "terminal" },
+  terminal: { labelKey: "Run command", icon: "terminal" },
+  shell: { labelKey: "Run command", icon: "terminal" },
   run_command: { labelKey: "Run command", icon: "terminal" },
   grep: { labelKey: "Search text", icon: "search" },
   grep_search: { labelKey: "Search text", icon: "search" },
   glob: { labelKey: "Find files", icon: "folder-search" },
   find_by_name: { labelKey: "Find files", icon: "folder-search" },
+  ls: { labelKey: "List folder", icon: "folder" },
   list_dir: { labelKey: "List folder", icon: "folder" },
   webfetch: { labelKey: "Web search", icon: "globe" },
+  websearch: { labelKey: "Web search", icon: "globe" },
+  web_search: { labelKey: "Web search", icon: "globe" },
   search_web: { labelKey: "Web search", icon: "globe" },
   read_url_content: { labelKey: "Web search", icon: "globe" },
   todowrite: { labelKey: "Task list", icon: "list-todo" },
+  todoread: { labelKey: "Task list", icon: "list-todo" },
   task: { labelKey: "Subagent", icon: "bot" },
+  agent: { labelKey: "Subagent", icon: "bot" },
   invoke_subagent: { labelKey: "Subagent", icon: "bot" },
   question: { labelKey: "Question", icon: "help-circle" },
-  ask_question: { labelKey: "Question", icon: "help-circle" }
+  ask_question: { labelKey: "Question", icon: "help-circle" },
+  askuserquestion: { labelKey: "Question", icon: "help-circle" }
 };
 function formatToolAction(tool, rawTitle, t) {
   const key = (tool || "").toLowerCase();
@@ -1845,8 +1961,7 @@ var ChatView = class extends import_obsidian6.ItemView {
   }
   assistantLabel() {
     const desc = this.getRunner().descriptor;
-    return desc.id === "opencode" ? this.plugin.t(desc.shortName) :
-      desc.shortName;
+    return this.plugin.t(desc.shortName);
   }
   getViewType() {
     return CHAT_VIEW_TYPE;
@@ -2335,9 +2450,17 @@ var ChatView = class extends import_obsidian6.ItemView {
   updateModelBtn() {
     if (!this.modelBtn) return;
     const engine = this.sessionEngine();
+    const provider = this.plugin.registry.get(engine);
+    const shortName = provider?.descriptor.shortName || engine;
     const m = this.activeModelFor(engine);
-    this.modelBtn.setText(m.length > 30 ? m.slice(0, 27) + "…" : m);
-    this.modelBtn.setAttribute("title", `${m} (${this.engineLabel(engine)})`);
+    const display = m || `${shortName} (${this.plugin.t("default")})`;
+    this.modelBtn.setText(
+      display.length > 30 ? display.slice(0, 27) + "…" : display
+    );
+    this.modelBtn.setAttribute(
+      "title",
+      `${display} (${this.engineLabel(engine)})`
+    );
   }
   async openModelList() {
     const activeEngine = this.sessionEngine();
@@ -2357,6 +2480,18 @@ var ChatView = class extends import_obsidian6.ItemView {
         const models = res.status === "fulfilled" ? res.value : [];
         const providerLabel = provider.costNote ||
           provider.descriptor.shortName;
+        if (!provider.descriptor.defaultModel) {
+          items.push({
+            id: "",
+            label: substitute(
+              this.plugin.t("(default from $1)"),
+              provider.descriptor.shortName
+            ),
+            engine: provider.id,
+            provider: providerLabel,
+            isActive: provider.id === activeEngine && cur === ""
+          });
+        }
         for (const m of models) {
           items.push({
             id: m,
@@ -2366,35 +2501,42 @@ var ChatView = class extends import_obsidian6.ItemView {
           });
         }
       });
-      new ModelSuggestModal(this.app, this.plugin, items, (item) => {
-        const engineChanged = item.engine !== activeEngine;
-        this.plugin.settings.engine = item.engine;
-        const cfg = this.plugin.getEngineConfig(item.engine);
-        cfg.model = item.id;
-        const setPrefix = this.plugin.t("Model set:");
-        if (this.viewSession && engineChanged) {
-          this.viewSession = "";
-          this.plugin.settings.sessionId = "";
-          void this.plugin.saveSettings();
-          this.loadHistoryForSession("");
-          new import_obsidian6.Notice(
-            `${setPrefix} ${item.id} (${item.provider})`);
-          return;
-        }
-        if (this.viewSession) {
-          if (!this.plugin.settings.sessionEngines) {
-            this.plugin.settings.sessionEngines = {};
+      new ModelSuggestModal(
+        this.app,
+        this.plugin,
+        items,
+        activeEngine,
+        (item) => {
+          const engineChanged = item.engine !== activeEngine;
+          this.plugin.settings.engine = item.engine;
+          const cfg = this.plugin.getEngineConfig(item.engine);
+          cfg.model = item.id;
+          const shownModel = item.label || item.id;
+          const setPrefix = this.plugin.t("Model set:");
+          if (this.viewSession && engineChanged) {
+            this.viewSession = "";
+            this.plugin.settings.sessionId = "";
+            void this.plugin.saveSettings();
+            this.loadHistoryForSession("");
+            new import_obsidian6.Notice(
+              `${setPrefix} ${shownModel} (${item.provider})`);
+            return;
           }
-          this.plugin.settings.sessionEngines[this.viewSession] = item.engine;
+          if (this.viewSession) {
+            if (!this.plugin.settings.sessionEngines) {
+              this.plugin.settings.sessionEngines = {};
+            }
+            this.plugin.settings.sessionEngines[this.viewSession] = item.engine;
+          }
+          void this.plugin.saveSettings();
+          this.updateModelBtn();
+          this.updateStatsBar();
+          this.contextLimit = 0;
+          void this.refreshContext();
+          new import_obsidian6.Notice(
+            `${setPrefix} ${shownModel} (${item.provider})`);
         }
-        void this.plugin.saveSettings();
-        this.updateModelBtn();
-        this.updateStatsBar();
-        this.contextLimit = 0;
-        void this.refreshContext();
-        new import_obsidian6.Notice(
-          `${setPrefix} ${item.id} (${item.provider})`);
-      }).open();
+      ).open();
     } catch (e) {
       new import_obsidian6.Notice(`${this.plugin.t("Error:")} ${e.message}`);
     }
@@ -2948,6 +3090,12 @@ var import_promises2 = require("fs/promises");
 var import_path = require("path");
 var import_os = require("os");
 var MAX_STREAM_LINE_BYTES = 2e7;
+var MAX_INLINE_ATTACHMENT_BYTES = 256 * 1024;
+var BINARY_EXT_REGEX = new RegExp(
+    "\\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|7z|rar|bin|exe|dmg|" +
+    "iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$",
+  "i"
+);
 var BaseCliRunner = class {
   plugin;
   resolvedBinaries = /* @__PURE__ */ new Map();
@@ -3134,6 +3282,8 @@ var BaseCliRunner = class {
       (0, import_path.join)((0, import_os.homedir)(), ".opencode", "bin", bin),
       (0, import_path.join)((0, import_os.homedir)(), ".gemini",
         "antigravity-cli", "bin", bin),
+      (0, import_path.join)((0, import_os.homedir)(), ".hermes", "bin", bin),
+      (0, import_path.join)((0, import_os.homedir)(), ".claude", "local", bin),
       `/usr/local/bin/${bin}`,
       `/usr/bin/${bin}`
     ];
@@ -3188,6 +3338,273 @@ var BaseCliRunner = class {
    */
   getVaultPath() {
     return this.plugin.getVaultPath();
+  }
+  /**
+   * Inline small text attachments into the prompt and pass larger/binary files
+   * by path. Used by CLI providers without a dedicated `--file` flag.
+   */
+  inlinePromptAttachments(prompt, fileAttachments, cwd) {
+    const s = this.plugin.settings;
+    let finalPrompt = prompt;
+    const maxInlineBytes = Math.min(
+      MAX_INLINE_ATTACHMENT_BYTES,
+      Math.max(1, s.maxAttachMB || 20) * 1024 * 1024
+    );
+    for (const p of fileAttachments) {
+      const fullPath = !(0, import_path.isAbsolute)(p) && cwd ?
+        (0, import_path.join)(cwd, p) : p;
+      if (BINARY_EXT_REGEX.test(fullPath)) {
+        finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
+
+---
+
+` + finalPrompt;
+      } else {
+        try {
+          const st = (0, import_fs.statSync)(fullPath);
+          if (st.size > maxInlineBytes) {
+            finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
+
+---
+
+` + finalPrompt;
+          } else {
+            const content = (0, import_fs.readFileSync)(fullPath, "utf-8");
+            const filename = (0, import_path.basename)(fullPath);
+            finalPrompt = `[ATTACHMENT: ${filename}]
+${content}
+
+---
+
+` + finalPrompt;
+          }
+        } catch {
+          finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
+
+---
+
+` + finalPrompt;
+        }
+      }
+    }
+    return finalPrompt;
+  }
+  /**
+   * List sessions saved in Obsidian histories for a given engine.
+   */
+  listHistorySessions(engineId, seenIds =
+    /* @__PURE__ */ new Set(), legacyIdMatcher) {
+    const sessions = [];
+    const histories = this.plugin.histories ?? {};
+    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
+    for (const [id, msgs] of Object.entries(histories)) {
+      if (seenIds.has(id)) continue;
+      const matchesEngine = sessionEngines[id] === engineId ||
+        !sessionEngines[id] && Boolean(legacyIdMatcher?.test(id));
+      if (matchesEngine) {
+        const firstUser = msgs.find((m) => m.role === "user" && m.text.trim());
+        const rawTitle = firstUser?.text ?
+          firstUser.text.trim().replace(/\s+/g, " ") : id;
+        const title = rawTitle.length > 44 ? rawTitle.slice(0, 41) + "…" :
+          rawTitle;
+        const lastTs = msgs[msgs.length - 1]?.timestamp ?? Date.now();
+        sessions.push({
+          id,
+          title,
+          updated: lastTs,
+          engine: engineId
+        });
+        seenIds.add(id);
+      }
+    }
+    return sessions;
+  }
+  /**
+   * Read the last turn's token usage from saved Obsidian history.
+   */
+  getHistorySessionTokens(sessionId) {
+    const history = this.plugin.getHistory(sessionId);
+    for (let i = history.length - 1; i >= 0; i--) {
+      const msg = history[i];
+      if (msg.role === "assistant" && msg.tokens) {
+        const tk = msg.tokens;
+        const input = Number(tk.input ?? 0) + Number(tk.cache?.read ?? 0) +
+          Number(tk.cache?.write ?? 0);
+        const output = Number(tk.output ?? 0);
+        if (input > 0 || output > 0) {
+          return { input, output };
+        }
+      }
+    }
+    return { input: 0, output: 0 };
+  }
+  /**
+   * Compute 5h / week / month usage statistics from saved Obsidian histories.
+   */
+  computeHistoryUsageStats(engineId, legacyIdMatcher) {
+    const now = Date.now();
+    const h5Cutoff = now - 5 * 3600 * 1e3;
+    const weekCutoff = now - 7 * 24 * 3600 * 1e3;
+    const monthCutoff = now - 30 * 24 * 3600 * 1e3;
+    const h5 = { input: 0, output: 0, cost: 0 };
+    const week = { input: 0, output: 0, cost: 0 };
+    const month = { input: 0, output: 0, cost: 0 };
+    const histories = this.plugin.histories ?? {};
+    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
+    for (const [id, msgs] of Object.entries(histories)) {
+      const matchesEngine = sessionEngines[id] === engineId ||
+        !sessionEngines[id] && Boolean(legacyIdMatcher?.test(id));
+      if (!matchesEngine) continue;
+      for (const msg of msgs) {
+        if (msg.role === "assistant" && msg.tokens) {
+          const inp = msg.tokens.input ?? 0;
+          const out = msg.tokens.output ?? 0;
+          const cost = msg.cost ?? 0;
+          const ts = msg.timestamp;
+          if (!ts || ts >= monthCutoff) {
+            month.input += inp;
+            month.output += out;
+            month.cost += cost;
+          }
+          if (!ts || ts >= weekCutoff) {
+            week.input += inp;
+            week.output += out;
+            week.cost += cost;
+          }
+          if (!ts || ts >= h5Cutoff) {
+            h5.input += inp;
+            h5.output += out;
+            h5.cost += cost;
+          }
+        }
+      }
+    }
+    return { h5, week, month };
+  }
+  /**
+   * Estimate model context window limit from well-known model family names.
+   */
+  estimateModelContextLimit(model, defaultLimit = 128e3) {
+    const m = (model || "").toLowerCase();
+    if (m.includes("gemini")) return 1048576;
+    if (m.includes("claude")) return 2e5;
+    if (m.includes("gpt-5") || m.includes("codex")) return 256e3;
+    if (m.includes("o3") || m.includes("o4") || m.includes("gpt-4")) {
+      return 2e5;
+    }
+    if (m.includes("hermes") || m.includes("deepseek")) return 128e3;
+    return defaultLimit;
+  }
+  /**
+   * Extract a human-friendly target title from arbitrary tool parameters.
+   */
+  extractCommonToolTitle(toolName, input, stateTitle) {
+    const inp = input && typeof input === "object" ? input : null;
+    if (inp) {
+      if (typeof inp.toolSummary === "string" && inp.toolSummary.trim()) {
+        return inp.toolSummary.trim();
+      }
+      for (const key of [
+        "filePath",
+        "file_path",
+        "TargetFile",
+        "AbsolutePath",
+        "Path",
+        "path"
+      ]) {
+        const val = inp[key];
+        if (typeof val === "string" && val.trim()) {
+          return (0, import_path.basename)(val.trim()) || val.trim();
+        }
+      }
+      if (typeof inp.DirectoryPath === "string" && inp.DirectoryPath.trim()) {
+        const dp = inp.DirectoryPath.trim();
+        return (0, import_path.basename)(dp) || dp;
+      }
+      if (typeof inp.SearchDirectory === "string" &&
+        inp.SearchDirectory.trim()) {
+        const dirName = (0, import_path.basename)(inp.SearchDirectory.trim());
+        const q = typeof inp.Query === "string" ? inp.Query.trim() : "";
+        return q ? `"${q}" in ${dirName}` : dirName;
+      }
+      if (typeof inp.Query === "string" && inp.Query.trim()) {
+        return `"${inp.Query.trim()}"`;
+      }
+      for (const key of [
+        "description",
+        "command",
+        "CommandLine",
+        "cmd",
+        "pattern",
+        "Pattern",
+        "url",
+        "query",
+        "Role",
+        "toolAction"
+      ]) {
+        const val = inp[key];
+        if (typeof val === "string" && val.trim()) {
+          return val.trim();
+        }
+      }
+      if (Array.isArray(inp.todos) && inp.todos.length > 0) {
+        const doneCount = inp.todos.filter(
+          (t) => t && typeof t === "object" && t.status === "completed"
+        ).length;
+        const tasksWord = this.plugin.t("tasks");
+        const doneWord = this.plugin.t("done");
+        return `${inp.todos.length} ${tasksWord} (${doneCount} ${doneWord})`;
+      }
+    }
+    if (stateTitle && stateTitle.trim() &&
+      stateTitle.trim().toLowerCase() !== toolName.toLowerCase()) {
+      return stateTitle.trim();
+    }
+    return toolName;
+  }
+  /**
+   * Parse interactive agent questions from tool parameters across providers.
+   */
+  parseCommonQuestions(input) {
+    if (!input || typeof input !== "object") return [];
+    const params = input;
+    let rawQuestions = params.questions;
+    if (typeof rawQuestions === "string") {
+      try {
+        rawQuestions = JSON.parse(rawQuestions);
+      } catch {
+        return [];
+      }
+    }
+    if (!Array.isArray(rawQuestions)) return [];
+    const result = [];
+    for (const item of rawQuestions) {
+      if (!item || typeof item !== "object") continue;
+      const qObj = item;
+      const question = typeof qObj.question === "string" ?
+        qObj.question.trim() : "";
+      if (!question) continue;
+      const header = typeof qObj.header === "string" ? qObj.header.trim() :
+        void 0;
+      const multiple = Boolean(qObj.is_multi_select ?? qObj.multiple);
+      const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
+      const options = [];
+      for (const opt of rawOpts) {
+        if (typeof opt === "string" && opt.trim()) {
+          options.push({ label: opt.trim() });
+        } else if (opt && typeof opt === "object") {
+          const o = opt;
+          const label = typeof o.label === "string" ? o.label.trim() : "";
+          if (label) {
+            const desc = typeof o.description === "string" ?
+              o.description.trim() : void 0;
+            options.push({ label, description: desc });
+          }
+        }
+      }
+      result.push({ header, question, options, multiple });
+    }
+    return result;
   }
   /**
    * Convert a document (PDF, Word, Excel, etc.) to Markdown using anydoc
@@ -3267,7 +3684,6 @@ var import_fs2 = require("fs");
 var import_path2 = require("path");
 var import_os2 = require("os");
 var ANTIGRAVITY_ID_HINT = /-/;
-var MAX_INLINE_ATTACHMENT_BYTES = 256 * 1024;
 var ANTIGRAVITY_DESCRIPTOR = {
   id: "antigravity",
   displayName: "Antigravity CLI (Google AI Pro)",
@@ -3425,24 +3841,9 @@ var AntigravityRunner = class extends BaseCliRunner {
         }
       }
     }
-    const histories = this.plugin.histories ?? {};
-    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
-    for (const [id, msgs] of Object.entries(histories)) {
-      if (seenIds.has(id)) continue;
-      const isAgy = sessionEngines[id] === "antigravity" ||
-        !sessionEngines[id] && ANTIGRAVITY_ID_HINT.test(id);
-      if (isAgy) {
-        const firstUser = msgs.find((m) => m.role === "user");
-        const title = firstUser?.text ? firstUser.text.slice(0, 40) : id;
-        sessions.push({
-          id,
-          title,
-          updated: Date.now(),
-          engine: "antigravity"
-        });
-        seenIds.add(id);
-      }
-    }
+    sessions.push(
+      ...this.listHistorySessions("antigravity", seenIds, ANTIGRAVITY_ID_HINT)
+    );
     return sessions;
   }
   async renameSession(sessionId, title) {
@@ -3476,59 +3877,13 @@ var AntigravityRunner = class extends BaseCliRunner {
     }
   }
   async getModelContextLimit(model) {
-    const m = model.toLowerCase();
-    if (m.includes("gemini")) return 1048576;
-    if (m.includes("claude")) return 2e5;
-    return 128e3;
+    return this.estimateModelContextLimit(model, 128e3);
   }
   async getSessionTokens(sessionId) {
-    const history = this.plugin.getHistory(sessionId);
-    for (let i = history.length - 1; i >= 0; i--) {
-      const msg = history[i];
-      if (msg.role === "assistant" && msg.tokens) {
-        return {
-          input: msg.tokens.input ?? 0,
-          output: msg.tokens.output ?? 0
-        };
-      }
-    }
-    return { input: 0, output: 0 };
+    return this.getHistorySessionTokens(sessionId);
   }
   async getUsageStats() {
-    const now = Date.now();
-    const h5Cutoff = now - 5 * 3600 * 1e3;
-    const weekCutoff = now - 7 * 24 * 3600 * 1e3;
-    const monthCutoff = now - 30 * 24 * 3600 * 1e3;
-    const h5 = { input: 0, output: 0, cost: 0 };
-    const week = { input: 0, output: 0, cost: 0 };
-    const month = { input: 0, output: 0, cost: 0 };
-    const histories = this.plugin.histories ?? {};
-    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
-    for (const [id, msgs] of Object.entries(histories)) {
-      const isAgy = sessionEngines[id] === "antigravity" ||
-        !sessionEngines[id] && ANTIGRAVITY_ID_HINT.test(id);
-      if (!isAgy) continue;
-      for (const msg of msgs) {
-        if (msg.role === "assistant" && msg.tokens) {
-          const inp = msg.tokens.input ?? 0;
-          const out = msg.tokens.output ?? 0;
-          const ts = msg.timestamp;
-          if (!ts || ts >= monthCutoff) {
-            month.input += inp;
-            month.output += out;
-          }
-          if (!ts || ts >= weekCutoff) {
-            week.input += inp;
-            week.output += out;
-          }
-          if (!ts || ts >= h5Cutoff) {
-            h5.input += inp;
-            h5.output += out;
-          }
-        }
-      }
-    }
-    return { h5, week, month };
+    return this.computeHistoryUsageStats("antigravity", ANTIGRAVITY_ID_HINT);
   }
   /**
    * Build CLI arguments for an Antigravity invocation (exposed for testing)
@@ -3537,53 +3892,11 @@ var AntigravityRunner = class extends BaseCliRunner {
     const s = this.plugin.settings;
     const cfg = this.getConfig();
     const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
-    let finalPrompt = req.prompt;
-    const BINARY_EXT_REGEX = new RegExp(
-        "\\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|7z|rar|bin|exe|" +
-        "dmg|iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$",
-      "i"
+    const finalPrompt = this.inlinePromptAttachments(
+      req.prompt,
+      req.fileAttachments,
+      cwd
     );
-    const maxInlineBytes = Math.min(
-      MAX_INLINE_ATTACHMENT_BYTES,
-      Math.max(1, s.maxAttachMB || 20) * 1024 * 1024
-    );
-    for (const p of req.fileAttachments) {
-      const fullPath = !(0, import_path2.isAbsolute)(p) && cwd ?
-        (0, import_path2.join)(cwd, p) : p;
-      if (BINARY_EXT_REGEX.test(fullPath)) {
-        finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
-
----
-
-` + finalPrompt;
-      } else {
-        try {
-          const st = (0, import_fs2.statSync)(fullPath);
-          if (st.size > maxInlineBytes) {
-            finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
-
----
-
-` + finalPrompt;
-          } else {
-            const content = (0, import_fs2.readFileSync)(fullPath, "utf-8");
-            const filename = (0, import_path2.basename)(fullPath);
-            finalPrompt = `[ATTACHMENT: ${filename}]
-${content}
-
----
-
-` + finalPrompt;
-          }
-        } catch {
-          finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
-
----
-
-` + finalPrompt;
-        }
-      }
-    }
     const args = ["-p", finalPrompt, "--output-format", "stream-json"];
     if (s.autoApprove) {
       args.push("--dangerously-skip-permissions");
@@ -3682,7 +3995,7 @@ ${content}
           su.duration_seconds > 0 ? Math.round(su.duration_seconds * 1e3) :
             void 0;
         if (toolName === "ask_question" || toolName === "question") {
-          const questions = this.parseAntigravityQuestions(params);
+          const questions = this.parseCommonQuestions(params);
           const qSummary = questions[0]?.question ||
             this.plugin.t("Agent question");
           const stepKey = String(stepIndex ?? qSummary);
@@ -3707,7 +4020,7 @@ ${content}
           });
           return;
         }
-        const title = this.extractAntigravityToolTitle(toolName, params);
+        const title = this.extractCommonToolTitle(toolName, params);
         if (!isDone) {
           cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
         } else {
@@ -3755,94 +4068,6 @@ ${content}
       cb.onError(String(msg));
     }
   }
-  extractAntigravityToolTitle(toolName, params) {
-    if (params && typeof params === "object") {
-      if (typeof params.toolSummary === "string" && params.toolSummary.trim()) {
-        return params.toolSummary.trim();
-      }
-      if (typeof params.TargetFile === "string" && params.TargetFile.trim()) {
-        return (0, import_path2.basename)(params.TargetFile.trim());
-      }
-      if (typeof params.AbsolutePath === "string" &&
-        params.AbsolutePath.trim()) {
-        return (0, import_path2.basename)(params.AbsolutePath.trim());
-      }
-      if (typeof params.Path === "string" && params.Path.trim()) {
-        return (0, import_path2.basename)(params.Path.trim());
-      }
-      if (typeof params.DirectoryPath === "string" &&
-        params.DirectoryPath.trim()) {
-        const dp = params.DirectoryPath.trim();
-        return (0, import_path2.basename)(dp) || dp;
-      }
-      if (typeof params.SearchDirectory === "string" &&
-        params.SearchDirectory.trim()) {
-        const dirName =
-          (0, import_path2.basename)(params.SearchDirectory.trim());
-        const q = typeof params.Query === "string" ? params.Query.trim() : "";
-        return q ? `"${q}" in ${dirName}` : dirName;
-      }
-      if (typeof params.Query === "string" && params.Query.trim()) {
-        return `"${params.Query.trim()}"`;
-      }
-      if (typeof params.query === "string" && params.query.trim()) {
-        return params.query.trim();
-      }
-      if (typeof params.Pattern === "string" && params.Pattern.trim()) {
-        return params.Pattern.trim();
-      }
-      if (typeof params.CommandLine === "string" && params.CommandLine.trim()) {
-        return params.CommandLine.trim();
-      }
-      if (typeof params.Role === "string" && params.Role.trim()) {
-        return params.Role.trim();
-      }
-      if (typeof params.toolAction === "string" && params.toolAction.trim()) {
-        return params.toolAction.trim();
-      }
-    }
-    return toolName;
-  }
-  parseAntigravityQuestions(params) {
-    if (!params || typeof params !== "object") return [];
-    let rawQuestions = params.questions;
-    if (typeof rawQuestions === "string") {
-      try {
-        rawQuestions = JSON.parse(rawQuestions);
-      } catch {
-        return [];
-      }
-    }
-    if (!Array.isArray(rawQuestions)) return [];
-    const result = [];
-    for (const item of rawQuestions) {
-      if (!item || typeof item !== "object") continue;
-      const qObj = item;
-      const question = typeof qObj.question === "string" ?
-        qObj.question.trim() : "";
-      if (!question) continue;
-      const header = typeof qObj.header === "string" ? qObj.header.trim() :
-        void 0;
-      const multiple = Boolean(qObj.is_multi_select ?? qObj.multiple);
-      const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
-      const options = [];
-      for (const opt of rawOpts) {
-        if (typeof opt === "string" && opt.trim()) {
-          options.push({ label: opt.trim() });
-        } else if (opt && typeof opt === "object") {
-          const o = opt;
-          const label = typeof o.label === "string" ? o.label.trim() : "";
-          if (label) {
-            const desc = typeof o.description === "string" ?
-              o.description.trim() : void 0;
-            options.push({ label, description: desc });
-          }
-        }
-      }
-      result.push({ header, question, options, multiple });
-    }
-    return result;
-  }
   execSqlite(dbPath, query) {
     return this.execCli("sqlite3", [dbPath, query]);
   }
@@ -3874,23 +4099,51 @@ var DEFAULT_ENGINE_CONFIGS = {
     options: {
       agent: ""
     }
+  },
+  claude: {
+    binary: "claude",
+    model: "",
+    options: {
+      effort: ""
+    }
+  },
+  codex: {
+    binary: "codex",
+    model: "",
+    options: {
+      sandbox: "workspace-write"
+    }
+  },
+  hermes: {
+    binary: "hermes",
+    model: "",
+    options: {
+      provider: ""
+    }
+  },
+  pi: {
+    binary: "pi",
+    model: "",
+    options: {
+      provider: ""
+    }
   }
 };
+function createDefaultEnginesMap() {
+  const map = {};
+  for (const [id, def] of Object.entries(DEFAULT_ENGINE_CONFIGS)) {
+    map[id] = {
+      binary: def.binary,
+      model: def.model,
+      options: { ...def.options }
+    };
+  }
+  return map;
+}
 var DEFAULT_SETTINGS = {
   language: "en",
   engine: "antigravity",
-  engines: {
-    antigravity: {
-      binary: DEFAULT_ENGINE_CONFIGS.antigravity.binary,
-      model: DEFAULT_ENGINE_CONFIGS.antigravity.model,
-      options: { ...DEFAULT_ENGINE_CONFIGS.antigravity.options }
-    },
-    opencode: {
-      binary: DEFAULT_ENGINE_CONFIGS.opencode.binary,
-      model: DEFAULT_ENGINE_CONFIGS.opencode.model,
-      options: { ...DEFAULT_ENGINE_CONFIGS.opencode.options }
-    }
-  },
+  engines: createDefaultEnginesMap(),
   binaryPath: "opencode",
   model: "opencode-go/deepseek-v4.1-flash",
   agent: "",
@@ -3943,18 +4196,7 @@ function migrateSettings(raw) {
     {},
     DEFAULT_SETTINGS,
     {
-      engines: {
-        antigravity: {
-          binary: DEFAULT_ENGINE_CONFIGS.antigravity.binary,
-          model: DEFAULT_ENGINE_CONFIGS.antigravity.model,
-          options: { ...DEFAULT_ENGINE_CONFIGS.antigravity.options }
-        },
-        opencode: {
-          binary: DEFAULT_ENGINE_CONFIGS.opencode.binary,
-          model: DEFAULT_ENGINE_CONFIGS.opencode.model,
-          options: { ...DEFAULT_ENGINE_CONFIGS.opencode.options }
-        }
-      },
+      engines: createDefaultEnginesMap(),
       sessionEngines: {},
       pinned: [],
       prompts: []
@@ -4135,23 +4377,7 @@ var OpencodeRunner = class extends BaseCliRunner {
       } catch {
       }
     }
-    const histories = this.plugin.histories ?? {};
-    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
-    for (const [id, msgs] of Object.entries(histories)) {
-      if (seenIds.has(id)) continue;
-      const isOc = sessionEngines[id] === "opencode" || !sessionEngines[id] &&
-        /^ses_/.test(id);
-      if (isOc) {
-        const lastTs = msgs[msgs.length - 1]?.timestamp ?? Date.now();
-        sessions.push({
-          id,
-          title: this.fallbackSessionTitle(id),
-          updated: lastTs,
-          engine: "opencode"
-        });
-        seenIds.add(id);
-      }
-    }
+    sessions.push(...this.listHistorySessions("opencode", seenIds, /^ses_/));
     return sessions;
   }
   fallbackSessionTitle(sessionId) {
@@ -4482,7 +4708,7 @@ var OpencodeRunner = class extends BaseCliRunner {
             typeof endMs === "number" && endMs >= startMs ? endMs - startMs :
               void 0;
           if (toolName === "question" || toolName === "ask_question") {
-            const questions = this.parseOpencodeQuestions(input);
+            const questions = this.parseCommonQuestions(input);
             const qTitle = questions[0]?.question ||
               this.plugin.t("Agent question");
             if (questions.length > 0) {
@@ -4500,7 +4726,7 @@ var OpencodeRunner = class extends BaseCliRunner {
             });
             break;
           }
-          const title = this.extractOpencodeToolTitle(
+          const title = this.extractCommonToolTitle(
             toolName,
             input,
             part.state?.title
@@ -4556,84 +4782,1121 @@ var OpencodeRunner = class extends BaseCliRunner {
       cb.onReasoning(part.text, String(part.id));
     }
   }
-  extractOpencodeToolTitle(toolName, input, stateTitle) {
-    const inp = input && typeof input === "object" ? input : null;
-    if (inp) {
-      if (typeof inp.filePath === "string" && inp.filePath.trim()) {
-        return (0, import_path3.basename)(inp.filePath.trim());
-      }
-      if (typeof inp.path === "string" && inp.path.trim()) {
-        return (0, import_path3.basename)(inp.path.trim()) || inp.path.trim();
-      }
-      if (typeof inp.description === "string" && inp.description.trim()) {
-        return inp.description.trim();
-      }
-      if (typeof inp.command === "string" && inp.command.trim()) {
-        return inp.command.trim();
-      }
-      if (typeof inp.pattern === "string" && inp.pattern.trim()) {
-        return inp.pattern.trim();
-      }
-      if (typeof inp.url === "string" && inp.url.trim()) {
-        return inp.url.trim();
-      }
-      if (typeof inp.query === "string" && inp.query.trim()) {
-        return inp.query.trim();
-      }
-      if (Array.isArray(inp.todos) && inp.todos.length > 0) {
-        const doneCount = inp.todos.filter(
-          (t) => t && typeof t === "object" && t.status === "completed"
-        ).length;
-        const tasksWord = this.plugin.t("tasks");
-        const doneWord = this.plugin.t("done");
-        return `${inp.todos.length} ${tasksWord} (${doneCount} ${doneWord})`;
-      }
-    }
-    if (stateTitle && stateTitle.trim() &&
-      stateTitle.trim().toLowerCase() !== toolName.toLowerCase()) {
-      return stateTitle.trim();
-    }
-    return toolName;
-  }
-  parseOpencodeQuestions(input) {
-    if (!input || typeof input !== "object") return [];
-    const inp = input;
-    const rawQuestions = inp.questions;
-    if (!Array.isArray(rawQuestions)) return [];
-    const result = [];
-    for (const item of rawQuestions) {
-      if (!item || typeof item !== "object") continue;
-      const qObj = item;
-      const question = typeof qObj.question === "string" ?
-        qObj.question.trim() : "";
-      if (!question) continue;
-      const header = typeof qObj.header === "string" ? qObj.header.trim() :
-        void 0;
-      const multiple = Boolean(qObj.multiple ?? qObj.is_multi_select);
-      const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
-      const options = [];
-      for (const opt of rawOpts) {
-        if (typeof opt === "string" && opt.trim()) {
-          options.push({ label: opt.trim() });
-        } else if (opt && typeof opt === "object") {
-          const o = opt;
-          const label = typeof o.label === "string" ? o.label.trim() : "";
-          if (label) {
-            const desc = typeof o.description === "string" ?
-              o.description.trim() : void 0;
-            options.push({ label, description: desc });
-          }
-        }
-      }
-      result.push({ header, question, options, multiple });
-    }
-    return result;
-  }
   errorMessage(err) {
     if (!err) return this.plugin.t("Unknown error");
     const e = err;
     const msg = e.data?.message || e.message || JSON.stringify(err);
     return String(msg);
+  }
+};
+
+// src/providers/claude/runner.ts
+var import_fs3 = require("fs");
+var import_os3 = require("os");
+var import_path4 = require("path");
+var CLAUDE_DESCRIPTOR = {
+  id: "claude",
+  displayName: "Claude Code CLI",
+  shortName: "Claude",
+  defaultBinary: "claude",
+  defaultModel: "",
+  binaryDesc:
+    "Command or full path to the claude executable. Usually 'claude' is " +
+    "enough if it is on your PATH.",
+  modelDesc:
+    "Leave on default to use your Claude CLI config, or pick an alias " +
+    "(sonnet, opus, haiku) / enter an exact model ID.",
+  included: false,
+  supportsSessions: "local-db",
+  supportsUsageStats: true,
+  supportsDbCleanup: false,
+  options: [
+    {
+      key: "effort",
+      label: "Reasoning effort",
+      desc: "Reasoning effort level passed to Claude Code.",
+      type: "select",
+      default: "",
+      choices: [
+        { value: "", label: "(default)" },
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium" },
+        { value: "high", label: "High" }
+      ]
+    }
+  ]
+};
+var ClaudeRunner = class extends BaseCliRunner {
+  descriptor = CLAUDE_DESCRIPTOR;
+  id = "claude";
+  displayName = "Claude Code CLI";
+  engine = "claude";
+  included = false;
+  cachedModels = null;
+  constructor(plugin) {
+    super(plugin);
+  }
+  getConfig() {
+    return this.plugin.getEngineConfig("claude");
+  }
+  getBin() {
+    return this.resolveBinaryPath(this.getConfig().binary || "claude");
+  }
+  async getVersion() {
+    const out = await this.execCli(this.getBin(), ["--version"]);
+    const first = out.trim().split("\n")[0];
+    if (!first) throw new Error("Empty output from claude --version");
+    return first;
+  }
+  async listModels(forceRefresh = false) {
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+      return this.cachedModels;
+    }
+    const models = ["sonnet", "opus", "haiku", "opusplan"];
+    try {
+      const cfgPath =
+        (0, import_path4.join)((0, import_os3.homedir)(), ".claude",
+          "settings.json");
+      if ((0, import_fs3.existsSync)(cfgPath)) {
+        const parsed =
+          JSON.parse((0, import_fs3.readFileSync)(cfgPath, "utf-8"));
+        if (typeof parsed.model === "string" && parsed.model.trim() &&
+          !models.includes(parsed.model.trim())) {
+          models.unshift(parsed.model.trim());
+        }
+      }
+    } catch {
+    }
+    this.cachedModels = models;
+    return models;
+  }
+  async listSessions() {
+    return this.listHistorySessions("claude");
+  }
+  async renameSession(_sessionId, _title) {
+  }
+  async deleteSession(_sessionId) {
+  }
+  async getModelContextLimit(model) {
+    return this.estimateModelContextLimit(model, 2e5);
+  }
+  async getSessionTokens(sessionId) {
+    return this.getHistorySessionTokens(sessionId);
+  }
+  async getUsageStats() {
+    return this.computeHistoryUsageStats("claude");
+  }
+  buildArgs(req) {
+    const s = this.plugin.settings;
+    const cfg = this.getConfig();
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const finalPrompt = this.inlinePromptAttachments(
+      req.prompt,
+      req.fileAttachments,
+      cwd
+    );
+    const args = [
+      "-p",
+      finalPrompt,
+      "--output-format",
+      "stream-json",
+      "--verbose"
+    ];
+    if (s.autoApprove) {
+      args.push("--dangerously-skip-permissions");
+    }
+    const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
+    if (sid) {
+      args.push("--resume", sid);
+    }
+    const model = cfg.model.trim();
+    if (model) {
+      args.push("--model", model);
+    }
+    const effort = cfg.options.effort;
+    if (effort) {
+      args.push("--effort", effort);
+    }
+    return args;
+  }
+  createStreamState() {
+    return {
+      accumulatedText: "",
+      accumulatedReasoning: "",
+      toolNames: /* @__PURE__ */ new Map(),
+      emittedQuestions: /* @__PURE__ */ new Set()
+    };
+  }
+  runStream(reqOrPrompt, fileAttachmentsOrCb, maybeCb) {
+    const { req, cb } = this.normalizeRunArgs(
+      reqOrPrompt,
+      fileAttachmentsOrCb,
+      maybeCb
+    );
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const args = this.buildArgs({ ...req, cwd });
+    const bin = this.getBin();
+    const state = this.createStreamState();
+    return this.spawnJsonlStream(
+      bin,
+      args,
+      cwd,
+      (line) => this.handleLine(line, cb, state),
+      cb
+    );
+  }
+  handleLine(line, cb, state = this.createStreamState()) {
+    if (line.length > MAX_STREAM_LINE_BYTES) {
+      cb.onRaw?.(`[omitted event of ${line.length} bytes]
+`);
+      return;
+    }
+    let ev;
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      cb.onRaw?.(line + "\n");
+      return;
+    }
+    if (typeof ev.session_id === "string" && ev.session_id) {
+      cb.onSession(ev.session_id);
+    }
+    if (ev.type === "system") {
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if (ev.type === "stream_event" && ev.event) {
+      const delta = ev.event.delta;
+      if (delta?.type === "text_delta" && typeof delta.text === "string") {
+        state.accumulatedText += delta.text;
+        cb.onActivity?.(this.plugin.t("Writing response..."));
+        cb.onText(state.accumulatedText, String(ev.event.index ?? 0));
+      } else if (delta?.type === "thinking_delta" &&
+        typeof delta.thinking === "string") {
+        state.accumulatedReasoning += delta.thinking;
+        cb.onActivity?.(this.plugin.t("Thinking..."));
+        cb.onReasoning(state.accumulatedReasoning, String(ev.event.index ?? 0));
+      }
+      return;
+    }
+    if (ev.type === "assistant" && ev.message) {
+      const blocks = Array.isArray(ev.message.content) ? ev.message.content :
+        [];
+      for (const block of blocks) {
+        if (!block || typeof block !== "object") continue;
+        if (block.type === "thinking" && typeof block.thinking === "string") {
+          state.accumulatedReasoning = block.thinking;
+          cb.onActivity?.(this.plugin.t("Thinking..."));
+          cb.onReasoning(block.thinking, String(block.id ?? "thinking"));
+        } else if (block.type === "text" && typeof block.text === "string") {
+          state.accumulatedText = block.text;
+          cb.onActivity?.(this.plugin.t("Writing response..."));
+          cb.onText(block.text, String(block.id ?? "text"));
+        } else if (block.type === "tool_use") {
+          const toolName = String(block.name || "tool");
+          const stepId = String(block.id || `step-${Date.now()}-${toolName}`);
+          const input = block.input;
+          if (toolName === "AskUserQuestion" || toolName === "ask_question" ||
+            toolName === "question") {
+            const questions = this.parseCommonQuestions(input);
+            const qTitle = questions[0]?.question ||
+              this.plugin.t("Agent question");
+            if (questions.length > 0 && !state.emittedQuestions.has(stepId)) {
+              state.emittedQuestions.add(stepId);
+              cb.onQuestion?.(questions);
+            }
+            cb.onActivity?.(this.plugin.t("Waiting for your answer..."));
+            cb.onStep({
+              id: stepId,
+              tool: toolName,
+              title: qTitle,
+              state: "completed",
+              input
+            });
+            continue;
+          }
+          const title = this.extractCommonToolTitle(toolName, input);
+          state.toolNames.set(stepId, { name: toolName, title, input });
+          cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
+          cb.onStep({
+            id: stepId,
+            tool: toolName,
+            title,
+            state: "running",
+            input
+          });
+        }
+      }
+      return;
+    }
+    if (ev.type === "user" && ev.message) {
+      const blocks = Array.isArray(ev.message.content) ? ev.message.content :
+        [];
+      for (const block of blocks) {
+        if (block?.type === "tool_result" && block.tool_use_id) {
+          const stepId = String(block.tool_use_id);
+          const meta = state.toolNames.get(stepId);
+          const toolName = meta?.name || "tool";
+          const title = meta?.title || toolName;
+          const isErr = Boolean(block.is_error);
+          cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+          cb.onStep({
+            id: stepId,
+            tool: toolName,
+            title,
+            state: isErr ? "error" : "completed",
+            input: meta?.input,
+            output: block.content
+          });
+        }
+      }
+      return;
+    }
+    if (ev.type === "result") {
+      if (ev.is_error) {
+        const errText = typeof ev.result === "string" && ev.result.trim() ?
+          ev.result.trim() : this.plugin.t("Unknown error");
+        cb.onError(errText);
+        return;
+      }
+      if (typeof ev.result === "string" && ev.result.trim()) {
+        state.accumulatedText = ev.result;
+        cb.onText(state.accumulatedText, "final");
+      }
+      const u = ev.usage ?? {};
+      const input = Number(u.input_tokens ?? 0);
+      const output = Number(u.output_tokens ?? 0);
+      const cacheRead = Number(u.cache_read_input_tokens ?? 0);
+      const cacheWrite = Number(u.cache_creation_input_tokens ?? 0);
+      const cost = typeof ev.total_cost_usd === "number" ? ev.total_cost_usd :
+        typeof ev.cost_usd === "number" ? ev.cost_usd : void 0;
+      cb.onFinish({
+        tokens: {
+          total: input + output,
+          input,
+          output,
+          cache: cacheRead > 0 || cacheWrite > 0 ?
+            { read: cacheRead, write: cacheWrite } : void 0
+        },
+        cost
+      });
+      return;
+    }
+    if (ev.type === "error" || ev.error) {
+      const msg = typeof ev.error === "string" ? ev.error :
+        ev.error?.message || JSON.stringify(ev.error || ev);
+      cb.onError(String(msg));
+    }
+  }
+};
+
+// src/providers/codex/runner.ts
+var import_fs4 = require("fs");
+var import_os4 = require("os");
+var import_path5 = require("path");
+var CODEX_DESCRIPTOR = {
+  id: "codex",
+  displayName: "OpenAI Codex CLI",
+  shortName: "Codex",
+  defaultBinary: "codex",
+  defaultModel: "",
+  binaryDesc:
+    "Command or full path to the codex executable. Usually 'codex' is " +
+    "enough if it is on your PATH.",
+  modelDesc:
+    "Leave on default to use your ~/.codex/config.toml model, or enter an " +
+    "OpenAI model ID.",
+  included: false,
+  supportsSessions: "local-db",
+  supportsUsageStats: true,
+  supportsDbCleanup: false,
+  options: [
+    {
+      key: "sandbox",
+      label: "Sandbox mode",
+      desc: "Filesystem sandbox policy when auto-approve is disabled.",
+      type: "select",
+      default: "workspace-write",
+      choices: [
+        { value: "read-only", label: "Read-only" },
+        { value: "workspace-write", label: "Workspace write" },
+        { value: "danger-full-access", label: "Full access" }
+      ]
+    }
+  ]
+};
+var CodexRunner = class extends BaseCliRunner {
+  descriptor = CODEX_DESCRIPTOR;
+  id = "codex";
+  displayName = "OpenAI Codex CLI";
+  engine = "codex";
+  included = false;
+  cachedModels = null;
+  constructor(plugin) {
+    super(plugin);
+  }
+  getConfig() {
+    return this.plugin.getEngineConfig("codex");
+  }
+  getBin() {
+    return this.resolveBinaryPath(this.getConfig().binary || "codex");
+  }
+  async getVersion() {
+    const out = await this.execCli(this.getBin(), ["--version"]);
+    const first = out.trim().split("\n")[0];
+    if (!first) throw new Error("Empty output from codex --version");
+    return first;
+  }
+  async listModels(forceRefresh = false) {
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+      return this.cachedModels;
+    }
+    const models = [];
+    try {
+      const cfgPath =
+        (0, import_path5.join)((0, import_os4.homedir)(), ".codex",
+          "config.toml");
+      if ((0, import_fs4.existsSync)(cfgPath)) {
+        const raw = (0, import_fs4.readFileSync)(cfgPath, "utf-8");
+        const m = raw.match(/^\s*model\s*=\s*["']([^"']+)["']/m);
+        if (m && m[1].trim()) {
+          models.push(m[1].trim());
+        }
+      }
+    } catch {
+    }
+    for (const def of ["o3", "o4-mini"]) {
+      if (!models.includes(def)) models.push(def);
+    }
+    this.cachedModels = models;
+    return models;
+  }
+  async listSessions() {
+    return this.listHistorySessions("codex");
+  }
+  async renameSession(_sessionId, _title) {
+  }
+  async deleteSession(_sessionId) {
+  }
+  async getModelContextLimit(model) {
+    return this.estimateModelContextLimit(model, 2e5);
+  }
+  async getSessionTokens(sessionId) {
+    return this.getHistorySessionTokens(sessionId);
+  }
+  async getUsageStats() {
+    return this.computeHistoryUsageStats("codex");
+  }
+  buildArgs(req) {
+    const s = this.plugin.settings;
+    const cfg = this.getConfig();
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const finalPrompt = this.inlinePromptAttachments(
+      req.prompt,
+      req.fileAttachments,
+      cwd
+    );
+    const args = ["exec", "--json", "--skip-git-repo-check"];
+    const model = cfg.model.trim();
+    if (model) {
+      args.push("--model", model);
+    }
+    if (s.autoApprove) {
+      args.push("--full-auto");
+    } else {
+      const sandbox = cfg.options.sandbox || "workspace-write";
+      args.push("--sandbox", sandbox);
+    }
+    const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
+    if (sid) {
+      args.push("resume", sid, finalPrompt);
+    } else {
+      args.push(finalPrompt);
+    }
+    return args;
+  }
+  runStream(reqOrPrompt, fileAttachmentsOrCb, maybeCb) {
+    const { req, cb } = this.normalizeRunArgs(
+      reqOrPrompt,
+      fileAttachmentsOrCb,
+      maybeCb
+    );
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const args = this.buildArgs({ ...req, cwd });
+    const bin = this.getBin();
+    const state = { accumulatedText: "" };
+    return this.spawnJsonlStream(
+      bin,
+      args,
+      cwd,
+      (line) => this.handleLine(line, cb, state),
+      cb
+    );
+  }
+  handleLine(line, cb, state = { accumulatedText: "" }) {
+    if (line.length > MAX_STREAM_LINE_BYTES) {
+      cb.onRaw?.(`[omitted event of ${line.length} bytes]
+`);
+      return;
+    }
+    let ev;
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      cb.onRaw?.(line + "\n");
+      return;
+    }
+    if (ev.type === "thread.started") {
+      if (typeof ev.thread_id === "string" && ev.thread_id) {
+        cb.onSession(ev.thread_id);
+      }
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if (ev.type === "turn.started") {
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if ((ev.type === "item.started" || ev.type === "item.updated" ||
+      ev.type === "item.completed" || ev.type === "item.failed") && ev.item) {
+      this.handleItemEvent(ev.type, ev.item, cb, state);
+      return;
+    }
+    if (ev.type === "turn.completed") {
+      const u = ev.usage ?? {};
+      const input = Number(u.input_tokens ?? 0);
+      const cached = Number(u.cached_input_tokens ?? 0);
+      const output = Number(u.output_tokens ?? 0);
+      const reasoning = Number(u.reasoning_tokens ?? 0);
+      cb.onFinish({
+        tokens: {
+          total: input + output + reasoning,
+          input,
+          output,
+          reasoning,
+          cache: cached > 0 ? { read: cached, write: 0 } : void 0
+        }
+      });
+      return;
+    }
+    if (ev.type === "turn.failed" || ev.type === "error" || ev.error) {
+      const msg = typeof ev.error === "string" ? ev.error :
+        ev.error?.message || ev.message || JSON.stringify(ev.error || ev);
+      cb.onError(String(msg));
+    }
+  }
+  handleItemEvent(eventType, item, cb, state) {
+    const itemId = String(item.id || `item-${Date.now()}`);
+    const isCompleted = eventType === "item.completed";
+    const isFailed = eventType === "item.failed" || item.status === "failed" ||
+      typeof item.exit_code === "number" && item.exit_code !== 0;
+    if (item.type === "reasoning") {
+      if (typeof item.text === "string" && item.text) {
+        cb.onActivity?.(this.plugin.t("Thinking..."));
+        cb.onReasoning(item.text, itemId);
+      }
+      return;
+    }
+    if (item.type === "agent_message") {
+      if (typeof item.text === "string" && item.text) {
+        state.accumulatedText = item.text;
+        cb.onActivity?.(this.plugin.t("Writing response..."));
+        cb.onText(state.accumulatedText, itemId);
+      }
+      return;
+    }
+    if (item.type === "command_execution") {
+      const title = item.command?.trim() || "bash";
+      if (!isCompleted && !isFailed) {
+        cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
+      } else {
+        cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      }
+      cb.onStep({
+        id: itemId,
+        tool: "bash",
+        title,
+        state: isFailed ? "error" : isCompleted ? "completed" : "running",
+        input: item.command ? { command: item.command } : void 0,
+        output: item.aggregated_output
+      });
+      return;
+    }
+    if (item.type === "file_change") {
+      const firstPath = item.changes?.[0]?.path || "";
+      const title = firstPath ? (0, import_path5.basename)(firstPath) : "file";
+      cb.onStep({
+        id: itemId,
+        tool: "edit_file",
+        title,
+        state: isFailed ? "error" : isCompleted ? "completed" : "running",
+        input: item.changes
+      });
+      return;
+    }
+    if (item.type === "web_search") {
+      const title = item.query || "search_web";
+      cb.onStep({
+        id: itemId,
+        tool: "search_web",
+        title,
+        state: isFailed ? "error" : isCompleted ? "completed" : "running",
+        input: item.query ? { query: item.query } : void 0
+      });
+      return;
+    }
+    if (item.type === "mcp_tool_call") {
+      const toolName = item.tool || "tool";
+      const title = this.extractCommonToolTitle(toolName, item.arguments);
+      cb.onStep({
+        id: itemId,
+        tool: toolName,
+        title,
+        state: isFailed ? "error" : isCompleted ? "completed" : "running",
+        input: item.arguments,
+        output: item.result
+      });
+    }
+  }
+};
+
+// src/providers/hermes/runner.ts
+var import_fs5 = require("fs");
+var import_os5 = require("os");
+var import_path6 = require("path");
+var HERMES_DESCRIPTOR = {
+  id: "hermes",
+  displayName: "Hermes Agent CLI (Nous Research)",
+  shortName: "Hermes",
+  defaultBinary: "hermes",
+  defaultModel: "",
+  binaryDesc:
+    "Command or full path to the hermes executable. Default is 'hermes' or " +
+    "'~/.hermes/bin/hermes'.",
+  modelDesc:
+    "Leave on default to use your ~/.hermes/config.yaml model, or enter a " +
+    "provider/model ID.",
+  included: false,
+  supportsSessions: "local-db",
+  supportsUsageStats: true,
+  supportsDbCleanup: false,
+  options: [
+    {
+      key: "provider",
+      label: "Provider",
+      desc:
+        "Optional Hermes backend provider (e.g. openrouter, nous, " +
+        "anthropic).",
+      type: "text",
+      placeholder: "e.g. openrouter",
+      default: ""
+    }
+  ]
+};
+var HermesRunner = class extends BaseCliRunner {
+  descriptor = HERMES_DESCRIPTOR;
+  id = "hermes";
+  displayName = "Hermes Agent CLI";
+  engine = "hermes";
+  included = false;
+  cachedModels = null;
+  constructor(plugin) {
+    super(plugin);
+  }
+  getConfig() {
+    return this.plugin.getEngineConfig("hermes");
+  }
+  getBin() {
+    return this.resolveBinaryPath(this.getConfig().binary || "hermes");
+  }
+  async getVersion() {
+    const out = await this.execCli(this.getBin(), ["--version"]);
+    const first = out.trim().split("\n")[0];
+    if (!first) throw new Error("Empty output from hermes --version");
+    return first;
+  }
+  async listModels(forceRefresh = false) {
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+      return this.cachedModels;
+    }
+    const models = [];
+    try {
+      const cfgPath =
+        (0, import_path6.join)((0, import_os5.homedir)(), ".hermes",
+          "config.yaml");
+      if ((0, import_fs5.existsSync)(cfgPath)) {
+        const raw = (0, import_fs5.readFileSync)(cfgPath, "utf-8");
+        const m = raw.match(/^\s*(?:default_)?model\s*:\s*["']?([^\s"'#]+)/m);
+        if (m && m[1].trim()) {
+          models.push(m[1].trim());
+        }
+      }
+    } catch {
+    }
+    this.cachedModels = models;
+    return models;
+  }
+  async listSessions() {
+    return this.listHistorySessions("hermes");
+  }
+  async renameSession(_sessionId, _title) {
+  }
+  async deleteSession(_sessionId) {
+  }
+  async getModelContextLimit(model) {
+    return this.estimateModelContextLimit(model, 128e3);
+  }
+  async getSessionTokens(sessionId) {
+    return this.getHistorySessionTokens(sessionId);
+  }
+  async getUsageStats() {
+    return this.computeHistoryUsageStats("hermes");
+  }
+  buildArgs(req) {
+    const s = this.plugin.settings;
+    const cfg = this.getConfig();
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const finalPrompt = this.inlinePromptAttachments(
+      req.prompt,
+      req.fileAttachments,
+      cwd
+    );
+    const args = ["chat", "-q", finalPrompt, "--format", "stream-json"];
+    const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
+    if (sid) {
+      args.push("--resume", sid);
+    }
+    const model = cfg.model.trim();
+    if (model) {
+      args.push("--model", model);
+    }
+    const provider = cfg.options.provider;
+    if (provider) {
+      args.push("--provider", provider);
+    }
+    return args;
+  }
+  createStreamState() {
+    return {
+      accumulatedText: "",
+      activeToolSteps: /* @__PURE__ */ new Map()
+    };
+  }
+  runStream(reqOrPrompt, fileAttachmentsOrCb, maybeCb) {
+    const { req, cb } = this.normalizeRunArgs(
+      reqOrPrompt,
+      fileAttachmentsOrCb,
+      maybeCb
+    );
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const args = this.buildArgs({ ...req, cwd });
+    const bin = this.getBin();
+    const state = this.createStreamState();
+    return this.spawnJsonlStream(
+      bin,
+      args,
+      cwd,
+      (line) => this.handleLine(line, cb, state),
+      cb
+    );
+  }
+  handleLine(line, cb, state = this.createStreamState()) {
+    if (line.length > MAX_STREAM_LINE_BYTES) {
+      cb.onRaw?.(`[omitted event of ${line.length} bytes]
+`);
+      return;
+    }
+    let ev;
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      cb.onRaw?.(line + "\n");
+      return;
+    }
+    if (typeof ev.session_id === "string" && ev.session_id) {
+      cb.onSession(ev.session_id);
+    }
+    if (ev.type === "system") {
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if (ev.type === "text" && typeof ev.text === "string") {
+      state.accumulatedText += ev.text;
+      cb.onActivity?.(this.plugin.t("Writing response..."));
+      cb.onText(state.accumulatedText, "text");
+      return;
+    }
+    if ((ev.type === "reasoning" || ev.type === "thought") &&
+      typeof (ev.text ?? ev.reasoning) === "string") {
+      const thought = String(ev.text ?? ev.reasoning);
+      cb.onActivity?.(this.plugin.t("Thinking..."));
+      cb.onReasoning(thought, "reasoning");
+      return;
+    }
+    if (ev.type === "tool_use") {
+      const toolName = String(ev.name || ev.tool || "tool");
+      const key = String(ev.call_id || ev.id || toolName);
+      const stepId = `step-${ev.timestamp ?? Date.now()}-${key}`;
+      const input = ev.input;
+      if (toolName === "ask_question" || toolName === "question") {
+        const questions = this.parseCommonQuestions(input);
+        const qTitle = questions[0]?.question ||
+          this.plugin.t("Agent question");
+        if (questions.length > 0) {
+          cb.onQuestion?.(questions);
+        }
+        cb.onActivity?.(this.plugin.t("Waiting for your answer..."));
+        cb.onStep({
+          id: stepId,
+          tool: toolName,
+          title: qTitle,
+          state: "completed",
+          input
+        });
+        return;
+      }
+      const title = this.extractCommonToolTitle(toolName, input);
+      state.activeToolSteps.set(key, { id: stepId, tool: toolName, title,
+        input });
+      cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
+      cb.onStep({
+        id: stepId,
+        tool: toolName,
+        title,
+        state: "running",
+        input
+      });
+      return;
+    }
+    if (ev.type === "tool_result") {
+      const toolName = String(ev.name || ev.tool || "tool");
+      const key = String(ev.call_id || ev.id || toolName);
+      const prev = state.activeToolSteps.get(key);
+      const stepId = prev?.id || `step-${ev.timestamp ?? Date.now()}-${key}`;
+      const title = prev?.title || toolName;
+      const isErr = Boolean(ev.is_error);
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      cb.onStep({
+        id: stepId,
+        tool: prev?.tool || toolName,
+        title,
+        state: isErr ? "error" : "completed",
+        input: prev?.input,
+        output: ev.output,
+        durationMs: ev.duration_ms
+      });
+      return;
+    }
+    if (ev.type === "result") {
+      if (ev.error) {
+        const msg = typeof ev.error === "string" ? ev.error :
+          ev.error?.message || JSON.stringify(ev.error);
+        cb.onError(String(msg));
+        return;
+      }
+      if (typeof ev.text === "string" && ev.text.trim()) {
+        state.accumulatedText = ev.text;
+        cb.onText(state.accumulatedText, "final");
+      }
+      const tk = ev.tokens ?? {};
+      const input = Number(tk.input ?? 0);
+      const output = Number(tk.output ?? 0);
+      const reasoning = Number(tk.reasoning ?? 0);
+      const rawTotal = Number(tk.total ?? 0);
+      const total = rawTotal > 0 ? rawTotal : input + output + reasoning;
+      const cacheRead = Number(tk.cache_read ?? 0);
+      const cacheWrite = Number(tk.cache_write ?? 0);
+      cb.onFinish({
+        tokens: {
+          total,
+          input,
+          output,
+          reasoning,
+          cache: cacheRead > 0 || cacheWrite > 0 ?
+            { read: cacheRead, write: cacheWrite } : void 0
+        },
+        cost: typeof ev.cost === "number" ? ev.cost : void 0
+      });
+      return;
+    }
+    if (ev.type === "error" || ev.error) {
+      const msg = typeof ev.error === "string" ? ev.error :
+        ev.error?.message || JSON.stringify(ev.error || ev);
+      cb.onError(String(msg));
+    }
+  }
+};
+
+// src/providers/pi/runner.ts
+var PI_DESCRIPTOR = {
+  id: "pi",
+  displayName: "Pi Coding Agent CLI",
+  shortName: "Pi",
+  defaultBinary: "pi",
+  defaultModel: "",
+  binaryDesc:
+    "Command or full path to the pi executable. Usually 'pi' is enough if " +
+    "it is on your PATH.",
+  modelDesc:
+    "Leave on default to use your Pi config, or pick a model from 'pi --" +
+    "list-models'.",
+  included: false,
+  supportsSessions: "local-db",
+  supportsUsageStats: true,
+  supportsDbCleanup: false,
+  options: [
+    {
+      key: "provider",
+      label: "Provider",
+      desc: "Optional model provider for Pi (e.g. anthropic, openai, google).",
+      type: "text",
+      placeholder: "e.g. anthropic",
+      default: ""
+    }
+  ]
+};
+var PiRunner = class extends BaseCliRunner {
+  descriptor = PI_DESCRIPTOR;
+  id = "pi";
+  displayName = "Pi Coding Agent CLI";
+  engine = "pi";
+  included = false;
+  cachedModels = null;
+  constructor(plugin) {
+    super(plugin);
+  }
+  getConfig() {
+    return this.plugin.getEngineConfig("pi");
+  }
+  getBin() {
+    return this.resolveBinaryPath(this.getConfig().binary || "pi");
+  }
+  async getVersion() {
+    const out = await this.execCli(this.getBin(), ["--version"]);
+    const first = out.trim().split("\n")[0];
+    if (!first) throw new Error("Empty output from pi --version");
+    return first;
+  }
+  async listModels(forceRefresh = false) {
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+      return this.cachedModels;
+    }
+    try {
+      const out = await this.execCli(this.getBin(), ["--list-models"]);
+      const models = [];
+      for (const line of out.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const firstToken = trimmed.split(/\s+/)[0];
+        if (firstToken && /^[a-zA-Z0-9_.:/+-]+$/.test(firstToken) &&
+          firstToken.toLowerCase() !== "model" &&
+            firstToken.toLowerCase() !== "provider" &&
+              !models.includes(firstToken)) {
+          models.push(firstToken);
+        }
+      }
+      if (models.length > 0) {
+        this.cachedModels = models;
+        return models;
+      }
+    } catch {
+    }
+    return [];
+  }
+  async listSessions() {
+    return this.listHistorySessions("pi");
+  }
+  async renameSession(_sessionId, _title) {
+  }
+  async deleteSession(_sessionId) {
+  }
+  async getModelContextLimit(model) {
+    return this.estimateModelContextLimit(model, 2e5);
+  }
+  async getSessionTokens(sessionId) {
+    return this.getHistorySessionTokens(sessionId);
+  }
+  async getUsageStats() {
+    return this.computeHistoryUsageStats("pi");
+  }
+  buildArgs(req) {
+    const s = this.plugin.settings;
+    const cfg = this.getConfig();
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const finalPrompt = this.inlinePromptAttachments(
+      req.prompt,
+      req.fileAttachments,
+      cwd
+    );
+    const args = ["--print", "--mode", "json"];
+    const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
+    if (sid) {
+      args.push("--session", sid);
+    }
+    const model = cfg.model.trim();
+    if (model) {
+      args.push("--model", model);
+    }
+    const provider = cfg.options.provider;
+    if (provider) {
+      args.push("--provider", provider);
+    }
+    args.push(finalPrompt);
+    return args;
+  }
+  createStreamState() {
+    return {
+      accumulatedText: "",
+      accumulatedReasoning: "",
+      toolTitles: /* @__PURE__ */ new Map()
+    };
+  }
+  runStream(reqOrPrompt, fileAttachmentsOrCb, maybeCb) {
+    const { req, cb } = this.normalizeRunArgs(
+      reqOrPrompt,
+      fileAttachmentsOrCb,
+      maybeCb
+    );
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const args = this.buildArgs({ ...req, cwd });
+    const bin = this.getBin();
+    const state = this.createStreamState();
+    return this.spawnJsonlStream(
+      bin,
+      args,
+      cwd,
+      (line) => this.handleLine(line, cb, state),
+      cb
+    );
+  }
+  handleLine(line, cb, state = this.createStreamState()) {
+    if (line.length > MAX_STREAM_LINE_BYTES) {
+      cb.onRaw?.(`[omitted event of ${line.length} bytes]
+`);
+      return;
+    }
+    let ev;
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      cb.onRaw?.(line + "\n");
+      return;
+    }
+    if (ev.type === "session") {
+      const sid = ev.id || ev.sessionId;
+      if (typeof sid === "string" && sid) {
+        cb.onSession(sid);
+      }
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if (ev.type === "agent_start" || ev.type === "turn_start") {
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if (ev.type === "message_update" && ev.assistantMessageEvent) {
+      const ame = ev.assistantMessageEvent;
+      if (ame.type === "text_delta" && typeof ame.delta === "string") {
+        state.accumulatedText += ame.delta;
+        cb.onActivity?.(this.plugin.t("Writing response..."));
+        cb.onText(state.accumulatedText, String(ame.contentIndex ?? 0));
+      } else if (ame.type === "thinking_delta" &&
+        typeof ame.delta === "string") {
+        state.accumulatedReasoning += ame.delta;
+        cb.onActivity?.(this.plugin.t("Thinking..."));
+        cb.onReasoning(
+          state.accumulatedReasoning,
+          String(ame.contentIndex ?? 0)
+        );
+      }
+      return;
+    }
+    if (ev.type === "tool_execution_start") {
+      const stepId = String(ev.toolCallId || `step-${Date.now()}`);
+      const toolName = String(ev.toolName || "tool");
+      const input = ev.args;
+      const title = this.extractCommonToolTitle(toolName, input);
+      state.toolTitles.set(stepId, { tool: toolName, title, input });
+      cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
+      cb.onStep({
+        id: stepId,
+        tool: toolName,
+        title,
+        state: "running",
+        input
+      });
+      return;
+    }
+    if (ev.type === "tool_execution_end") {
+      const stepId = String(ev.toolCallId || `step-${Date.now()}`);
+      const prev = state.toolTitles.get(stepId);
+      const toolName = prev?.tool || String(ev.toolName || "tool");
+      const title = prev?.title ||
+        this.extractCommonToolTitle(toolName, ev.args);
+      const isErr = Boolean(ev.isError);
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      cb.onStep({
+        id: stepId,
+        tool: toolName,
+        title,
+        state: isErr ? "error" : "completed",
+        input: prev?.input ?? ev.args,
+        output: ev.result
+      });
+      return;
+    }
+    if (ev.type === "message_end" && ev.message) {
+      this.extractPiMessageUsage(ev.message, cb, state);
+      return;
+    }
+    if (ev.type === "agent_end" && Array.isArray(ev.messages)) {
+      for (const msg of ev.messages) {
+        if (msg?.role === "assistant") {
+          this.extractPiMessageUsage(msg, cb, state);
+        }
+      }
+      return;
+    }
+    if (ev.type === "error" || ev.error) {
+      const msg = typeof ev.error === "string" ? ev.error :
+        ev.error?.message || JSON.stringify(ev.error || ev);
+      cb.onError(String(msg));
+    }
+  }
+  extractPiMessageUsage(msg, cb, state) {
+    if (Array.isArray(msg.content)) {
+      for (const block of msg.content) {
+        if (block?.type === "text" && typeof block.text === "string" &&
+          block.text.trim()) {
+          state.accumulatedText = block.text;
+          cb.onText(state.accumulatedText, "final");
+        } else if (block?.type === "thinking" &&
+          typeof block.thinking === "string" && block.thinking.trim()) {
+          state.accumulatedReasoning = block.thinking;
+          cb.onReasoning(state.accumulatedReasoning, "final");
+        }
+      }
+    }
+    if (msg.usage) {
+      const u = msg.usage;
+      const input = Number(u.input ?? 0);
+      const output = Number(u.output ?? 0);
+      const cacheRead = Number(u.cacheRead ?? 0);
+      const cacheWrite = Number(u.cacheWrite ?? 0);
+      const total = Number(u.totalTokens ?? 0) || input + output;
+      if (total > 0) {
+        cb.onFinish({
+          tokens: {
+            total,
+            input,
+            output,
+            cache: cacheRead > 0 || cacheWrite > 0 ?
+              { read: cacheRead, write: cacheWrite } : void 0
+          },
+          cost: typeof u.cost?.total === "number" ? u.cost.total : void 0
+        });
+      }
+    }
   }
 };
 
@@ -4730,14 +5993,12 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
         this.display();
       });
     });
-    const sectionTitle = activeDesc.id === "antigravity" ?
-      t("Antigravity settings (Google AI Pro)") :
-        activeDesc.id === "opencode" ? t("OpenCode settings") :
-          activeDesc.displayName;
+    const sectionTitle = substitute(
+      t("$1 settings"),
+      t(activeDesc.displayName)
+    );
     containerEl.createEl("h3", { text: sectionTitle });
-    const binaryNameLabel = activeDesc.id === "antigravity" ?
-      t("Antigravity binary path") : t("Binary path");
-    new import_obsidian7.Setting(containerEl).setName(binaryNameLabel).setDesc(
+    new import_obsidian7.Setting(containerEl).setName(t("Binary path")).setDesc(
       t(activeDesc.binaryDesc)).addText(
       (text) =>
         text.setPlaceholder(activeDesc.defaultBinary).setValue(activeCfg.binary)
@@ -4750,6 +6011,20 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
       activeDesc.modelDesc)).addDropdown((dd) => {
       void this.populateProviderModelDropdown(dd, activeProvider);
     });
+    new import_obsidian7.Setting(containerEl).setName(t("Custom model ID"))
+      .setDesc(
+      t(
+          "Type any exact model ID or alias manually. Leave empty to use " +
+          "the CLI's own configured default model."
+      )
+    ).addText(
+      (text) => text.setPlaceholder(activeDesc.defaultModel ||
+        t("(CLI default)")).setValue(activeCfg.model).onChange(async (value) =>
+          {
+        activeCfg.model = value.trim();
+        await this.plugin.saveSettings();
+      })
+    );
     for (const opt of activeDesc.options) {
       const setting =
         new import_obsidian7.Setting(containerEl).setName(t(opt.label)).setDesc(
@@ -4777,14 +6052,14 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
       }
     }
     const binCmd = activeDesc.defaultBinary;
-    const testDesc = activeDesc.id === "antigravity" ? t(
-      "Run 'agy --version' to verify the binary is reachable.") :
-        activeDesc.id === "opencode" ? t(
-      "Run 'opencode --version' to verify the binary is reachable.") :
-        `Run '${binCmd} --version' to verify the binary is reachable.`;
-    const foundPrefix = activeDesc.id === "antigravity" ?
-      t("Antigravity found:") : activeDesc.id === "opencode" ?
-        t("Opencode found:") : `${activeDesc.shortName}:`;
+    const testDesc = substitute(
+      t("Run '$1 --version' to verify the binary is reachable."),
+      binCmd
+    );
+    const foundPrefix = substitute(
+      t("$1 found:"),
+      t(activeDesc.shortName)
+    );
     new import_obsidian7.Setting(containerEl).setName(t("Test connection"))
       .setDesc(testDesc).addButton(
       (btn) => btn.setButtonText(t("Test")).onClick(async () => {
@@ -5041,32 +6316,29 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
       dd.addOption(val, display);
     };
     if (!desc.included) {
-      addOption("", t("(default from opencode)"));
-      if (cur) {
-        const suffix = cur.includes("/") ? "" : ` ${t("(custom)")}`;
-        addOption(cur, cur + suffix);
-      }
+      addOption("", substitute(t("(default from $1)"), desc.shortName));
+    }
+    if (cur) {
+      addOption(cur, cur);
     }
     try {
       const models = await provider.listModels();
       for (const m of models) addOption(m, m);
       dd.setValue(cur || "");
     } catch (e) {
-      if (desc.id === "antigravity") {
-        addOption("gemini-3.8-flash-high", "Gemini 3.8 Flash (High)");
-        addOption("claude-opus-5-5-high", "Claude Opus 5.5 (High)");
-        addOption("claude-sonnet-5-5-high", "Claude Sonnet 5.5 (High)");
-      } else {
-        const opt = dd.selectEl.createEl("option");
-        opt.value = "__error__";
-        opt.textContent = `${t("Error:")} ${e.message}`;
-        opt.disabled = true;
+      if (desc.defaultModel) {
+        addOption(desc.defaultModel, desc.defaultModel);
       }
-      dd.setValue(cur || "");
+      const opt = dd.selectEl.createEl("option");
+      opt.value = "__error__";
+      opt.textContent = `${t("Error:")} ${e.message}`;
+      opt.disabled = true;
+      dd.setValue(cur || desc.defaultModel || "");
     }
     dd.onChange(async (val) => {
       cfg.model = val;
       await this.plugin.saveSettings();
+      this.display();
     });
   }
 };
@@ -5106,7 +6378,13 @@ var OpencodePlugin = class extends import_obsidian8.Plugin {
     this.registry = new ProviderRegistry();
     this.registry.register(this.opencodeRunner);
     this.registry.register(this.antigravityRunner);
-    void this.opencodeRunner.pruneOversizedParts();
+    this.registry.register(new ClaudeRunner(this));
+    this.registry.register(new CodexRunner(this));
+    this.registry.register(new HermesRunner(this));
+    this.registry.register(new PiRunner(this));
+    for (const provider of this.registry.getAll()) {
+      void provider.pruneOversizedParts?.();
+    }
     const t = this.t.bind(this);
     this.registerView(CHAT_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
     this.addRibbonIcon("bot", t("New Vault Agents chat"), () => {

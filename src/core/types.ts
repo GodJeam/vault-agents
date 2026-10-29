@@ -168,23 +168,52 @@ export const DEFAULT_ENGINE_CONFIGS: Record<string, EngineConfig> = {
       agent: "",
     },
   },
+  claude: {
+    binary: "claude",
+    model: "",
+    options: {
+      effort: "",
+    },
+  },
+  codex: {
+    binary: "codex",
+    model: "",
+    options: {
+      sandbox: "workspace-write",
+    },
+  },
+  hermes: {
+    binary: "hermes",
+    model: "",
+    options: {
+      provider: "",
+    },
+  },
+  pi: {
+    binary: "pi",
+    model: "",
+    options: {
+      provider: "",
+    },
+  },
 };
+
+export function createDefaultEnginesMap(): Record<string, EngineConfig> {
+  const map: Record<string, EngineConfig> = {};
+  for (const [id, def] of Object.entries(DEFAULT_ENGINE_CONFIGS)) {
+    map[id] = {
+      binary: def.binary,
+      model: def.model,
+      options: { ...def.options },
+    };
+  }
+  return map;
+}
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   language: "en",
   engine: "antigravity",
-  engines: {
-    antigravity: {
-      binary: DEFAULT_ENGINE_CONFIGS.antigravity.binary,
-      model: DEFAULT_ENGINE_CONFIGS.antigravity.model,
-      options: { ...DEFAULT_ENGINE_CONFIGS.antigravity.options },
-    },
-    opencode: {
-      binary: DEFAULT_ENGINE_CONFIGS.opencode.binary,
-      model: DEFAULT_ENGINE_CONFIGS.opencode.model,
-      options: { ...DEFAULT_ENGINE_CONFIGS.opencode.options },
-    },
-  },
+  engines: createDefaultEnginesMap(),
   binaryPath: "opencode",
   model: "opencode-go/deepseek-v4.1-flash",
   agent: "",
@@ -264,18 +293,7 @@ export function migrateSettings(
     {},
     DEFAULT_SETTINGS,
     {
-      engines: {
-        antigravity: {
-          binary: DEFAULT_ENGINE_CONFIGS.antigravity.binary,
-          model: DEFAULT_ENGINE_CONFIGS.antigravity.model,
-          options: { ...DEFAULT_ENGINE_CONFIGS.antigravity.options },
-        },
-        opencode: {
-          binary: DEFAULT_ENGINE_CONFIGS.opencode.binary,
-          model: DEFAULT_ENGINE_CONFIGS.opencode.model,
-          options: { ...DEFAULT_ENGINE_CONFIGS.opencode.options },
-        },
-      },
+      engines: createDefaultEnginesMap(),
       sessionEngines: {},
       pinned: [],
       prompts: [],
