@@ -7,7 +7,7 @@ import {
 } from "obsidian";
 import type OpencodePlugin from "../../main";
 import { PromptModal } from "../../shared/modals";
-import type { Language } from "../../i18n";
+import { substitute, type Language } from "../../i18n";
 import type { EngineType } from "../../core/types";
 import type { AgentProvider } from "../../core/provider";
 
@@ -79,21 +79,14 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
       });
 
     // Data-driven Engine Settings section
-    const sectionTitle =
-      activeDesc.id === "antigravity"
-        ? t("Antigravity settings (Google AI Pro)")
-        : activeDesc.id === "opencode"
-          ? t("OpenCode settings")
-          : activeDesc.displayName;
+    const sectionTitle = substitute(
+      t("$1 settings"),
+      t(activeDesc.displayName)
+    );
     containerEl.createEl("h3", { text: sectionTitle });
 
-    const binaryNameLabel =
-      activeDesc.id === "antigravity"
-        ? t("Antigravity binary path")
-        : t("Binary path");
-
     new Setting(containerEl)
-      .setName(binaryNameLabel)
+      .setName(t("Binary path"))
       .setDesc(t(activeDesc.binaryDesc))
       .addText((text) =>
         text
@@ -111,6 +104,24 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
       .addDropdown((dd) => {
         void this.populateProviderModelDropdown(dd, activeProvider);
       });
+
+    new Setting(containerEl)
+      .setName(t("Custom model ID"))
+      .setDesc(
+        t(
+          "Type any exact model ID or alias manually. Leave empty to use " +
+            "the CLI's own configured default model."
+        )
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder(activeDesc.defaultModel || t("(CLI default)"))
+          .setValue(activeCfg.model)
+          .onChange(async (value) => {
+            activeCfg.model = value.trim();
+            await this.plugin.saveSettings();
+          })
+      );
 
     // Render descriptor-defined engine options (e.g. effort, agent, etc.)
     for (const opt of activeDesc.options) {
@@ -142,19 +153,14 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
     }
 
     const binCmd = activeDesc.defaultBinary;
-    const testDesc =
-      activeDesc.id === "antigravity"
-        ? t("Run 'agy --version' to verify the binary is reachable.")
-        : activeDesc.id === "opencode"
-          ? t("Run 'opencode --version' to verify the binary is reachable.")
-          : `Run '${binCmd} --version' to verify the binary is reachable.`;
-
-    const foundPrefix =
-      activeDesc.id === "antigravity"
-        ? t("Antigravity found:")
-        : activeDesc.id === "opencode"
-          ? t("Opencode found:")
-          : `${activeDesc.shortName}:`;
+    const testDesc = substitute(
+      t("Run '$1 --version' to verify the binary is reachable."),
+      binCmd
+    );
+    const foundPrefix = substitute(
+      t("$1 found:"),
+      t(activeDesc.shortName)
+    );
 
     new Setting(containerEl)
       .setName(t("Test connection"))
@@ -474,11 +480,10 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
     };
 
     if (!desc.included) {
-      addOption("", t("(default from opencode)"));
-      if (cur) {
-        const suffix = cur.includes("/") ? "" : ` ${t("(custom)")}`;
-        addOption(cur, cur + suffix);
-      }
+      addOption("", substitute(t("(default from $1)"), desc.shortName));
+    }
+    if (cur) {
+      addOption(cur, cur);
     }
 
     try {
@@ -486,22 +491,20 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
       for (const m of models) addOption(m, m);
       dd.setValue(cur || "");
     } catch (e) {
-      if (desc.id === "antigravity") {
-        addOption("gemini-3.8-flash-high", "Gemini 3.8 Flash (High)");
-        addOption("claude-opus-5-5-high", "Claude Opus 5.5 (High)");
-        addOption("claude-sonnet-5-5-high", "Claude Sonnet 5.5 (High)");
-      } else {
-        const opt = dd.selectEl.createEl("option");
-        opt.value = "__error__";
-        opt.textContent = `${t("Error:")} ${(e as Error).message}`;
-        opt.disabled = true;
+      if (desc.defaultModel) {
+        addOption(desc.defaultModel, desc.defaultModel);
       }
-      dd.setValue(cur || "");
+      const opt = dd.selectEl.createEl("option");
+      opt.value = "__error__";
+      opt.textContent = `${t("Error:")} ${(e as Error).message}`;
+      opt.disabled = true;
+      dd.setValue(cur || desc.defaultModel || "");
     }
 
     dd.onChange(async (val) => {
       cfg.model = val;
       await this.plugin.saveSettings();
+      this.display();
     });
   }
 }

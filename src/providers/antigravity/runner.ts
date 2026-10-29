@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, statSync } from "fs";
-import { basename, isAbsolute, join } from "path";
+import { existsSync } from "fs";
+import { join } from "path";
 import { homedir } from "os";
 import type {
   AgentProvider,
@@ -7,15 +7,12 @@ import type {
   RunnerHost,
 } from "../../core/provider";
 import type {
-  AgentQuestion,
-  AgentQuestionOption,
   EngineType,
   RunHandle,
   RunRequest,
   SessionInfo,
   StreamCallbacks,
   UsageStats,
-  UsageWindow,
 } from "../../core/types";
 import { substitute } from "../../i18n";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
@@ -25,10 +22,6 @@ import type { AntigravityEvent } from "./types";
 // opencode session ids use the "ses_..." form. Used to attribute untagged
 // history entries that pre-date `sessionEngines`.
 const ANTIGRAVITY_ID_HINT = /-/;
-
-// Maximum size (in bytes) of a text attachment to inline directly into CLI args
-// so we never hit OS ARG_MAX / E2BIG limits. Larger files are passed by path.
-const MAX_INLINE_ATTACHMENT_BYTES = 256 * 1024;
 
 export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   id: "antigravity",
@@ -208,25 +201,9 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     }
 
     // 2. Add any Antigravity sessions saved in Obsidian histories
-    const histories = this.plugin.histories ?? {};
-    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
-    for (const [id, msgs] of Object.entries(histories)) {
-      if (seenIds.has(id)) continue;
-      const isAgy =
-        sessionEngines[id] === "antigravity" ||
-        (!sessionEngines[id] && ANTIGRAVITY_ID_HINT.test(id));
-      if (isAgy) {
-        const firstUser = msgs.find((m) => m.role === "user");
-        const title = firstUser?.text ? firstUser.text.slice(0, 40) : id;
-        sessions.push({
-          id,
-          title,
-          updated: Date.now(),
-          engine: "antigravity",
-        });
-        seenIds.add(id);
-      }
-    }
+    sessions.push(
+      ...this.listHistorySessions("antigravity", seenIds, ANTIGRAVITY_ID_HINT)
+    );
 
     return sessions;
   }
@@ -266,67 +243,17 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async getModelContextLimit(model: string): Promise<number> {
-    const m = model.toLowerCase();
-    if (m.includes("gemini")) return 1_048_576; // 1M tokens
-    if (m.includes("claude")) return 200_000; // 200K tokens
-    return 128_000;
+    return this.estimateModelContextLimit(model, 128_000);
   }
 
   async getSessionTokens(
     sessionId: string
   ): Promise<{ input: number; output: number }> {
-    const history = this.plugin.getHistory(sessionId);
-    for (let i = history.length - 1; i >= 0; i--) {
-      const msg = history[i];
-      if (msg.role === "assistant" && msg.tokens) {
-        return {
-          input: msg.tokens.input ?? 0,
-          output: msg.tokens.output ?? 0,
-        };
-      }
-    }
-    return { input: 0, output: 0 };
+    return this.getHistorySessionTokens(sessionId);
   }
 
   async getUsageStats(): Promise<UsageStats> {
-    const now = Date.now();
-    const h5Cutoff = now - 5 * 3600 * 1000;
-    const weekCutoff = now - 7 * 24 * 3600 * 1000;
-    const monthCutoff = now - 30 * 24 * 3600 * 1000;
-
-    const h5: UsageWindow = { input: 0, output: 0, cost: 0 };
-    const week: UsageWindow = { input: 0, output: 0, cost: 0 };
-    const month: UsageWindow = { input: 0, output: 0, cost: 0 };
-
-    const histories = this.plugin.histories ?? {};
-    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
-    for (const [id, msgs] of Object.entries(histories)) {
-      const isAgy =
-        sessionEngines[id] === "antigravity" ||
-        (!sessionEngines[id] && ANTIGRAVITY_ID_HINT.test(id));
-      if (!isAgy) continue;
-
-      for (const msg of msgs) {
-        if (msg.role === "assistant" && msg.tokens) {
-          const inp = msg.tokens.input ?? 0;
-          const out = msg.tokens.output ?? 0;
-          const ts = msg.timestamp;
-          if (!ts || ts >= monthCutoff) {
-            month.input += inp;
-            month.output += out;
-          }
-          if (!ts || ts >= weekCutoff) {
-            week.input += inp;
-            week.output += out;
-          }
-          if (!ts || ts >= h5Cutoff) {
-            h5.input += inp;
-            h5.output += out;
-          }
-        }
-      }
-    }
-    return { h5, week, month };
+    return this.computeHistoryUsageStats("antigravity", ANTIGRAVITY_ID_HINT);
   }
 
   /**
@@ -337,40 +264,11 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     const cfg = this.getConfig();
     const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
 
-    let finalPrompt = req.prompt;
-
-    const BINARY_EXT_REGEX = new RegExp(
-      "\\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|" +
-        "7z|rar|bin|exe|dmg|iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$",
-      "i"
+    const finalPrompt = this.inlinePromptAttachments(
+      req.prompt,
+      req.fileAttachments,
+      cwd
     );
-    const maxInlineBytes = Math.min(
-      MAX_INLINE_ATTACHMENT_BYTES,
-      Math.max(1, s.maxAttachMB || 20) * 1024 * 1024
-    );
-
-    for (const p of req.fileAttachments) {
-      const fullPath = !isAbsolute(p) && cwd ? join(cwd, p) : p;
-      if (BINARY_EXT_REGEX.test(fullPath)) {
-        finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
-      } else {
-        try {
-          const st = statSync(fullPath);
-          if (st.size > maxInlineBytes) {
-            finalPrompt =
-              `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
-          } else {
-            const content = readFileSync(fullPath, "utf-8");
-            const filename = basename(fullPath);
-            finalPrompt =
-              `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
-          }
-        } catch {
-          finalPrompt =
-            `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
-        }
-      }
-    }
 
     const args = ["-p", finalPrompt, "--output-format", "stream-json"];
 
@@ -506,7 +404,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
 
         // Intercept ask_question tool calls for interactive chat answers
         if (toolName === "ask_question" || toolName === "question") {
-          const questions = this.parseAntigravityQuestions(params);
+          const questions = this.parseCommonQuestions(params);
           const qSummary =
             questions[0]?.question || this.plugin.t("Agent question");
           const stepKey = String(stepIndex ?? qSummary);
@@ -534,7 +432,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
           return;
         }
 
-        const title = this.extractAntigravityToolTitle(toolName, params);
+        const title = this.extractCommonToolTitle(toolName, params);
         if (!isDone) {
           cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
         } else {
@@ -588,109 +486,6 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       const msg = ev.error?.message || JSON.stringify(ev.error || ev);
       cb.onError(String(msg));
     }
-  }
-
-  private extractAntigravityToolTitle(
-    toolName: string,
-    params: Record<string, unknown> | undefined
-  ): string {
-    if (params && typeof params === "object") {
-      if (typeof params.toolSummary === "string" && params.toolSummary.trim()) {
-        return params.toolSummary.trim();
-      }
-      if (typeof params.TargetFile === "string" && params.TargetFile.trim()) {
-        return basename(params.TargetFile.trim());
-      }
-      if (
-        typeof params.AbsolutePath === "string" &&
-        params.AbsolutePath.trim()
-      ) {
-        return basename(params.AbsolutePath.trim());
-      }
-      if (typeof params.Path === "string" && params.Path.trim()) {
-        return basename(params.Path.trim());
-      }
-      if (
-        typeof params.DirectoryPath === "string" &&
-        params.DirectoryPath.trim()
-      ) {
-        const dp = params.DirectoryPath.trim();
-        return basename(dp) || dp;
-      }
-      if (
-        typeof params.SearchDirectory === "string" &&
-        params.SearchDirectory.trim()
-      ) {
-        const dirName = basename(params.SearchDirectory.trim());
-        const q = typeof params.Query === "string" ? params.Query.trim() : "";
-        return q ? `"${q}" in ${dirName}` : dirName;
-      }
-      if (typeof params.Query === "string" && params.Query.trim()) {
-        return `"${params.Query.trim()}"`;
-      }
-      if (typeof params.query === "string" && params.query.trim()) {
-        return params.query.trim();
-      }
-      if (typeof params.Pattern === "string" && params.Pattern.trim()) {
-        return params.Pattern.trim();
-      }
-      if (typeof params.CommandLine === "string" && params.CommandLine.trim()) {
-        return params.CommandLine.trim();
-      }
-      if (typeof params.Role === "string" && params.Role.trim()) {
-        return params.Role.trim();
-      }
-      if (typeof params.toolAction === "string" && params.toolAction.trim()) {
-        return params.toolAction.trim();
-      }
-    }
-    return toolName;
-  }
-
-  private parseAntigravityQuestions(
-    params: Record<string, unknown> | undefined
-  ): AgentQuestion[] {
-    if (!params || typeof params !== "object") return [];
-    let rawQuestions: unknown = params.questions;
-    if (typeof rawQuestions === "string") {
-      try {
-        rawQuestions = JSON.parse(rawQuestions);
-      } catch {
-        return [];
-      }
-    }
-    if (!Array.isArray(rawQuestions)) return [];
-
-    const result: AgentQuestion[] = [];
-    for (const item of rawQuestions) {
-      if (!item || typeof item !== "object") continue;
-      const qObj = item as Record<string, unknown>;
-      const question =
-        typeof qObj.question === "string" ? qObj.question.trim() : "";
-      if (!question) continue;
-      const header =
-        typeof qObj.header === "string" ? qObj.header.trim() : undefined;
-      const multiple = Boolean(qObj.is_multi_select ?? qObj.multiple);
-      const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
-      const options: AgentQuestionOption[] = [];
-      for (const opt of rawOpts) {
-        if (typeof opt === "string" && opt.trim()) {
-          options.push({ label: opt.trim() });
-        } else if (opt && typeof opt === "object") {
-          const o = opt as Record<string, unknown>;
-          const label = typeof o.label === "string" ? o.label.trim() : "";
-          if (label) {
-            const desc =
-              typeof o.description === "string"
-                ? o.description.trim()
-                : undefined;
-            options.push({ label, description: desc });
-          }
-        }
-      }
-      result.push({ header, question, options, multiple });
-    }
-    return result;
   }
 
   private execSqlite(dbPath: string, query: string): Promise<string> {

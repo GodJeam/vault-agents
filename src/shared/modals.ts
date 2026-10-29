@@ -260,9 +260,11 @@ export class FileSuggestModal extends SuggestModal<TFile> {
 
 export interface ModelItem {
   id: string;
+  label?: string;
   engine: EngineType;
   provider: string;
   isActive: boolean;
+  isCustom?: boolean;
 }
 
 export class ModelSuggestModal extends SuggestModal<ModelItem> {
@@ -270,12 +272,13 @@ export class ModelSuggestModal extends SuggestModal<ModelItem> {
     app: App,
     private plugin: OpencodePlugin,
     private items: ModelItem[],
+    private activeEngine: EngineType,
     private onPick: (item: ModelItem) => void
   ) {
     super(app);
     const t = (s: string) => this.plugin.t(s);
     this.setPlaceholder(
-      t("Search models... (e.g. gemini, claude, flash, deepseek)")
+      t("Search or type a custom model ID... (e.g. sonnet, gpt-5, gemini)")
     );
     this.setInstructions([
       { command: "↑↓", purpose: t("navigate") },
@@ -289,23 +292,50 @@ export class ModelSuggestModal extends SuggestModal<ModelItem> {
   }
 
   getSuggestions(query: string): ModelItem[] {
-    const q = query.trim().toLowerCase();
+    const raw = query.trim();
+    const q = raw.toLowerCase();
     if (!q) {
       return this.items.slice(0, 30);
     }
-    const filtered = this.items.filter(
+    const filtered = this.items
+      .filter(
+        (item) =>
+          item.id.toLowerCase().includes(q) ||
+          (item.label ?? "").toLowerCase().includes(q) ||
+          item.provider.toLowerCase().includes(q) ||
+          item.engine.toLowerCase().includes(q)
+      )
+      .slice(0, 29);
+
+    const exactExists = this.items.some(
       (item) =>
-        item.id.toLowerCase().includes(q) ||
-        item.provider.toLowerCase().includes(q) ||
-        item.engine.toLowerCase().includes(q)
+        item.engine === this.activeEngine && item.id.toLowerCase() === q
     );
-    return filtered.slice(0, 30);
+    if (!exactExists && /^[a-zA-Z0-9_.:/+-]+$/.test(raw)) {
+      const provider = this.plugin.registry.get(this.activeEngine);
+      const providerLabel =
+        provider?.costNote ||
+        provider?.descriptor.shortName ||
+        this.activeEngine;
+      filtered.push({
+        id: raw,
+        label: `${raw} ${this.plugin.t("(custom)")}`,
+        engine: this.activeEngine,
+        provider: providerLabel,
+        isActive: false,
+        isCustom: true,
+      });
+    }
+    return filtered;
   }
 
   renderSuggestion(item: ModelItem, el: HTMLElement): void {
     el.addClass("opencode-model-suggest-item");
     const titleEl = el.createDiv({ cls: "opencode-model-suggest-title" });
-    titleEl.createSpan({ text: item.id, cls: "opencode-model-suggest-name" });
+    titleEl.createSpan({
+      text: item.label || item.id,
+      cls: "opencode-model-suggest-name",
+    });
     if (item.isActive) {
       titleEl.createSpan({ text: "  ✓", cls: "opencode-model-suggest-check" });
     }

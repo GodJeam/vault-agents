@@ -1,12 +1,10 @@
-import { basename, isAbsolute, join } from "path";
+import { isAbsolute, join } from "path";
 import type {
   AgentProvider,
   ProviderDescriptor,
   RunnerHost,
 } from "../../core/provider";
 import type {
-  AgentQuestion,
-  AgentQuestionOption,
   EngineType,
   FinishInfo,
   RunHandle,
@@ -172,24 +170,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     }
 
     // 3. Ensure any OpenCode sessions saved in Obsidian histories are included
-    const histories = this.plugin.histories ?? {};
-    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
-    for (const [id, msgs] of Object.entries(histories)) {
-      if (seenIds.has(id)) continue;
-      const isOc =
-        sessionEngines[id] === "opencode" ||
-        (!sessionEngines[id] && /^ses_/.test(id));
-      if (isOc) {
-        const lastTs = msgs[msgs.length - 1]?.timestamp ?? Date.now();
-        sessions.push({
-          id,
-          title: this.fallbackSessionTitle(id),
-          updated: lastTs,
-          engine: "opencode",
-        });
-        seenIds.add(id);
-      }
-    }
+    sessions.push(...this.listHistorySessions("opencode", seenIds, /^ses_/));
 
     return sessions;
   }
@@ -589,7 +570,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
               : undefined;
 
           if (toolName === "question" || toolName === "ask_question") {
-            const questions = this.parseOpencodeQuestions(input);
+            const questions = this.parseCommonQuestions(input);
             const qTitle =
               questions[0]?.question || this.plugin.t("Agent question");
             if (questions.length > 0) {
@@ -608,7 +589,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
             break;
           }
 
-          const title = this.extractOpencodeToolTitle(
+          const title = this.extractCommonToolTitle(
             toolName,
             input,
             part.state?.title
@@ -669,97 +650,6 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       cb.onActivity?.(this.plugin.t("Thinking..."));
       cb.onReasoning(part.text, String(part.id));
     }
-  }
-
-  private extractOpencodeToolTitle(
-    toolName: string,
-    input: unknown,
-    stateTitle?: string
-  ): string {
-    const inp =
-      input && typeof input === "object"
-        ? (input as Record<string, unknown>)
-        : null;
-    if (inp) {
-      if (typeof inp.filePath === "string" && inp.filePath.trim()) {
-        return basename(inp.filePath.trim());
-      }
-      if (typeof inp.path === "string" && inp.path.trim()) {
-        return basename(inp.path.trim()) || inp.path.trim();
-      }
-      if (typeof inp.description === "string" && inp.description.trim()) {
-        return inp.description.trim();
-      }
-      if (typeof inp.command === "string" && inp.command.trim()) {
-        return inp.command.trim();
-      }
-      if (typeof inp.pattern === "string" && inp.pattern.trim()) {
-        return inp.pattern.trim();
-      }
-      if (typeof inp.url === "string" && inp.url.trim()) {
-        return inp.url.trim();
-      }
-      if (typeof inp.query === "string" && inp.query.trim()) {
-        return inp.query.trim();
-      }
-      if (Array.isArray(inp.todos) && inp.todos.length > 0) {
-        const doneCount = inp.todos.filter(
-          (t) =>
-            t &&
-            typeof t === "object" &&
-            (t as { status?: string }).status === "completed"
-        ).length;
-        const tasksWord = this.plugin.t("tasks");
-        const doneWord = this.plugin.t("done");
-        return `${inp.todos.length} ${tasksWord} (${doneCount} ${doneWord})`;
-      }
-    }
-    if (
-      stateTitle &&
-      stateTitle.trim() &&
-      stateTitle.trim().toLowerCase() !== toolName.toLowerCase()
-    ) {
-      return stateTitle.trim();
-    }
-    return toolName;
-  }
-
-  private parseOpencodeQuestions(input: unknown): AgentQuestion[] {
-    if (!input || typeof input !== "object") return [];
-    const inp = input as Record<string, unknown>;
-    const rawQuestions = inp.questions;
-    if (!Array.isArray(rawQuestions)) return [];
-
-    const result: AgentQuestion[] = [];
-    for (const item of rawQuestions) {
-      if (!item || typeof item !== "object") continue;
-      const qObj = item as Record<string, unknown>;
-      const question =
-        typeof qObj.question === "string" ? qObj.question.trim() : "";
-      if (!question) continue;
-      const header =
-        typeof qObj.header === "string" ? qObj.header.trim() : undefined;
-      const multiple = Boolean(qObj.multiple ?? qObj.is_multi_select);
-      const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
-      const options: AgentQuestionOption[] = [];
-      for (const opt of rawOpts) {
-        if (typeof opt === "string" && opt.trim()) {
-          options.push({ label: opt.trim() });
-        } else if (opt && typeof opt === "object") {
-          const o = opt as Record<string, unknown>;
-          const label = typeof o.label === "string" ? o.label.trim() : "";
-          if (label) {
-            const desc =
-              typeof o.description === "string"
-                ? o.description.trim()
-                : undefined;
-            options.push({ label, description: desc });
-          }
-        }
-      }
-      result.push({ header, question, options, multiple });
-    }
-    return result;
   }
 
   private errorMessage(err: unknown): string {

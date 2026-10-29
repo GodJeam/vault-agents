@@ -355,8 +355,75 @@ const IT: Record<string, string> = {
   "Extra high": "Extra alto",
   "Max": "Massimo",
   "Antigravity found:": "Antigravity trovato:",
+  "$1 settings": "Impostazioni $1",
+  "$1 found:": "$1 trovato:",
+  "Run '$1 --version' to verify the binary is reachable.":
+    "Esegue '$1 --version' per verificare che il binario sia raggiungibile.",
   "Run 'agy --version' to verify the binary is reachable.":
     "Esegue 'agy --version' per verificare che il binario sia raggiungibile.",
+  "Claude Code CLI": "Claude Code CLI",
+  "OpenAI Codex CLI": "OpenAI Codex CLI",
+  "Hermes Agent CLI (Nous Research)": "Hermes Agent CLI (Nous Research)",
+  "Pi Coding Agent CLI": "Pi Coding Agent CLI",
+  [
+    "Command or full path to the claude executable. Usually 'claude' " +
+      "is enough if it is on your PATH."
+  ]:
+    "Comando o percorso completo dell'eseguibile claude. Di solito " +
+    "basta 'claude' se è nel PATH.",
+  [
+    "Pick a Claude model (e.g. claude-sonnet-4-5, claude-opus-4-5, " +
+      "claude-haiku-4-5)."
+  ]:
+    "Scegli un modello Claude (es. claude-sonnet-4-5, claude-opus-4-5, " +
+    "claude-haiku-4-5).",
+  "Reasoning effort level passed to Claude Code.":
+    "Livello di ragionamento (effort) passato a Claude Code.",
+  [
+    "Command or full path to the codex executable. Usually 'codex' " +
+      "is enough if it is on your PATH."
+  ]:
+    "Comando o percorso completo dell'eseguibile codex. Di solito " +
+    "basta 'codex' se è nel PATH.",
+  "Pick an OpenAI Codex model (e.g. gpt-5-codex, o3, o4-mini).":
+    "Scegli un modello OpenAI Codex (es. gpt-5-codex, o3, o4-mini).",
+  "Sandbox mode": "Modalità sandbox",
+  "Filesystem sandbox policy when auto-approve is disabled.":
+    "Policy della sandbox sul filesystem quando l'auto-approve è disattivato.",
+  "Read-only": "Sola lettura",
+  "Workspace write": "Scrittura nel workspace",
+  "Full access": "Accesso completo",
+  [
+    "Command or full path to the hermes executable. Default is 'hermes' " +
+      "or '~/.hermes/bin/hermes'."
+  ]:
+    "Comando o percorso completo dell'eseguibile hermes. Il default è " +
+    "'hermes' o '~/.hermes/bin/hermes'.",
+  [
+    "Pick a model for Hermes Agent (e.g. anthropic/claude-sonnet-4, " +
+      "nous/hermes-4-405b)."
+  ]:
+    "Scegli un modello per Hermes Agent (es. anthropic/claude-sonnet-4, " +
+    "nous/hermes-4-405b).",
+  "Provider": "Provider",
+  "Optional Hermes backend provider (e.g. openrouter, nous, anthropic).":
+    "Provider backend opzionale per Hermes (es. openrouter, nous, anthropic).",
+  "e.g. openrouter": "es. openrouter",
+  [
+    "Command or full path to the pi executable. Usually 'pi' " +
+      "is enough if it is on your PATH."
+  ]:
+    "Comando o percorso completo dell'eseguibile pi. Di solito " +
+    "basta 'pi' se è nel PATH.",
+  [
+    "Pick a model for the Pi coding agent (e.g. claude-sonnet-4-5, " +
+      "gpt-5, gemini-2.5-pro)."
+  ]:
+    "Scegli un modello per l'agente Pi (es. claude-sonnet-4-5, " +
+    "gpt-5, gemini-2.5-pro).",
+  "Optional model provider for Pi (e.g. anthropic, openai, google).":
+    "Provider opzionale per Pi (es. anthropic, openai, google).",
+  "e.g. anthropic": "es. anthropic",
   [
     "Automatically allow tool permissions (bash, file edits, etc.). " +
       "Turn it off for extra safety."
@@ -387,6 +454,43 @@ const IT: Record<string, string> = {
   "Included ($0.00)": "Incluso ($0.00)",
   "Search models... (e.g. gemini, claude, flash, deepseek)":
     "Cerca modelli... (es. gemini, claude, flash, deepseek)",
+  "Search or type a custom model ID... (e.g. sonnet, gpt-5, gemini)":
+    "Cerca o digita un ID modello personalizzato... (es. sonnet, gpt-5, gemini)",
+  "Custom model ID": "ID modello personalizzato",
+  [
+    "Type any exact model ID or alias manually. Leave empty to use " +
+      "the CLI's own configured default model."
+  ]:
+    "Digita manualmente qualsiasi ID modello o alias esatto. Lascia vuoto " +
+    "per usare il modello predefinito configurato nella CLI.",
+  "(CLI default)": "(default della CLI)",
+  "(default from $1)": "(default di $1)",
+  "(default)": "(default)",
+  "default": "default",
+  [
+    "Leave on default to use your Claude CLI config, or pick an alias " +
+      "(sonnet, opus, haiku) / enter an exact model ID."
+  ]:
+    "Lascia su default per usare la configurazione della tua CLI Claude, " +
+    "oppure scegli un alias (sonnet, opus, haiku) o inserisci un ID modello.",
+  [
+    "Leave on default to use your ~/.codex/config.toml model, or enter " +
+      "an OpenAI model ID."
+  ]:
+    "Lascia su default per usare il modello in ~/.codex/config.toml, " +
+    "oppure inserisci un ID modello OpenAI.",
+  [
+    "Leave on default to use your ~/.hermes/config.yaml model, or enter " +
+      "a provider/model ID."
+  ]:
+    "Lascia su default per usare il modello in ~/.hermes/config.yaml, " +
+    "oppure inserisci un ID provider/modello.",
+  [
+    "Leave on default to use your Pi config, or pick a model from " +
+      "'pi --list-models'."
+  ]:
+    "Lascia su default per usare la configurazione di Pi, oppure scegli " +
+    "un modello da 'pi --list-models'.",
   "select": "seleziona",
 
   // --- live activity, human-friendly tools & interactive questions ---

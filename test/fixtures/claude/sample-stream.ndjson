@@ -1,0 +1,6 @@
+{"type":"system","subtype":"init","session_id":"claude-sess-001","model":"claude-sonnet-4-5"}
+{"type":"assistant","session_id":"claude-sess-001","message":{"id":"msg_1","role":"assistant","content":[{"type":"thinking","id":"th_1","thinking":"Checking the vault notes first..."},{"type":"tool_use","id":"toolu_01","name":"Read","input":{"file_path":"/vault/Roadmap.md"}}]}}
+{"type":"user","session_id":"claude-sess-001","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"# Roadmap\n- Phase 1","is_error":false}]}}
+{"type":"stream_event","session_id":"claude-sess-001","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"The roadmap contains "}}}
+{"type":"stream_event","session_id":"claude-sess-001","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Phase 1."}}}
+{"type":"result","session_id":"claude-sess-001","result":"The roadmap contains Phase 1.","total_cost_usd":0.0042,"usage":{"input_tokens":800,"output_tokens":150,"cache_read_input_tokens":200}}

@@ -1,0 +1,7 @@
+{"type":"thread.started","thread_id":"codex-thread-001"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_1","type":"reasoning","text":"Inspecting project files and running tests..."}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","status":"in_progress","command":"npm test"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","status":"completed","command":"npm test","aggregated_output":"All tests passed","exit_code":0}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"All unit tests are passing."}}
+{"type":"turn.completed","usage":{"input_tokens":1400,"cached_input_tokens":500,"output_tokens":95,"reasoning_tokens":60}}

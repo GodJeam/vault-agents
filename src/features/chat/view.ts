@@ -102,9 +102,7 @@ export class ChatView extends ItemView {
 
   assistantLabel(): string {
     const desc = this.getRunner().descriptor;
-    return desc.id === "opencode"
-      ? this.plugin.t(desc.shortName)
-      : desc.shortName;
+    return this.plugin.t(desc.shortName);
   }
 
   getViewType(): string {
@@ -648,9 +646,17 @@ export class ChatView extends ItemView {
   private updateModelBtn(): void {
     if (!this.modelBtn) return;
     const engine = this.sessionEngine();
+    const provider = this.plugin.registry.get(engine);
+    const shortName = provider?.descriptor.shortName || engine;
     const m = this.activeModelFor(engine);
-    this.modelBtn.setText(m.length > 30 ? m.slice(0, 27) + "…" : m);
-    this.modelBtn.setAttribute("title", `${m} (${this.engineLabel(engine)})`);
+    const display = m || `${shortName} (${this.plugin.t("default")})`;
+    this.modelBtn.setText(
+      display.length > 30 ? display.slice(0, 27) + "…" : display
+    );
+    this.modelBtn.setAttribute(
+      "title",
+      `${display} (${this.engineLabel(engine)})`
+    );
   }
 
   private async openModelList(): Promise<void> {
@@ -675,6 +681,18 @@ export class ChatView extends ItemView {
         const models = res.status === "fulfilled" ? res.value : [];
         const providerLabel =
           provider.costNote || provider.descriptor.shortName;
+        if (!provider.descriptor.defaultModel) {
+          items.push({
+            id: "",
+            label: substitute(
+              this.plugin.t("(default from $1)"),
+              provider.descriptor.shortName
+            ),
+            engine: provider.id,
+            provider: providerLabel,
+            isActive: provider.id === activeEngine && cur === "",
+          });
+        }
         for (const m of models) {
           items.push({
             id: m,
@@ -685,35 +703,42 @@ export class ChatView extends ItemView {
         }
       });
 
-      new ModelSuggestModal(this.app, this.plugin, items, (item) => {
-        const engineChanged = item.engine !== activeEngine;
-        this.plugin.settings.engine = item.engine;
-        const cfg = this.plugin.getEngineConfig(item.engine);
-        cfg.model = item.id;
+      new ModelSuggestModal(
+        this.app,
+        this.plugin,
+        items,
+        activeEngine,
+        (item) => {
+          const engineChanged = item.engine !== activeEngine;
+          this.plugin.settings.engine = item.engine;
+          const cfg = this.plugin.getEngineConfig(item.engine);
+          cfg.model = item.id;
 
-        const setPrefix = this.plugin.t("Model set:");
-        if (this.viewSession && engineChanged) {
-          // The open session belongs to another engine: start a fresh session
-          this.viewSession = "";
-          this.plugin.settings.sessionId = "";
-          void this.plugin.saveSettings();
-          this.loadHistoryForSession("");
-          new Notice(`${setPrefix} ${item.id} (${item.provider})`);
-          return;
-        }
-        if (this.viewSession) {
-          if (!this.plugin.settings.sessionEngines) {
-            this.plugin.settings.sessionEngines = {};
+          const shownModel = item.label || item.id;
+          const setPrefix = this.plugin.t("Model set:");
+          if (this.viewSession && engineChanged) {
+            // The open session belongs to another engine: start a fresh session
+            this.viewSession = "";
+            this.plugin.settings.sessionId = "";
+            void this.plugin.saveSettings();
+            this.loadHistoryForSession("");
+            new Notice(`${setPrefix} ${shownModel} (${item.provider})`);
+            return;
           }
-          this.plugin.settings.sessionEngines[this.viewSession] = item.engine;
+          if (this.viewSession) {
+            if (!this.plugin.settings.sessionEngines) {
+              this.plugin.settings.sessionEngines = {};
+            }
+            this.plugin.settings.sessionEngines[this.viewSession] = item.engine;
+          }
+          void this.plugin.saveSettings();
+          this.updateModelBtn();
+          this.updateStatsBar();
+          this.contextLimit = 0;
+          void this.refreshContext();
+          new Notice(`${setPrefix} ${shownModel} (${item.provider})`);
         }
-        void this.plugin.saveSettings();
-        this.updateModelBtn();
-        this.updateStatsBar();
-        this.contextLimit = 0;
-        void this.refreshContext();
-        new Notice(`${setPrefix} ${item.id} (${item.provider})`);
-      }).open();
+      ).open();
     } catch (e) {
       new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`);
     }
