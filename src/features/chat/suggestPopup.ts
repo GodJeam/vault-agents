@@ -5,6 +5,7 @@ import type { SuggestItem } from "./types";
 const MAX_SUGGEST = 50;
 
 export interface SuggestPopupCallbacks {
+  onOpenAgentList: () => void;
   onOpenModelList: () => void;
   onStartNewSession: () => void;
   onAttachCurrentNote: () => void;
@@ -222,6 +223,14 @@ export class SuggestPopup {
   private commandItems(): SuggestItem[] {
     return [
       {
+        label: this.plugin.t("/agent"),
+        desc: this.plugin.t("Change the AI agent"),
+        action: () => {
+          this.removeTrigger();
+          this.cb.onOpenAgentList();
+        },
+      },
+      {
         label: this.plugin.t("/model"),
         desc: this.plugin.t("Change the model"),
         action: () => {
@@ -355,6 +364,14 @@ export class SuggestPopup {
         action: () => {
           this.removeTrigger();
           this.cb.onTogglePin();
+        },
+      },
+      {
+        label: this.plugin.t("active agent"),
+        desc: this.plugin.t("Change the AI agent"),
+        action: () => {
+          this.removeTrigger();
+          this.cb.onOpenAgentList();
         },
       },
       {

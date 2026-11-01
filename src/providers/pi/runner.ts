@@ -1,3 +1,4 @@
+import { isAbsolute, join } from "path";
 import type {
   AgentProvider,
   ProviderDescriptor,
@@ -40,6 +41,22 @@ export const PI_DESCRIPTOR: ProviderDescriptor = {
       placeholder: "e.g. anthropic",
       default: "",
     },
+    {
+      key: "thinking",
+      label: "Reasoning effort",
+      desc: "Thinking level passed to Pi (--thinking).",
+      type: "select",
+      default: "",
+      choices: [
+        { value: "", label: "(default)" },
+        { value: "off", label: "Off" },
+        { value: "minimal", label: "Minimal" },
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium" },
+        { value: "high", label: "High" },
+        { value: "xhigh", label: "Extra high" },
+      ],
+    },
   ],
 };
 
@@ -57,6 +74,7 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
   readonly included = false;
 
   private cachedModels: string[] | null = null;
+  private cachedModelsBin = "";
 
   constructor(plugin: RunnerHost) {
     super(plugin);
@@ -78,21 +96,53 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async listModels(forceRefresh = false): Promise<string[]> {
-    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+    const bin = this.getBin();
+    if (
+      !forceRefresh &&
+      this.cachedModels &&
+      this.cachedModels.length > 0 &&
+      this.cachedModelsBin === bin
+    ) {
       return this.cachedModels;
     }
     try {
-      const out = await this.execCli(this.getBin(), ["--list-models"]);
+      const out = await this.execCli(bin, ["--list-models"]);
       const models: string[] = [];
       for (const line of out.split(/\r?\n/)) {
         const trimmed = line.trim();
-        if (!trimmed) continue;
-        const firstToken = trimmed.split(/\s+/)[0];
+        if (
+          !trimmed ||
+          trimmed.startsWith("No models") ||
+          trimmed.startsWith("Warning:") ||
+          trimmed.startsWith("/")
+        ) {
+          continue;
+        }
+        const cols = trimmed.split(/\s{2,}|\s+/);
+        if (cols.length >= 2) {
+          const prov = cols[0];
+          const mod = cols[1];
+          if (
+            prov.toLowerCase() === "provider" &&
+            mod.toLowerCase() === "model"
+          ) {
+            continue;
+          }
+          if (
+            /^[a-zA-Z0-9_.-]+$/.test(prov) &&
+            /^[a-zA-Z0-9_.:/+-]+$/.test(mod)
+          ) {
+            const full = mod.includes("/") ? mod : `${prov}/${mod}`;
+            if (!models.includes(full)) models.push(full);
+            continue;
+          }
+        }
+        const firstToken = cols[0];
         if (
           firstToken &&
           /^[a-zA-Z0-9_.:/+-]+$/.test(firstToken) &&
-          firstToken.toLowerCase() !== "model" &&
           firstToken.toLowerCase() !== "provider" &&
+          firstToken.toLowerCase() !== "model" &&
           !models.includes(firstToken)
         ) {
           models.push(firstToken);
@@ -100,6 +150,7 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
       }
       if (models.length > 0) {
         this.cachedModels = models;
+        this.cachedModelsBin = bin;
         return models;
       }
     } catch {
@@ -135,12 +186,6 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
     const cfg = this.getConfig();
     const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
 
-    const finalPrompt = this.inlinePromptAttachments(
-      req.prompt,
-      req.fileAttachments,
-      cwd
-    );
-
     const args = ["--print", "--mode", "json"];
 
     const sid = req.sessionId !== undefined ? req.sessionId : s.sessionId;
@@ -153,12 +198,23 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
       args.push("--model", model);
     }
 
-    const provider = cfg.options.provider;
-    if (provider) {
+    const provider = cfg.options.provider?.trim();
+    if (provider && !model.includes("/")) {
       args.push("--provider", provider);
     }
 
-    args.push(finalPrompt);
+    const thinking = cfg.options.thinking?.trim();
+    if (thinking && !model.includes(":")) {
+      args.push("--thinking", thinking);
+    }
+
+    // Pi natively supports `@<filepath>` for both text and image attachments
+    for (const f of req.fileAttachments) {
+      const fullPath = !isAbsolute(f) && cwd ? join(cwd, f) : f;
+      args.push(`@${fullPath}`);
+    }
+
+    args.push(req.prompt);
     return args;
   }
 
@@ -285,15 +341,17 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
 
     // 4. Message end / Agent end with final text and usage
     if (ev.type === "message_end" && ev.message) {
-      this.extractPiMessageUsage(ev.message, cb, state);
+      if (ev.message.role === "assistant") {
+        this.extractPiMessageUsage(ev.message, cb, state);
+      }
       return;
     }
 
     if (ev.type === "agent_end" && Array.isArray(ev.messages)) {
-      for (const msg of ev.messages) {
-        if (msg?.role === "assistant") {
-          this.extractPiMessageUsage(msg, cb, state);
-        }
+      const assistantMsgs = ev.messages.filter((m) => m?.role === "assistant");
+      const lastAssistant = assistantMsgs[assistantMsgs.length - 1];
+      if (lastAssistant) {
+        this.extractPiMessageUsage(lastAssistant, cb, state);
       }
       return;
     }
@@ -313,6 +371,9 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
     cb: StreamCallbacks,
     state: PiStreamState
   ): void {
+    if (msg.stopReason === "error" && msg.errorMessage) {
+      cb.onError(msg.errorMessage);
+    }
     if (Array.isArray(msg.content)) {
       for (const block of msg.content) {
         if (block?.type === "text" && typeof block.text === "string" && block.text.trim()) {

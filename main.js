@@ -257,6 +257,9 @@ var IT = {
   "User": "Utente",
   "Unknown error": "Errore sconosciuto",
   // --- suggestions ---
+  "/agent": "/agente",
+  "Change the AI agent": "Cambia l'agente AI",
+  "active agent": "agente attivo",
   "/model": "/modello",
   "Change the model": "Cambia il modello",
   "/new": "/nuova",
@@ -397,6 +400,10 @@ var IT = {
   "Optional model provider for Pi (e.g. anthropic, openai, google).":
     "Provider opzionale per Pi (es. anthropic, openai, google).",
   "e.g. anthropic": "es. anthropic",
+  "Thinking level passed to Pi (--thinking).":
+    "Livello di ragionamento passato a Pi (--thinking).",
+  "Off": "Disattivato",
+  "Minimal": "Minimo",
   ["Automatically allow tool permissions (bash, file edits, etc.). Turn " +
     "it off for extra safety."]:
     "Concede automaticamente i permessi degli strumenti (bash, edit file, " +
@@ -449,6 +456,15 @@ var IT = {
     "Lascia su default per usare la configurazione di Pi, oppure scegli un " +
     "modello da 'pi --list-models'.",
   "select": "seleziona",
+  "Select an AI Agent...": "Seleziona un Agente AI...",
+  "Search $1 models or type a custom ID...":
+    "Cerca i modelli di $1 o digita un ID personalizzato...",
+  "Installed": "Installato",
+  "Not found": "Non trovato",
+  "Default": "Default",
+  "Custom ID": "ID personalizzato",
+  "Select model...": "Scegli modello...",
+  "Reset to default": "Ripristina default",
   // --- live activity, human-friendly tools & interactive questions ---
   "Read file": "Lettura file",
   "Write file": "Scrittura file",
@@ -689,6 +705,78 @@ var FileSuggestModal = class extends import_obsidian.SuggestModal {
     this.onPick(file);
   }
 };
+var AgentSuggestModal = class extends import_obsidian.SuggestModal {
+  constructor(app, plugin, items, onPick) {
+    super(app);
+    this.plugin = plugin;
+    this.items = items;
+    this.onPick = onPick;
+    const t = (s) => this.plugin.t(s);
+    this.setPlaceholder(t("Select an AI Agent..."));
+    this.setInstructions([
+      { command: "↑↓", purpose: t("navigate") },
+      { command: "↵", purpose: t("select") },
+      { command: "esc", purpose: t("close") }
+    ]);
+  }
+  getItems() {
+    return this.items;
+  }
+  getSuggestions(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) return this.items;
+    return this.items.filter(
+      (item) => item.shortName.toLowerCase().includes(q) ||
+        item.displayName.toLowerCase().includes(q) ||
+          item.id.toLowerCase().includes(q) ||
+            item.activeModel.toLowerCase().includes(q)
+    );
+  }
+  renderSuggestion(item, el) {
+    const t = (s) => this.plugin.t(s);
+    el.addClass("opencode-agent-suggest-item");
+    if (item.isActive) el.addClass("is-selected");
+    const topRow = el.createDiv({ cls: "opencode-agent-suggest-top" });
+    const leftGroup = topRow.createDiv({ cls: "opencode-agent-suggest-left" });
+    const iconEl = leftGroup.createSpan({ cls: "opencode-agent-suggest-icon" });
+    (0, import_obsidian.setIcon)(iconEl, "bot");
+    leftGroup.createSpan({
+      text: item.shortName,
+      cls: "opencode-agent-suggest-name"
+    });
+    leftGroup.createSpan({
+      text: item.displayName,
+      cls: "opencode-agent-suggest-fullname"
+    });
+    const rightGroup =
+      topRow.createDiv({ cls: "opencode-agent-suggest-right" });
+    const statusBadge = rightGroup.createSpan({
+      cls:
+        "opencode-suggest-" +
+        "badge " + (item.installed ? "opencode-suggest-badge--ok" : "opencode-suggest-badge--muted"),
+      text: item.installed ? t("Installed") : t("Not found")
+    });
+    statusBadge.setAttribute("title", item.binary);
+    if (item.isActive) {
+      rightGroup.createSpan({
+        text: "✓",
+        cls: "opencode-model-suggest-check"
+      });
+    }
+    const bottomRow = el.createDiv({ cls: "opencode-agent-suggest-bottom" });
+    bottomRow.createSpan({
+      text: `${t("Model")}: `,
+      cls: "opencode-agent-suggest-meta-label"
+    });
+    bottomRow.createSpan({
+      text: item.activeModel || t("(CLI default)"),
+      cls: "opencode-agent-suggest-meta-val"
+    });
+  }
+  onChooseSuggestion(item) {
+    this.onPick(item);
+  }
+};
 var ModelSuggestModal = class extends import_obsidian.SuggestModal {
   constructor(app, plugin, items, activeEngine, onPick) {
     super(app);
@@ -697,8 +785,13 @@ var ModelSuggestModal = class extends import_obsidian.SuggestModal {
     this.activeEngine = activeEngine;
     this.onPick = onPick;
     const t = (s) => this.plugin.t(s);
+    const provider = this.plugin.registry.get(this.activeEngine);
+    const agentName = provider?.descriptor.shortName || this.activeEngine;
     this.setPlaceholder(
-      t("Search or type a custom model ID... (e.g. sonnet, gpt-5, gemini)")
+      substitute(
+        t("Search $1 models or type a custom ID..."),
+        agentName
+      )
     );
     this.setInstructions([
       { command: "↑↓", purpose: t("navigate") },
@@ -713,24 +806,23 @@ var ModelSuggestModal = class extends import_obsidian.SuggestModal {
     const raw = query.trim();
     const q = raw.toLowerCase();
     if (!q) {
-      return this.items.slice(0, 30);
+      return this.items.slice(0, 60);
     }
-    const filtered = this.items.filter(
-      (item) => item.id.toLowerCase().includes(q) || (item.label ??
-        "").toLowerCase().includes(q) ||
-          item.provider.toLowerCase().includes(q) ||
-            item.engine.toLowerCase().includes(q)
-    ).slice(0, 29);
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const filtered = this.items.filter((item) => {
+      const hay =
+        `${item.id} ${item.label ?? ""} ${item.provider}`.toLowerCase();
+      return tokens.every((tok) => hay.includes(tok));
+    }).slice(0, 59);
     const exactExists = this.items.some(
-      (item) => item.engine === this.activeEngine && item.id.toLowerCase() === q
+      (item) => item.id.toLowerCase() === q
     );
     if (!exactExists && /^[a-zA-Z0-9_.:/+-]+$/.test(raw)) {
       const provider = this.plugin.registry.get(this.activeEngine);
-      const providerLabel = provider?.costNote ||
-        provider?.descriptor.shortName || this.activeEngine;
+      const providerLabel = provider?.descriptor.shortName || this.activeEngine;
       filtered.push({
         id: raw,
-        label: `${raw} ${this.plugin.t("(custom)")}`,
+        label: raw,
         engine: this.activeEngine,
         provider: providerLabel,
         isActive: false,
@@ -740,22 +832,56 @@ var ModelSuggestModal = class extends import_obsidian.SuggestModal {
     return filtered;
   }
   renderSuggestion(item, el) {
+    const t = (s) => this.plugin.t(s);
     el.addClass("opencode-model-suggest-item");
+    if (item.isActive) el.addClass("is-selected");
+    const slashIdx = item.id.indexOf("/");
+    const vendorPrefix = !item.isDefault && !item.isCustom && slashIdx > 0 ?
+      item.id.slice(0, slashIdx) : "";
+    const shortModelName = vendorPrefix && slashIdx > 0 ?
+      item.id.slice(slashIdx + 1) : item.label || item.id;
     const titleEl = el.createDiv({ cls: "opencode-model-suggest-title" });
-    titleEl.createSpan({
-      text: item.label || item.id,
+    const leftEl = titleEl.createDiv({ cls: "opencode-model-suggest-left" });
+    const iconEl = leftEl.createSpan({ cls: "opencode-model-suggest-icon" });
+    (0, import_obsidian.setIcon)(iconEl, item.isDefault ? "sparkles" :
+      item.isCustom ? "edit-3" : "cpu");
+    leftEl.createSpan({
+      text: shortModelName,
       cls: "opencode-model-suggest-name"
     });
-    if (item.isActive) {
-      titleEl.createSpan({ text: "  ✓", cls: "opencode-model-suggest-check" });
+    const rightEl = titleEl.createDiv({ cls: "opencode-model-suggest-right" });
+    if (vendorPrefix) {
+      rightEl.createSpan({
+        text: vendorPrefix,
+        cls: "opencode-suggest-badge opencode-suggest-badge--vendor"
+      });
+    } else if (item.isDefault) {
+      rightEl.createSpan({
+        text: t("Default"),
+        cls: "opencode-suggest-badge opencode-suggest-badge--accent"
+      });
+    } else if (item.isCustom) {
+      rightEl.createSpan({
+        text: t("Custom ID"),
+        cls: "opencode-suggest-badge opencode-suggest-badge--accent"
+      });
     }
-    const activeSuffix = item.isActive ?
-      ` · ${this.plugin.t("active model")}` : "";
-    const descCls =
-      `opencode-model-suggest-desc opencode-model-suggest-desc--${item.engine}`;
+    if (item.isActive) {
+      rightEl.createSpan({ text: "✓", cls: "opencode-model-suggest-check" });
+    }
+    const subTextParts = [];
+    if (vendorPrefix) {
+      subTextParts.push(item.id);
+    } else {
+      subTextParts.push(item.provider);
+    }
+    if (item.isActive) {
+      subTextParts.push(t("active model"));
+    }
     el.createDiv({
-      cls: descCls,
-      text: item.provider + activeSuffix
+      cls:
+        `opencode-model-suggest-desc opencode-model-suggest-desc--${item.engine}`,
+      text: subTextParts.join(" · ")
     });
   }
   onChooseSuggestion(item) {
@@ -1604,6 +1730,14 @@ var SuggestPopup = class {
   commandItems() {
     return [
       {
+        label: this.plugin.t("/agent"),
+        desc: this.plugin.t("Change the AI agent"),
+        action: () => {
+          this.removeTrigger();
+          this.cb.onOpenAgentList();
+        }
+      },
+      {
         label: this.plugin.t("/model"),
         desc: this.plugin.t("Change the model"),
         action: () => {
@@ -1733,6 +1867,14 @@ var SuggestPopup = class {
         action: () => {
           this.removeTrigger();
           this.cb.onTogglePin();
+        }
+      },
+      {
+        label: this.plugin.t("active agent"),
+        desc: this.plugin.t("Change the AI agent"),
+        action: () => {
+          this.removeTrigger();
+          this.cb.onOpenAgentList();
         }
       },
       {
@@ -1909,6 +2051,7 @@ var ChatView = class extends import_obsidian6.ItemView {
   pinBtn;
   renameBtn;
   deleteBtn;
+  agentBtn;
   modelBtn;
   sendBtn;
   stopBtn;
@@ -2398,6 +2541,7 @@ var ChatView = class extends import_obsidian6.ItemView {
       this.app,
       this.plugin,
       {
+        onOpenAgentList: () => this.openAgentList(),
         onOpenModelList: () => void this.openModelList(),
         onStartNewSession: () => this.startNewSession(),
         onAttachCurrentNote: () => void this.attachCurrentNote(),
@@ -2421,9 +2565,18 @@ var ChatView = class extends import_obsidian6.ItemView {
       () => this.suggestPopup.onInputChange()
     );
     const buttons = inputArea.createDiv({ cls: "opencode-buttons" });
-    this.modelBtn = buttons.createEl("button", { cls: "opencode-model-btn" });
-    this.updateModelBtn();
+    const selectorGroup = buttons.createDiv({
+      cls: "opencode-selector-group"
+    });
+    this.agentBtn = selectorGroup.createEl("button", {
+      cls: "opencode-agent-btn"
+    });
+    this.agentBtn.addEventListener("click", () => this.openAgentList());
+    this.modelBtn = selectorGroup.createEl("button", {
+      cls: "opencode-model-btn"
+    });
     this.modelBtn.addEventListener("click", () => void this.openModelList());
+    this.updateModelBtn();
     buttons.createSpan({ cls: "opencode-buttons-spacer" });
     this.sendBtn = buttons.createEl("button", { cls: "opencode-send-btn" });
     this.sendBtn.setText(this.plugin.t("Send"));
@@ -2448,91 +2601,154 @@ var ChatView = class extends import_obsidian6.ItemView {
     });
   }
   updateModelBtn() {
-    if (!this.modelBtn) return;
     const engine = this.sessionEngine();
     const provider = this.plugin.registry.get(engine);
     const shortName = provider?.descriptor.shortName || engine;
     const m = this.activeModelFor(engine);
-    const display = m || `${shortName} (${this.plugin.t("default")})`;
-    this.modelBtn.setText(
-      display.length > 30 ? display.slice(0, 27) + "…" : display
-    );
-    this.modelBtn.setAttribute(
-      "title",
-      `${display} (${this.engineLabel(engine)})`
-    );
+    if (this.agentBtn) {
+      this.agentBtn.empty();
+      const iconEl = this.agentBtn.createSpan({ cls: "opencode-chip-icon" });
+      (0, import_obsidian6.setIcon)(iconEl, "bot");
+      this.agentBtn.createSpan({
+        text: this.plugin.t(shortName),
+        cls: "opencode-chip-text"
+      });
+      const chevEl = this.agentBtn.createSpan({ cls: "opencode-chip-chevron" });
+      (0, import_obsidian6.setIcon)(chevEl, "chevron-down");
+      this.agentBtn.setAttribute(
+        "title",
+        `${this.plugin.t("AI Engine")}: ${this.engineLabel(engine)}`
+      );
+    }
+    if (this.modelBtn) {
+      this.modelBtn.empty();
+      const iconEl = this.modelBtn.createSpan({ cls: "opencode-chip-icon" });
+      (0, import_obsidian6.setIcon)(iconEl, "cpu");
+      const slashIdx = m.indexOf("/");
+      const shortModel = m && slashIdx > 0 ? m.slice(slashIdx + 1) : m ||
+        this.plugin.t("Default");
+      const vendor = m && slashIdx > 0 ? m.slice(0, slashIdx) : "";
+      if (vendor) {
+        this.modelBtn.createSpan({
+          text: vendor,
+          cls: "opencode-chip-vendor"
+        });
+      }
+      const display = shortModel.length > 26 ? shortModel.slice(0, 24) + "…" :
+        shortModel;
+      this.modelBtn.createSpan({
+        text: display,
+        cls: "opencode-chip-text"
+      });
+      const chevEl = this.modelBtn.createSpan({ cls: "opencode-chip-chevron" });
+      (0, import_obsidian6.setIcon)(chevEl, "chevron-down");
+      this.modelBtn.setAttribute(
+        "title",
+        `${this.plugin.t("Model")}: ${m || this.plugin.t("(CLI default)")}`
+      );
+    }
+  }
+  openAgentList() {
+    const activeEngine = this.sessionEngine();
+    const providers = this.plugin.registry.getAll();
+    const items = providers.map((p) => {
+      const cfg = this.plugin.getEngineConfig(p.id);
+      const installed = p.isAvailable ? p.isAvailable() : true;
+      return {
+        id: p.id,
+        shortName: this.plugin.t(p.descriptor.shortName),
+        displayName: this.plugin.t(p.descriptor.displayName),
+        binary: cfg.binary || p.descriptor.defaultBinary,
+        activeModel: cfg.model || p.descriptor.defaultModel || "",
+        installed,
+        isActive: p.id === activeEngine
+      };
+    });
+    new AgentSuggestModal(this.app, this.plugin, items, (item) => {
+      const engineChanged = item.id !== activeEngine;
+      this.plugin.settings.engine = item.id;
+      if (this.viewSession && engineChanged) {
+        this.viewSession = "";
+        this.plugin.settings.sessionId = "";
+        void this.plugin.saveSettings();
+        this.loadHistoryForSession("");
+      } else {
+        void this.plugin.saveSettings();
+        this.updateModelBtn();
+        this.updateStatsBar();
+        this.contextLimit = 0;
+        void this.refreshContext();
+      }
+      new import_obsidian6.Notice(
+        `${this.plugin.t("AI Engine")}: ${item.shortName} (${item.activeModel || this.plugin.t("default")})`
+      );
+    }).open();
   }
   async openModelList() {
     const activeEngine = this.sessionEngine();
     const cur = this.activeModelFor(activeEngine);
+    const provider = this.plugin.registry.resolveProvider(activeEngine);
     try {
-      const providers = this.plugin.registry.getAll();
-      const orderedProviders = [
-        ...providers.filter((p) => p.id === activeEngine),
-        ...providers.filter((p) => p.id !== activeEngine)
-      ];
-      const results = await Promise.allSettled(
-        orderedProviders.map((p) => p.listModels())
-      );
+      const models = await provider.listModels();
+      const providerLabel = provider.costNote ||
+        this.plugin.t(provider.descriptor.shortName);
       const items = [];
-      orderedProviders.forEach((provider, idx) => {
-        const res = results[idx];
-        const models = res.status === "fulfilled" ? res.value : [];
-        const providerLabel = provider.costNote ||
-          provider.descriptor.shortName;
-        if (!provider.descriptor.defaultModel) {
-          items.push({
-            id: "",
-            label: substitute(
-              this.plugin.t("(default from $1)"),
-              provider.descriptor.shortName
-            ),
-            engine: provider.id,
-            provider: providerLabel,
-            isActive: provider.id === activeEngine && cur === ""
-          });
-        }
-        for (const m of models) {
-          items.push({
-            id: m,
-            engine: provider.id,
-            provider: providerLabel,
-            isActive: provider.id === activeEngine && m === cur
-          });
-        }
-      });
+      const seen = /* @__PURE__ */ new Set();
+      if (!provider.descriptor.defaultModel) {
+        items.push({
+          id: "",
+          label: substitute(
+            this.plugin.t("(default from $1)"),
+            provider.descriptor.shortName
+          ),
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: cur === "",
+          isDefault: true
+        });
+        seen.add("");
+      }
+      if (cur && !seen.has(cur)) {
+        items.push({
+          id: cur,
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: true
+        });
+        seen.add(cur);
+      }
+      for (const m of models) {
+        if (seen.has(m)) continue;
+        seen.add(m);
+        items.push({
+          id: m,
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: m === cur
+        });
+      }
       new ModelSuggestModal(
         this.app,
         this.plugin,
         items,
         activeEngine,
         (item) => {
-          const engineChanged = item.engine !== activeEngine;
-          this.plugin.settings.engine = item.engine;
-          const cfg = this.plugin.getEngineConfig(item.engine);
+          const cfg = this.plugin.getEngineConfig(activeEngine);
           cfg.model = item.id;
-          const shownModel = item.label || item.id;
-          const setPrefix = this.plugin.t("Model set:");
-          if (this.viewSession && engineChanged) {
-            this.viewSession = "";
-            this.plugin.settings.sessionId = "";
-            void this.plugin.saveSettings();
-            this.loadHistoryForSession("");
-            new import_obsidian6.Notice(
-              `${setPrefix} ${shownModel} (${item.provider})`);
-            return;
-          }
           if (this.viewSession) {
             if (!this.plugin.settings.sessionEngines) {
               this.plugin.settings.sessionEngines = {};
             }
-            this.plugin.settings.sessionEngines[this.viewSession] = item.engine;
+            this.plugin.settings.sessionEngines[this.viewSession] =
+              activeEngine;
           }
           void this.plugin.saveSettings();
           this.updateModelBtn();
           this.updateStatsBar();
           this.contextLimit = 0;
           void this.refreshContext();
+          const shownModel = item.label || item.id;
+          const setPrefix = this.plugin.t("Model set:");
           new import_obsidian6.Notice(
             `${setPrefix} ${shownModel} (${item.provider})`);
         }
@@ -3163,12 +3379,30 @@ var BaseCliRunner = class {
    */
   spawnBinary(bin, args, cwd, extraEnv) {
     const isWin = process.platform === "win32";
-    const env = cwd || extraEnv ? Object.assign(
+    const env = Object.assign(
       {},
       process.env,
       cwd ? { PWD: cwd } : void 0,
       extraEnv
-    ) : process.env;
+    );
+    if (!isWin) {
+      const home = (0, import_os.homedir)();
+      const extraDirs = [
+        (0, import_path.join)(home, ".local", "bin"),
+        (0, import_path.join)(home, ".opencode", "bin"),
+        (0, import_path.join)(home, ".gemini", "antigravity-cli", "bin"),
+        (0, import_path.join)(home, ".hermes", "bin"),
+        (0, import_path.join)(home, ".claude", "local"),
+        "/usr/local/bin",
+        "/usr/bin"
+      ];
+      const curPath = env.PATH || "";
+      const parts = curPath.split(":").filter(Boolean);
+      for (const d of extraDirs) {
+        if (!parts.includes(d)) parts.push(d);
+      }
+      env.PATH = parts.join(":");
+    }
     const options = {
       cwd,
       shell: isWin && (bin.endsWith(".cmd") || bin.endsWith(".bat")),
@@ -3261,6 +3495,15 @@ var BaseCliRunner = class {
     });
   }
   /**
+   * Check whether the CLI executable is installed and reachable on the system
+   */
+  isAvailable() {
+    const cfg = this.plugin.getEngineConfig(this.descriptor.id);
+    const binName = cfg.binary || this.descriptor.defaultBinary;
+    const bin = this.resolveBinaryPath(binName);
+    return (0, import_fs.existsSync)(bin);
+  }
+  /**
    * Resolve full path to a CLI executable, checking PATH and candidate folders
    */
   resolveBinaryPath(bin, candidatePaths = []) {
@@ -3287,7 +3530,11 @@ var BaseCliRunner = class {
       `/usr/local/bin/${bin}`,
       `/usr/bin/${bin}`
     ];
-    const allCandidates = [...candidatePaths, ...defaultCandidates];
+    const pathDirs = (process.env.PATH ??
+      "").split(process.platform === "win32" ? ";" :
+        ":").filter(Boolean).map((dir) => (0, import_path.join)(dir, bin));
+    const allCandidates =
+      [...candidatePaths, ...defaultCandidates, ...pathDirs];
     for (const p of allCandidates) {
       if ((0, import_fs.existsSync)(p)) {
         this.resolvedBinaries.set(bin, p);
@@ -4125,7 +4372,8 @@ var DEFAULT_ENGINE_CONFIGS = {
     binary: "pi",
     model: "",
     options: {
-      provider: ""
+      provider: "",
+      thinking: ""
     }
   }
 };
@@ -5628,6 +5876,7 @@ var HermesRunner = class extends BaseCliRunner {
 };
 
 // src/providers/pi/runner.ts
+var import_path7 = require("path");
 var PI_DESCRIPTOR = {
   id: "pi",
   displayName: "Pi Coding Agent CLI",
@@ -5652,6 +5901,22 @@ var PI_DESCRIPTOR = {
       type: "text",
       placeholder: "e.g. anthropic",
       default: ""
+    },
+    {
+      key: "thinking",
+      label: "Reasoning effort",
+      desc: "Thinking level passed to Pi (--thinking).",
+      type: "select",
+      default: "",
+      choices: [
+        { value: "", label: "(default)" },
+        { value: "off", label: "Off" },
+        { value: "minimal", label: "Minimal" },
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium" },
+        { value: "high", label: "High" },
+        { value: "xhigh", label: "Extra high" }
+      ]
     }
   ]
 };
@@ -5662,6 +5927,7 @@ var PiRunner = class extends BaseCliRunner {
   engine = "pi";
   included = false;
   cachedModels = null;
+  cachedModelsBin = "";
   constructor(plugin) {
     super(plugin);
   }
@@ -5678,25 +5944,46 @@ var PiRunner = class extends BaseCliRunner {
     return first;
   }
   async listModels(forceRefresh = false) {
-    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+    const bin = this.getBin();
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0 &&
+      this.cachedModelsBin === bin) {
       return this.cachedModels;
     }
     try {
-      const out = await this.execCli(this.getBin(), ["--list-models"]);
+      const out = await this.execCli(bin, ["--list-models"]);
       const models = [];
       for (const line of out.split(/\r?\n/)) {
         const trimmed = line.trim();
-        if (!trimmed) continue;
-        const firstToken = trimmed.split(/\s+/)[0];
+        if (!trimmed || trimmed.startsWith("No models") ||
+          trimmed.startsWith("Warning:") || trimmed.startsWith("/")) {
+          continue;
+        }
+        const cols = trimmed.split(/\s{2,}|\s+/);
+        if (cols.length >= 2) {
+          const prov = cols[0];
+          const mod = cols[1];
+          if (prov.toLowerCase() === "provider" &&
+            mod.toLowerCase() === "model") {
+            continue;
+          }
+          if (/^[a-zA-Z0-9_.-]+$/.test(prov) &&
+            /^[a-zA-Z0-9_.:/+-]+$/.test(mod)) {
+            const full = mod.includes("/") ? mod : `${prov}/${mod}`;
+            if (!models.includes(full)) models.push(full);
+            continue;
+          }
+        }
+        const firstToken = cols[0];
         if (firstToken && /^[a-zA-Z0-9_.:/+-]+$/.test(firstToken) &&
-          firstToken.toLowerCase() !== "model" &&
-            firstToken.toLowerCase() !== "provider" &&
+          firstToken.toLowerCase() !== "provider" &&
+            firstToken.toLowerCase() !== "model" &&
               !models.includes(firstToken)) {
           models.push(firstToken);
         }
       }
       if (models.length > 0) {
         this.cachedModels = models;
+        this.cachedModelsBin = bin;
         return models;
       }
     } catch {
@@ -5723,11 +6010,6 @@ var PiRunner = class extends BaseCliRunner {
     const s = this.plugin.settings;
     const cfg = this.getConfig();
     const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
-    const finalPrompt = this.inlinePromptAttachments(
-      req.prompt,
-      req.fileAttachments,
-      cwd
-    );
     const args = ["--print", "--mode", "json"];
     const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
     if (sid) {
@@ -5737,11 +6019,20 @@ var PiRunner = class extends BaseCliRunner {
     if (model) {
       args.push("--model", model);
     }
-    const provider = cfg.options.provider;
-    if (provider) {
+    const provider = cfg.options.provider?.trim();
+    if (provider && !model.includes("/")) {
       args.push("--provider", provider);
     }
-    args.push(finalPrompt);
+    const thinking = cfg.options.thinking?.trim();
+    if (thinking && !model.includes(":")) {
+      args.push("--thinking", thinking);
+    }
+    for (const f of req.fileAttachments) {
+      const fullPath = !(0, import_path7.isAbsolute)(f) && cwd ?
+        (0, import_path7.join)(cwd, f) : f;
+      args.push(`@${fullPath}`);
+    }
+    args.push(req.prompt);
     return args;
   }
   createStreamState() {
@@ -5846,14 +6137,16 @@ var PiRunner = class extends BaseCliRunner {
       return;
     }
     if (ev.type === "message_end" && ev.message) {
-      this.extractPiMessageUsage(ev.message, cb, state);
+      if (ev.message.role === "assistant") {
+        this.extractPiMessageUsage(ev.message, cb, state);
+      }
       return;
     }
     if (ev.type === "agent_end" && Array.isArray(ev.messages)) {
-      for (const msg of ev.messages) {
-        if (msg?.role === "assistant") {
-          this.extractPiMessageUsage(msg, cb, state);
-        }
+      const assistantMsgs = ev.messages.filter((m) => m?.role === "assistant");
+      const lastAssistant = assistantMsgs[assistantMsgs.length - 1];
+      if (lastAssistant) {
+        this.extractPiMessageUsage(lastAssistant, cb, state);
       }
       return;
     }
@@ -5864,6 +6157,9 @@ var PiRunner = class extends BaseCliRunner {
     }
   }
   extractPiMessageUsage(msg, cb, state) {
+    if (msg.stopReason === "error" && msg.errorMessage) {
+      cb.onError(msg.errorMessage);
+    }
     if (Array.isArray(msg.content)) {
       for (const block of msg.content) {
         if (block?.type === "text" && typeof block.text === "string" &&
@@ -5984,7 +6280,10 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
       )
     ).addDropdown((dd) => {
       for (const desc of descriptors) {
-        dd.addOption(desc.id, t(desc.displayName));
+        const prov = this.plugin.registry.get(desc.id);
+        const avail = prov?.isAvailable ? prov.isAvailable() : true;
+        const prefix = avail ? "● " : "○ ";
+        dd.addOption(desc.id, prefix + t(desc.displayName));
       }
       dd.setValue(activeDesc.id);
       dd.onChange(async (value) => {
@@ -5998,8 +6297,9 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
       t(activeDesc.displayName)
     );
     containerEl.createEl("h3", { text: sectionTitle });
-    new import_obsidian7.Setting(containerEl).setName(t("Binary path")).setDesc(
-      t(activeDesc.binaryDesc)).addText(
+    const binSetting =
+      new import_obsidian7.Setting(containerEl).setName(t("Binary path"))
+        .setDesc(t(activeDesc.binaryDesc)).addText(
       (text) =>
         text.setPlaceholder(activeDesc.defaultBinary).setValue(activeCfg.binary)
           .onChange(async (value) => {
@@ -6007,24 +6307,46 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName(t("Model")).setDesc(t(
-      activeDesc.modelDesc)).addDropdown((dd) => {
-      void this.populateProviderModelDropdown(dd, activeProvider);
+    if (activeCfg.binary && activeCfg.binary !== activeDesc.defaultBinary) {
+      binSetting.addExtraButton(
+        (btn) =>
+          btn.setIcon("rotate-ccw").setTooltip(t("Reset to default")).onClick(
+            async () => {
+          activeCfg.binary = activeDesc.defaultBinary;
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+    }
+    const curModel = activeCfg.model || activeDesc.defaultModel;
+    const defaultLabel = substitute(
+      t("(default from $1)"),
+      activeDesc.shortName
+    );
+    const modelSetting =
+      new import_obsidian7.Setting(containerEl).setName(t("Model")).setDesc(t(
+        activeDesc.modelDesc));
+    const badgeEl = modelSetting.controlEl.createSpan({
+      cls: "opencode-settings-model-badge" + (curModel ? "" : " is-default"),
+      text: curModel || defaultLabel
     });
-    new import_obsidian7.Setting(containerEl).setName(t("Custom model ID"))
-      .setDesc(
-      t(
-          "Type any exact model ID or alias manually. Leave empty to use " +
-          "the CLI's own configured default model."
-      )
-    ).addText(
-      (text) => text.setPlaceholder(activeDesc.defaultModel ||
-        t("(CLI default)")).setValue(activeCfg.model).onChange(async (value) =>
-          {
-        activeCfg.model = value.trim();
-        await this.plugin.saveSettings();
+    badgeEl.setAttribute("title", curModel || defaultLabel);
+    modelSetting.addButton(
+      (btn) => btn.setButtonText(t("Select model...")).setCta().onClick(() => {
+        void this.openProviderModelModal(activeProvider);
       })
     );
+    if (activeCfg.model && activeCfg.model !== activeDesc.defaultModel) {
+      modelSetting.addExtraButton(
+        (btn) =>
+          btn.setIcon("rotate-ccw").setTooltip(t("Reset to default")).onClick(
+            async () => {
+          activeCfg.model = activeDesc.defaultModel;
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+    }
     for (const opt of activeDesc.options) {
       const setting =
         new import_obsidian7.Setting(containerEl).setName(t(opt.label)).setDesc(
@@ -6304,42 +6626,62 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
       }
     ).open();
   }
-  async populateProviderModelDropdown(dd, provider) {
+  async openProviderModelModal(provider) {
     const t = (s) => this.plugin.t(s);
     const desc = provider.descriptor;
     const cfg = this.plugin.getEngineConfig(desc.id);
     const cur = cfg.model || desc.defaultModel;
+    const providerLabel = provider.costNote || t(desc.shortName);
+    const items = [];
     const seen = /* @__PURE__ */ new Set();
-    const addOption = (val, display) => {
-      if (seen.has(val)) return;
-      seen.add(val);
-      dd.addOption(val, display);
-    };
-    if (!desc.included) {
-      addOption("", substitute(t("(default from $1)"), desc.shortName));
+    if (!desc.defaultModel) {
+      items.push({
+        id: "",
+        label: substitute(t("(default from $1)"), desc.shortName),
+        engine: desc.id,
+        provider: providerLabel,
+        isActive: cur === "",
+        isDefault: true
+      });
+      seen.add("");
     }
-    if (cur) {
-      addOption(cur, cur);
+    if (cur && !seen.has(cur)) {
+      items.push({
+        id: cur,
+        engine: desc.id,
+        provider: providerLabel,
+        isActive: true
+      });
+      seen.add(cur);
     }
     try {
       const models = await provider.listModels();
-      for (const m of models) addOption(m, m);
-      dd.setValue(cur || "");
-    } catch (e) {
-      if (desc.defaultModel) {
-        addOption(desc.defaultModel, desc.defaultModel);
+      for (const m of models) {
+        if (seen.has(m)) continue;
+        seen.add(m);
+        items.push({
+          id: m,
+          engine: desc.id,
+          provider: providerLabel,
+          isActive: m === cur
+        });
       }
-      const opt = dd.selectEl.createEl("option");
-      opt.value = "__error__";
-      opt.textContent = `${t("Error:")} ${e.message}`;
-      opt.disabled = true;
-      dd.setValue(cur || desc.defaultModel || "");
+    } catch {
     }
-    dd.onChange(async (val) => {
-      cfg.model = val;
-      await this.plugin.saveSettings();
-      this.display();
-    });
+    new ModelSuggestModal(
+      this.app,
+      this.plugin,
+      items,
+      desc.id,
+      async (item) => {
+        cfg.model = item.id;
+        await this.plugin.saveSettings();
+        this.display();
+        const shownModel = item.label || item.id;
+        new import_obsidian7.Notice(
+          `${t("Model set:")} ${shownModel} (${item.provider})`);
+      }
+    ).open();
   }
 };
 

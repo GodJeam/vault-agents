@@ -260,6 +260,9 @@ const IT: Record<string, string> = {
   "Unknown error": "Errore sconosciuto",
 
   // --- suggestions ---
+  "/agent": "/agente",
+  "Change the AI agent": "Cambia l'agente AI",
+  "active agent": "agente attivo",
   "/model": "/modello",
   "Change the model": "Cambia il modello",
   "/new": "/nuova",
@@ -424,6 +427,10 @@ const IT: Record<string, string> = {
   "Optional model provider for Pi (e.g. anthropic, openai, google).":
     "Provider opzionale per Pi (es. anthropic, openai, google).",
   "e.g. anthropic": "es. anthropic",
+  "Thinking level passed to Pi (--thinking).":
+    "Livello di ragionamento passato a Pi (--thinking).",
+  "Off": "Disattivato",
+  "Minimal": "Minimo",
   [
     "Automatically allow tool permissions (bash, file edits, etc.). " +
       "Turn it off for extra safety."
@@ -492,6 +499,15 @@ const IT: Record<string, string> = {
     "Lascia su default per usare la configurazione di Pi, oppure scegli " +
     "un modello da 'pi --list-models'.",
   "select": "seleziona",
+  "Select an AI Agent...": "Seleziona un Agente AI...",
+  "Search $1 models or type a custom ID...":
+    "Cerca i modelli di $1 o digita un ID personalizzato...",
+  "Installed": "Installato",
+  "Not found": "Non trovato",
+  "Default": "Default",
+  "Custom ID": "ID personalizzato",
+  "Select model...": "Scegli modello...",
+  "Reset to default": "Ripristina default",
 
   // --- live activity, human-friendly tools & interactive questions ---
   "Read file": "Lettura file",

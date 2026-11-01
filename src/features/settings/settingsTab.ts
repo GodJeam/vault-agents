@@ -1,12 +1,15 @@
 import {
   App,
-  DropdownComponent,
   Notice,
   PluginSettingTab,
   Setting,
 } from "obsidian";
 import type OpencodePlugin from "../../main";
-import { PromptModal } from "../../shared/modals";
+import {
+  ModelSuggestModal,
+  PromptModal,
+  type ModelItem,
+} from "../../shared/modals";
 import { substitute, type Language } from "../../i18n";
 import type { EngineType } from "../../core/types";
 import type { AgentProvider } from "../../core/provider";
@@ -68,7 +71,10 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
       )
       .addDropdown((dd) => {
         for (const desc of descriptors) {
-          dd.addOption(desc.id, t(desc.displayName));
+          const prov = this.plugin.registry.get(desc.id);
+          const avail = prov?.isAvailable ? prov.isAvailable() : true;
+          const prefix = avail ? "● " : "○ ";
+          dd.addOption(desc.id, prefix + t(desc.displayName));
         }
         dd.setValue(activeDesc.id);
         dd.onChange(async (value) => {
@@ -85,7 +91,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
     );
     containerEl.createEl("h3", { text: sectionTitle });
 
-    new Setting(containerEl)
+    const binSetting = new Setting(containerEl)
       .setName(t("Binary path"))
       .setDesc(t(activeDesc.binaryDesc))
       .addText((text) =>
@@ -98,30 +104,57 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(containerEl)
-      .setName(t("Model"))
-      .setDesc(t(activeDesc.modelDesc))
-      .addDropdown((dd) => {
-        void this.populateProviderModelDropdown(dd, activeProvider);
-      });
-
-    new Setting(containerEl)
-      .setName(t("Custom model ID"))
-      .setDesc(
-        t(
-          "Type any exact model ID or alias manually. Leave empty to use " +
-            "the CLI's own configured default model."
-        )
-      )
-      .addText((text) =>
-        text
-          .setPlaceholder(activeDesc.defaultModel || t("(CLI default)"))
-          .setValue(activeCfg.model)
-          .onChange(async (value) => {
-            activeCfg.model = value.trim();
+    if (activeCfg.binary && activeCfg.binary !== activeDesc.defaultBinary) {
+      binSetting.addExtraButton((btn) =>
+        btn
+          .setIcon("rotate-ccw")
+          .setTooltip(t("Reset to default"))
+          .onClick(async () => {
+            activeCfg.binary = activeDesc.defaultBinary;
             await this.plugin.saveSettings();
+            this.display();
           })
       );
+    }
+
+    const curModel = activeCfg.model || activeDesc.defaultModel;
+    const defaultLabel = substitute(
+      t("(default from $1)"),
+      activeDesc.shortName
+    );
+    const modelSetting = new Setting(containerEl)
+      .setName(t("Model"))
+      .setDesc(t(activeDesc.modelDesc));
+
+    const badgeEl = modelSetting.controlEl.createSpan({
+      cls:
+        "opencode-settings-model-badge" +
+        (curModel ? "" : " is-default"),
+      text: curModel || defaultLabel,
+    });
+    badgeEl.setAttribute("title", curModel || defaultLabel);
+
+    modelSetting.addButton((btn) =>
+      btn
+        .setButtonText(t("Select model..."))
+        .setCta()
+        .onClick(() => {
+          void this.openProviderModelModal(activeProvider);
+        })
+    );
+
+    if (activeCfg.model && activeCfg.model !== activeDesc.defaultModel) {
+      modelSetting.addExtraButton((btn) =>
+        btn
+          .setIcon("rotate-ccw")
+          .setTooltip(t("Reset to default"))
+          .onClick(async () => {
+            activeCfg.model = activeDesc.defaultModel;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
+    }
 
     // Render descriptor-defined engine options (e.g. effort, agent, etc.)
     for (const opt of activeDesc.options) {
@@ -464,48 +497,66 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
     ).open();
   }
 
-  private async populateProviderModelDropdown(
-    dd: DropdownComponent,
-    provider: AgentProvider
-  ): Promise<void> {
+  private async openProviderModelModal(provider: AgentProvider): Promise<void> {
     const t = (s: string) => this.plugin.t(s);
     const desc = provider.descriptor;
     const cfg = this.plugin.getEngineConfig(desc.id);
     const cur = cfg.model || desc.defaultModel;
+    const providerLabel = provider.costNote || t(desc.shortName);
+    const items: ModelItem[] = [];
     const seen = new Set<string>();
-    const addOption = (val: string, display: string) => {
-      if (seen.has(val)) return;
-      seen.add(val);
-      dd.addOption(val, display);
-    };
 
-    if (!desc.included) {
-      addOption("", substitute(t("(default from $1)"), desc.shortName));
+    if (!desc.defaultModel) {
+      items.push({
+        id: "",
+        label: substitute(t("(default from $1)"), desc.shortName),
+        engine: desc.id,
+        provider: providerLabel,
+        isActive: cur === "",
+        isDefault: true,
+      });
+      seen.add("");
     }
-    if (cur) {
-      addOption(cur, cur);
+
+    if (cur && !seen.has(cur)) {
+      items.push({
+        id: cur,
+        engine: desc.id,
+        provider: providerLabel,
+        isActive: true,
+      });
+      seen.add(cur);
     }
 
     try {
       const models = await provider.listModels();
-      for (const m of models) addOption(m, m);
-      dd.setValue(cur || "");
-    } catch (e) {
-      if (desc.defaultModel) {
-        addOption(desc.defaultModel, desc.defaultModel);
+      for (const m of models) {
+        if (seen.has(m)) continue;
+        seen.add(m);
+        items.push({
+          id: m,
+          engine: desc.id,
+          provider: providerLabel,
+          isActive: m === cur,
+        });
       }
-      const opt = dd.selectEl.createEl("option");
-      opt.value = "__error__";
-      opt.textContent = `${t("Error:")} ${(e as Error).message}`;
-      opt.disabled = true;
-      dd.setValue(cur || desc.defaultModel || "");
+    } catch {
+      // If listing fails, the user can still type a custom model ID
     }
 
-    dd.onChange(async (val) => {
-      cfg.model = val;
-      await this.plugin.saveSettings();
-      this.display();
-    });
+    new ModelSuggestModal(
+      this.app,
+      this.plugin,
+      items,
+      desc.id,
+      async (item) => {
+        cfg.model = item.id;
+        await this.plugin.saveSettings();
+        this.display();
+        const shownModel = item.label || item.id;
+        new Notice(`${t("Model set:")} ${shownModel} (${item.provider})`);
+      }
+    ).open();
   }
 }
 
