@@ -665,18 +665,43 @@ test("CodexRunner parses sample-stream.ndjson and builds CLI args", () => {
 });
 
 test("HermesRunner parses sample-stream.ndjson and builds CLI args", () => {
-  const host = createMockHost();
+  const host = createMockHost({
+    autoApprove: true,
+    engines: {
+      hermes: {
+        binary: "hermes",
+        model: "deepseek-v4.1-flash",
+        options: { provider: "custom", reasoning: "medium" },
+      },
+    },
+  });
   const runner = new HermesRunner(host);
   const col = createCollector();
 
-  const args = runner.buildArgs({
+  const newArgs = runner.buildArgs({
+    prompt: "Inspect repo",
+    fileAttachments: [],
+  });
+  assert.equal(newArgs[0], "chat");
+  assert.ok(newArgs.includes("--format"));
+  assert.ok(newArgs.includes("--yolo"));
+  assert.equal(newArgs[newArgs.indexOf("--model") + 1], "deepseek-v4.1-flash");
+  assert.equal(newArgs[newArgs.indexOf("--provider") + 1], "custom");
+  assert.equal(newArgs[newArgs.indexOf("--reasoning") + 1], "medium");
+
+  // On resume, Hermes refuses creation overrides (--yolo, --model, --provider, --reasoning)
+  const resumeArgs = runner.buildArgs({
     prompt: "Inspect repo",
     fileAttachments: [],
     sessionId: "hermes-sess-001",
   });
-  assert.equal(args[0], "chat");
-  assert.ok(args.includes("--format"));
-  assert.equal(args[args.indexOf("--resume") + 1], "hermes-sess-001");
+  assert.equal(resumeArgs[0], "chat");
+  assert.ok(resumeArgs.includes("--format"));
+  assert.equal(resumeArgs[resumeArgs.indexOf("--resume") + 1], "hermes-sess-001");
+  assert.equal(resumeArgs.includes("--yolo"), false);
+  assert.equal(resumeArgs.includes("--model"), false);
+  assert.equal(resumeArgs.includes("--provider"), false);
+  assert.equal(resumeArgs.includes("--reasoning"), false);
 
   const fixturePath = join(
     process.cwd(),
