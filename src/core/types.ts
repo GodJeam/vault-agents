@@ -168,20 +168,6 @@ export const DEFAULT_ENGINE_CONFIGS: Record<string, EngineConfig> = {
       agent: "",
     },
   },
-  claude: {
-    binary: "claude",
-    model: "",
-    options: {
-      effort: "",
-    },
-  },
-  codex: {
-    binary: "codex",
-    model: "",
-    options: {
-      sandbox: "workspace-write",
-    },
-  },
   hermes: {
     binary: "hermes",
     model: "",

@@ -8,8 +8,8 @@
  * Usage in Obsidian Settings -> Binary path:
  *   /absolute/path/to/vault-agents/test/mock-cli.mjs
  *
- * Or create symlinks named `claude`, `codex`, `hermes`, `pi`, `agy`, `opencode`
- * pointing to this script, or pass `MOCK_ENGINE=claude` in the environment.
+ * Or create symlinks named `hermes`, `pi`, `agy`, `opencode`
+ * pointing to this script, or pass `MOCK_ENGINE=hermes` in the environment.
  */
 import { readFileSync, existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -23,20 +23,18 @@ function detectEngine() {
   if (process.env.MOCK_ENGINE) {
     return process.env.MOCK_ENGINE.toLowerCase();
   }
-  const known = ["antigravity", "agy", "opencode", "claude", "codex", "hermes", "pi"];
+  const known = ["antigravity", "agy", "opencode", "hermes", "pi"];
   for (const k of known) {
     if (invokedName.toLowerCase().includes(k)) {
       return k === "agy" ? "antigravity" : k;
     }
   }
   // Heuristics based on CLI flags passed by each runner:
-  if (args[0] === "exec" && args.includes("--json")) return "codex";
   if (args[0] === "chat" && args.includes("-q")) return "hermes";
   if (args.includes("--mode") && args.includes("json")) return "pi";
   if (args[0] === "run" && args.includes("--format")) return "opencode";
-  if (args.includes("--verbose") && args.includes("stream-json")) return "claude";
   if (args.includes("stream-json")) return "antigravity";
-  return "claude";
+  return "hermes";
 }
 
 const engine = detectEngine();
@@ -52,12 +50,10 @@ if (args[0] === "models" || args.includes("--list-models")) {
   const modelsByEngine = {
     antigravity: ["gemini-3.8-flash-high", "claude-sonnet-5-5-high"],
     opencode: ["opencode-go/deepseek-v4.1-flash", "anthropic/claude-sonnet-4"],
-    claude: ["sonnet", "opus", "haiku"],
-    codex: ["o3", "o4-mini"],
     hermes: ["nous/hermes-4-405b", "anthropic/claude-sonnet-4"],
     pi: ["claude-sonnet-4-5", "gpt-5"],
   };
-  for (const m of modelsByEngine[engine] || modelsByEngine.claude) {
+  for (const m of modelsByEngine[engine] || modelsByEngine.hermes) {
     console.log(m);
   }
   process.exit(0);

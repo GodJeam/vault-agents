@@ -3,8 +3,6 @@ import { CHAT_VIEW_TYPE, ChatView } from "./features/chat";
 import {
   OpencodeRunner,
   AntigravityRunner,
-  ClaudeRunner,
-  CodexRunner,
   HermesRunner,
   PiRunner,
 } from "./providers";
@@ -68,8 +66,6 @@ export default class OpencodePlugin extends Plugin implements RunnerHost {
     this.registry = new ProviderRegistry();
     this.registry.register(this.opencodeRunner);
     this.registry.register(this.antigravityRunner);
-    this.registry.register(new ClaudeRunner(this));
-    this.registry.register(new CodexRunner(this));
     this.registry.register(new HermesRunner(this));
     this.registry.register(new PiRunner(this));
 

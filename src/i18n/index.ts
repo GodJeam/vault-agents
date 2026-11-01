@@ -364,38 +364,8 @@ const IT: Record<string, string> = {
     "Esegue '$1 --version' per verificare che il binario sia raggiungibile.",
   "Run 'agy --version' to verify the binary is reachable.":
     "Esegue 'agy --version' per verificare che il binario sia raggiungibile.",
-  "Claude Code CLI": "Claude Code CLI",
-  "OpenAI Codex CLI": "OpenAI Codex CLI",
   "Hermes Agent CLI (Nous Research)": "Hermes Agent CLI (Nous Research)",
   "Pi Coding Agent CLI": "Pi Coding Agent CLI",
-  [
-    "Command or full path to the claude executable. Usually 'claude' " +
-      "is enough if it is on your PATH."
-  ]:
-    "Comando o percorso completo dell'eseguibile claude. Di solito " +
-    "basta 'claude' se è nel PATH.",
-  [
-    "Pick a Claude model (e.g. claude-sonnet-4-5, claude-opus-4-5, " +
-      "claude-haiku-4-5)."
-  ]:
-    "Scegli un modello Claude (es. claude-sonnet-4-5, claude-opus-4-5, " +
-    "claude-haiku-4-5).",
-  "Reasoning effort level passed to Claude Code.":
-    "Livello di ragionamento (effort) passato a Claude Code.",
-  [
-    "Command or full path to the codex executable. Usually 'codex' " +
-      "is enough if it is on your PATH."
-  ]:
-    "Comando o percorso completo dell'eseguibile codex. Di solito " +
-    "basta 'codex' se è nel PATH.",
-  "Pick an OpenAI Codex model (e.g. gpt-5-codex, o3, o4-mini).":
-    "Scegli un modello OpenAI Codex (es. gpt-5-codex, o3, o4-mini).",
-  "Sandbox mode": "Modalità sandbox",
-  "Filesystem sandbox policy when auto-approve is disabled.":
-    "Policy della sandbox sul filesystem quando l'auto-approve è disattivato.",
-  "Read-only": "Sola lettura",
-  "Workspace write": "Scrittura nel workspace",
-  "Full access": "Accesso completo",
   [
     "Command or full path to the hermes executable. Default is 'hermes' " +
       "or '~/.hermes/bin/hermes'."
@@ -474,18 +444,6 @@ const IT: Record<string, string> = {
   "(default from $1)": "(default di $1)",
   "(default)": "(default)",
   "default": "default",
-  [
-    "Leave on default to use your Claude CLI config, or pick an alias " +
-      "(sonnet, opus, haiku) / enter an exact model ID."
-  ]:
-    "Lascia su default per usare la configurazione della tua CLI Claude, " +
-    "oppure scegli un alias (sonnet, opus, haiku) o inserisci un ID modello.",
-  [
-    "Leave on default to use your ~/.codex/config.toml model, or enter " +
-      "an OpenAI model ID."
-  ]:
-    "Lascia su default per usare il modello in ~/.codex/config.toml, " +
-    "oppure inserisci un ID modello OpenAI.",
   [
     "Leave on default to use your ~/.hermes/config.yaml model, or enter " +
       "a provider/model ID."

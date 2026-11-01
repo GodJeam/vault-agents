@@ -16,8 +16,6 @@ import type { RunnerHost } from "../src/core/provider";
 import { ProviderRegistry } from "../src/core/registry";
 import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
-import { ClaudeRunner } from "../src/providers/claude/runner";
-import { CodexRunner } from "../src/providers/codex/runner";
 import { HermesRunner } from "../src/providers/hermes/runner";
 import { PiRunner } from "../src/providers/pi/runner";
 import { formatToolAction } from "../src/features/chat/stepWidget";
@@ -561,109 +559,6 @@ test("Runners compute total tokens and read history fallback", async () => {
   assert.equal(ctxTokens.output, 120);
 });
 
-test("ClaudeRunner parses sample-stream.ndjson and builds CLI args", () => {
-  const hostDefault = createMockHost({ autoApprove: true });
-  const runnerDefault = new ClaudeRunner(hostDefault);
-  const defaultArgs = runnerDefault.buildArgs({
-    prompt: "Check Roadmap",
-    fileAttachments: [],
-  });
-  // By default, ClaudeRunner uses the CLI's own configured model and effort
-  assert.equal(defaultArgs.includes("--model"), false);
-  assert.equal(defaultArgs.includes("--effort"), false);
-
-  const host = createMockHost({
-    autoApprove: true,
-    engines: {
-      claude: {
-        binary: "claude",
-        model: "sonnet",
-        options: { effort: "high" },
-      },
-    },
-  });
-  const runner = new ClaudeRunner(host);
-  const col = createCollector();
-
-  const args = runner.buildArgs({
-    prompt: "Check Roadmap",
-    fileAttachments: [],
-    sessionId: "claude-sess-001",
-  });
-  assert.ok(args.includes("--dangerously-skip-permissions"));
-  assert.ok(args.includes("--verbose"));
-  assert.equal(args[args.indexOf("--resume") + 1], "claude-sess-001");
-  assert.equal(args[args.indexOf("--model") + 1], "sonnet");
-  assert.equal(args[args.indexOf("--effort") + 1], "high");
-
-  const fixturePath = join(
-    process.cwd(),
-    "test/fixtures/claude/sample-stream.ndjson"
-  );
-  const lines = readFileSync(fixturePath, "utf-8").split("\n").filter(Boolean);
-  const state = {
-    accumulatedText: "",
-    accumulatedReasoning: "",
-    toolNames: new Map(),
-    emittedQuestions: new Set<string>(),
-  };
-  for (const line of lines) {
-    runner.handleLine(line, col.cb, state);
-  }
-
-  assert.equal(col.sessions[0], "claude-sess-001");
-  assert.equal(col.reasonings[0].text, "Checking the vault notes first...");
-  assert.equal(col.steps.length, 2);
-  assert.equal(col.steps[0].state, "running");
-  assert.equal(col.steps[0].title, "Roadmap.md");
-  assert.equal(col.steps[1].state, "completed");
-  assert.equal(col.texts.at(-1)?.text, "The roadmap contains Phase 1.");
-  assert.equal(col.finishes.length, 1);
-  assert.equal(col.finishes[0].tokens?.total, 950);
-  assert.equal(col.finishes[0].tokens?.cache?.read, 200);
-  assert.equal(col.finishes[0].cost, 0.0042);
-});
-
-test("CodexRunner parses sample-stream.ndjson and builds CLI args", () => {
-  const host = createMockHost({ autoApprove: true });
-  const runner = new CodexRunner(host);
-  const col = createCollector();
-
-  const args = runner.buildArgs({
-    prompt: "Run tests",
-    fileAttachments: [],
-    sessionId: "codex-thread-001",
-  });
-  assert.equal(args[0], "exec");
-  assert.ok(args.includes("--json"));
-  assert.ok(args.includes("--full-auto"));
-  assert.equal(args[args.indexOf("resume") + 1], "codex-thread-001");
-
-  const fixturePath = join(
-    process.cwd(),
-    "test/fixtures/codex/sample-stream.ndjson"
-  );
-  const lines = readFileSync(fixturePath, "utf-8").split("\n").filter(Boolean);
-  const state = { accumulatedText: "" };
-  for (const line of lines) {
-    runner.handleLine(line, col.cb, state);
-  }
-
-  assert.equal(col.sessions[0], "codex-thread-001");
-  assert.equal(
-    col.reasonings[0].text,
-    "Inspecting project files and running tests..."
-  );
-  assert.equal(col.steps.length, 2);
-  assert.equal(col.steps[0].state, "running");
-  assert.equal(col.steps[0].title, "npm test");
-  assert.equal(col.steps[1].state, "completed");
-  assert.equal(col.texts.at(-1)?.text, "All unit tests are passing.");
-  assert.equal(col.finishes.length, 1);
-  assert.equal(col.finishes[0].tokens?.total, 1555);
-  assert.equal(col.finishes[0].tokens?.cache?.read, 500);
-});
-
 test("HermesRunner parses sample-stream.ndjson and builds CLI args", () => {
   const host = createMockHost({
     autoApprove: true,
@@ -773,20 +668,20 @@ test("Mock CLI Simulator executes end-to-end with runners", async () => {
   const mockCliPath = join(process.cwd(), "test/mock-cli.mjs");
   const host = createMockHost({
     engines: {
-      claude: {
+      hermes: {
         binary: mockCliPath,
-        model: "claude-sonnet-4-5",
-        options: { effort: "high" },
+        model: "deepseek-v4.1-flash",
+        options: { provider: "opencode-go", reasoning: "medium" },
       },
     },
   });
-  const claude = new ClaudeRunner(host);
-  const version = await claude.getVersion();
-  assert.match(version, /claude-mock 1\.0\.0/);
+  const hermes = new HermesRunner(host);
+  const version = await hermes.getVersion();
+  assert.match(version, /hermes-mock 1\.0\.0/);
 
   const col = createCollector();
   await new Promise<void>((resolve) => {
-    claude.runStream(
+    hermes.runStream(
       { prompt: "Hello mock", fileAttachments: [], cwd: process.cwd() },
       {
         ...col.cb,
@@ -799,8 +694,11 @@ test("Mock CLI Simulator executes end-to-end with runners", async () => {
   });
 
   assert.equal(col.dones[0], 0);
-  assert.equal(col.sessions[0], "claude-sess-001");
-  assert.equal(col.texts.at(-1)?.text, "The roadmap contains Phase 1.");
+  assert.equal(col.sessions[0], "hermes-sess-001");
+  assert.equal(
+    col.texts.at(-1)?.text,
+    "I inspected the directory and found README.md."
+  );
 
   // PiRunner dynamically queries `--list-models`
   const hostPi = createMockHost({

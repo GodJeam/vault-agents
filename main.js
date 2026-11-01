@@ -349,33 +349,8 @@ var IT = {
   "Run 'agy --version' to verify the binary is reachable.":
     "Esegue 'agy --version' per verificare che il binario sia " +
     "raggiungibile.",
-  "Claude Code CLI": "Claude Code CLI",
-  "OpenAI Codex CLI": "OpenAI Codex CLI",
   "Hermes Agent CLI (Nous Research)": "Hermes Agent CLI (Nous Research)",
   "Pi Coding Agent CLI": "Pi Coding Agent CLI",
-  ["Command or full path to the claude executable. Usually 'claude' is " +
-    "enough if it is on your PATH."]:
-    "Comando o percorso completo dell'eseguibile claude. Di solito basta " +
-    "'claude' se è nel PATH.",
-  ["Pick a Claude model (e.g. claude-sonnet-4-5, claude-opus-4-5, claude-" +
-    "haiku-4-5)."]:
-    "Scegli un modello Claude (es. claude-sonnet-4-5, claude-opus-4-5, " +
-    "claude-haiku-4-5).",
-  "Reasoning effort level passed to Claude Code.":
-    "Livello di ragionamento (effort) passato a Claude Code.",
-  ["Command or full path to the codex executable. Usually 'codex' is " +
-    "enough if it is on your PATH."]:
-    "Comando o percorso completo dell'eseguibile codex. Di solito basta " +
-    "'codex' se è nel PATH.",
-  "Pick an OpenAI Codex model (e.g. gpt-5-codex, o3, o4-mini).":
-    "Scegli un modello OpenAI Codex (es. gpt-5-codex, o3, o4-mini).",
-  "Sandbox mode": "Modalità sandbox",
-  "Filesystem sandbox policy when auto-approve is disabled.":
-    "Policy della sandbox sul filesystem quando l'auto-approve è " +
-    "disattivato.",
-  "Read-only": "Sola lettura",
-  "Workspace write": "Scrittura nel workspace",
-  "Full access": "Accesso completo",
   ["Command or full path to the hermes executable. Default is 'hermes' " +
     "or '~/.hermes/bin/hermes'."]:
     "Comando o percorso completo dell'eseguibile hermes. Il default è " +
@@ -438,15 +413,6 @@ var IT = {
   "(default from $1)": "(default di $1)",
   "(default)": "(default)",
   "default": "default",
-  ["Leave on default to use your Claude CLI config, or pick an alias " +
-    "(sonnet, opus, haiku) / enter an exact model ID."]:
-    "Lascia su default per usare la configurazione della tua CLI Claude, " +
-    "oppure scegli un alias (sonnet, opus, haiku) o inserisci un ID " +
-    "modello.",
-  ["Leave on default to use your ~/.codex/config.toml model, or enter an " +
-    "OpenAI model ID."]:
-    "Lascia su default per usare il modello in ~/.codex/config.toml, " +
-    "oppure inserisci un ID modello OpenAI.",
   ["Leave on default to use your ~/.hermes/config.yaml model, or enter a " +
     "provider/model ID."]:
     "Lascia su default per usare il modello in ~/.hermes/config.yaml, " +
@@ -4477,20 +4443,6 @@ var DEFAULT_ENGINE_CONFIGS = {
       agent: ""
     }
   },
-  claude: {
-    binary: "claude",
-    model: "",
-    options: {
-      effort: ""
-    }
-  },
-  codex: {
-    binary: "codex",
-    model: "",
-    options: {
-      sandbox: "workspace-write"
-    }
-  },
   hermes: {
     binary: "hermes",
     model: "",
@@ -5169,582 +5121,10 @@ var OpencodeRunner = class extends BaseCliRunner {
   }
 };
 
-// src/providers/claude/runner.ts
+// src/providers/hermes/runner.ts
 var import_fs3 = require("fs");
 var import_os3 = require("os");
 var import_path4 = require("path");
-var CLAUDE_DESCRIPTOR = {
-  id: "claude",
-  displayName: "Claude Code CLI",
-  shortName: "Claude",
-  icon: "brain-circuit",
-  defaultBinary: "claude",
-  defaultModel: "",
-  binaryDesc:
-    "Command or full path to the claude executable. Usually 'claude' is " +
-    "enough if it is on your PATH.",
-  modelDesc:
-    "Leave on default to use your Claude CLI config, or pick an alias " +
-    "(sonnet, opus, haiku) / enter an exact model ID.",
-  included: false,
-  supportsSessions: "local-db",
-  supportsUsageStats: true,
-  supportsDbCleanup: false,
-  options: [
-    {
-      key: "effort",
-      label: "Reasoning effort",
-      desc: "Reasoning effort level passed to Claude Code.",
-      type: "select",
-      default: "",
-      choices: [
-        { value: "", label: "(default)" },
-        { value: "low", label: "Low" },
-        { value: "medium", label: "Medium" },
-        { value: "high", label: "High" }
-      ]
-    }
-  ]
-};
-var ClaudeRunner = class extends BaseCliRunner {
-  descriptor = CLAUDE_DESCRIPTOR;
-  id = "claude";
-  displayName = "Claude Code CLI";
-  engine = "claude";
-  included = false;
-  cachedModels = null;
-  constructor(plugin) {
-    super(plugin);
-  }
-  getConfig() {
-    return this.plugin.getEngineConfig("claude");
-  }
-  getBin() {
-    return this.resolveBinaryPath(this.getConfig().binary || "claude");
-  }
-  async getVersion() {
-    const out = await this.execCli(this.getBin(), ["--version"]);
-    const first = out.trim().split("\n")[0];
-    if (!first) throw new Error("Empty output from claude --version");
-    return first;
-  }
-  async listModels(forceRefresh = false) {
-    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
-      return this.cachedModels;
-    }
-    const models = ["sonnet", "opus", "haiku", "opusplan"];
-    try {
-      const cfgPath =
-        (0, import_path4.join)((0, import_os3.homedir)(), ".claude",
-          "settings.json");
-      if ((0, import_fs3.existsSync)(cfgPath)) {
-        const parsed =
-          JSON.parse((0, import_fs3.readFileSync)(cfgPath, "utf-8"));
-        if (typeof parsed.model === "string" && parsed.model.trim() &&
-          !models.includes(parsed.model.trim())) {
-          models.unshift(parsed.model.trim());
-        }
-      }
-    } catch {
-    }
-    this.cachedModels = models;
-    return models;
-  }
-  async listSessions() {
-    return this.listHistorySessions("claude");
-  }
-  async renameSession(_sessionId, _title) {
-  }
-  async deleteSession(_sessionId) {
-  }
-  async getModelContextLimit(model) {
-    return this.estimateModelContextLimit(model, 2e5);
-  }
-  async getSessionTokens(sessionId) {
-    return this.getHistorySessionTokens(sessionId);
-  }
-  async getUsageStats() {
-    return this.computeHistoryUsageStats("claude");
-  }
-  buildArgs(req) {
-    const s = this.plugin.settings;
-    const cfg = this.getConfig();
-    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
-    const finalPrompt = this.inlinePromptAttachments(
-      req.prompt,
-      req.fileAttachments,
-      cwd
-    );
-    const args = [
-      "-p",
-      finalPrompt,
-      "--output-format",
-      "stream-json",
-      "--verbose"
-    ];
-    if (s.autoApprove) {
-      args.push("--dangerously-skip-permissions");
-    }
-    const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
-    if (sid) {
-      args.push("--resume", sid);
-    }
-    const model = cfg.model.trim();
-    if (model) {
-      args.push("--model", model);
-    }
-    const effort = cfg.options.effort;
-    if (effort) {
-      args.push("--effort", effort);
-    }
-    return args;
-  }
-  createStreamState() {
-    return {
-      accumulatedText: "",
-      accumulatedReasoning: "",
-      toolNames: /* @__PURE__ */ new Map(),
-      emittedQuestions: /* @__PURE__ */ new Set()
-    };
-  }
-  runStream(reqOrPrompt, fileAttachmentsOrCb, maybeCb) {
-    const { req, cb } = this.normalizeRunArgs(
-      reqOrPrompt,
-      fileAttachmentsOrCb,
-      maybeCb
-    );
-    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
-    const args = this.buildArgs({ ...req, cwd });
-    const bin = this.getBin();
-    const state = this.createStreamState();
-    return this.spawnJsonlStream(
-      bin,
-      args,
-      cwd,
-      (line) => this.handleLine(line, cb, state),
-      cb
-    );
-  }
-  handleLine(line, cb, state = this.createStreamState()) {
-    if (line.length > MAX_STREAM_LINE_BYTES) {
-      cb.onRaw?.(`[omitted event of ${line.length} bytes]
-`);
-      return;
-    }
-    let ev;
-    try {
-      ev = JSON.parse(line);
-    } catch {
-      cb.onRaw?.(line + "\n");
-      return;
-    }
-    if (typeof ev.session_id === "string" && ev.session_id) {
-      cb.onSession(ev.session_id);
-    }
-    if (ev.type === "system") {
-      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
-      return;
-    }
-    if (ev.type === "stream_event" && ev.event) {
-      const delta = ev.event.delta;
-      if (delta?.type === "text_delta" && typeof delta.text === "string") {
-        state.accumulatedText += delta.text;
-        cb.onActivity?.(this.plugin.t("Writing response..."));
-        cb.onText(state.accumulatedText, String(ev.event.index ?? 0));
-      } else if (delta?.type === "thinking_delta" &&
-        typeof delta.thinking === "string") {
-        state.accumulatedReasoning += delta.thinking;
-        cb.onActivity?.(this.plugin.t("Thinking..."));
-        cb.onReasoning(state.accumulatedReasoning, String(ev.event.index ?? 0));
-      }
-      return;
-    }
-    if (ev.type === "assistant" && ev.message) {
-      const blocks = Array.isArray(ev.message.content) ? ev.message.content :
-        [];
-      for (const block of blocks) {
-        if (!block || typeof block !== "object") continue;
-        if (block.type === "thinking" && typeof block.thinking === "string") {
-          state.accumulatedReasoning = block.thinking;
-          cb.onActivity?.(this.plugin.t("Thinking..."));
-          cb.onReasoning(block.thinking, String(block.id ?? "thinking"));
-        } else if (block.type === "text" && typeof block.text === "string") {
-          state.accumulatedText = block.text;
-          cb.onActivity?.(this.plugin.t("Writing response..."));
-          cb.onText(block.text, String(block.id ?? "text"));
-        } else if (block.type === "tool_use") {
-          const toolName = String(block.name || "tool");
-          const stepId = String(block.id || `step-${Date.now()}-${toolName}`);
-          const input = block.input;
-          if (toolName === "AskUserQuestion" || toolName === "ask_question" ||
-            toolName === "question") {
-            const questions = this.parseCommonQuestions(input);
-            const qTitle = questions[0]?.question ||
-              this.plugin.t("Agent question");
-            if (questions.length > 0 && !state.emittedQuestions.has(stepId)) {
-              state.emittedQuestions.add(stepId);
-              cb.onQuestion?.(questions);
-            }
-            cb.onActivity?.(this.plugin.t("Waiting for your answer..."));
-            cb.onStep({
-              id: stepId,
-              tool: toolName,
-              title: qTitle,
-              state: "completed",
-              input
-            });
-            continue;
-          }
-          const title = this.extractCommonToolTitle(toolName, input);
-          state.toolNames.set(stepId, { name: toolName, title, input });
-          cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
-          cb.onStep({
-            id: stepId,
-            tool: toolName,
-            title,
-            state: "running",
-            input
-          });
-        }
-      }
-      return;
-    }
-    if (ev.type === "user" && ev.message) {
-      const blocks = Array.isArray(ev.message.content) ? ev.message.content :
-        [];
-      for (const block of blocks) {
-        if (block?.type === "tool_result" && block.tool_use_id) {
-          const stepId = String(block.tool_use_id);
-          const meta = state.toolNames.get(stepId);
-          const toolName = meta?.name || "tool";
-          const title = meta?.title || toolName;
-          const isErr = Boolean(block.is_error);
-          cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
-          cb.onStep({
-            id: stepId,
-            tool: toolName,
-            title,
-            state: isErr ? "error" : "completed",
-            input: meta?.input,
-            output: block.content
-          });
-        }
-      }
-      return;
-    }
-    if (ev.type === "result") {
-      if (ev.is_error) {
-        const errText = typeof ev.result === "string" && ev.result.trim() ?
-          ev.result.trim() : this.plugin.t("Unknown error");
-        cb.onError(errText);
-        return;
-      }
-      if (typeof ev.result === "string" && ev.result.trim()) {
-        state.accumulatedText = ev.result;
-        cb.onText(state.accumulatedText, "final");
-      }
-      const u = ev.usage ?? {};
-      const input = Number(u.input_tokens ?? 0);
-      const output = Number(u.output_tokens ?? 0);
-      const cacheRead = Number(u.cache_read_input_tokens ?? 0);
-      const cacheWrite = Number(u.cache_creation_input_tokens ?? 0);
-      const cost = typeof ev.total_cost_usd === "number" ? ev.total_cost_usd :
-        typeof ev.cost_usd === "number" ? ev.cost_usd : void 0;
-      cb.onFinish({
-        tokens: {
-          total: input + output,
-          input,
-          output,
-          cache: cacheRead > 0 || cacheWrite > 0 ?
-            { read: cacheRead, write: cacheWrite } : void 0
-        },
-        cost
-      });
-      return;
-    }
-    if (ev.type === "error" || ev.error) {
-      const msg = typeof ev.error === "string" ? ev.error :
-        ev.error?.message || JSON.stringify(ev.error || ev);
-      cb.onError(String(msg));
-    }
-  }
-};
-
-// src/providers/codex/runner.ts
-var import_fs4 = require("fs");
-var import_os4 = require("os");
-var import_path5 = require("path");
-var CODEX_DESCRIPTOR = {
-  id: "codex",
-  displayName: "OpenAI Codex CLI",
-  shortName: "Codex",
-  icon: "code-2",
-  defaultBinary: "codex",
-  defaultModel: "",
-  binaryDesc:
-    "Command or full path to the codex executable. Usually 'codex' is " +
-    "enough if it is on your PATH.",
-  modelDesc:
-    "Leave on default to use your ~/.codex/config.toml model, or enter an " +
-    "OpenAI model ID.",
-  included: false,
-  supportsSessions: "local-db",
-  supportsUsageStats: true,
-  supportsDbCleanup: false,
-  options: [
-    {
-      key: "sandbox",
-      label: "Sandbox mode",
-      desc: "Filesystem sandbox policy when auto-approve is disabled.",
-      type: "select",
-      default: "workspace-write",
-      choices: [
-        { value: "read-only", label: "Read-only" },
-        { value: "workspace-write", label: "Workspace write" },
-        { value: "danger-full-access", label: "Full access" }
-      ]
-    }
-  ]
-};
-var CodexRunner = class extends BaseCliRunner {
-  descriptor = CODEX_DESCRIPTOR;
-  id = "codex";
-  displayName = "OpenAI Codex CLI";
-  engine = "codex";
-  included = false;
-  cachedModels = null;
-  constructor(plugin) {
-    super(plugin);
-  }
-  getConfig() {
-    return this.plugin.getEngineConfig("codex");
-  }
-  getBin() {
-    return this.resolveBinaryPath(this.getConfig().binary || "codex");
-  }
-  async getVersion() {
-    const out = await this.execCli(this.getBin(), ["--version"]);
-    const first = out.trim().split("\n")[0];
-    if (!first) throw new Error("Empty output from codex --version");
-    return first;
-  }
-  async listModels(forceRefresh = false) {
-    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
-      return this.cachedModels;
-    }
-    const models = [];
-    try {
-      const cfgPath =
-        (0, import_path5.join)((0, import_os4.homedir)(), ".codex",
-          "config.toml");
-      if ((0, import_fs4.existsSync)(cfgPath)) {
-        const raw = (0, import_fs4.readFileSync)(cfgPath, "utf-8");
-        const m = raw.match(/^\s*model\s*=\s*["']([^"']+)["']/m);
-        if (m && m[1].trim()) {
-          models.push(m[1].trim());
-        }
-      }
-    } catch {
-    }
-    for (const def of ["o3", "o4-mini"]) {
-      if (!models.includes(def)) models.push(def);
-    }
-    this.cachedModels = models;
-    return models;
-  }
-  async listSessions() {
-    return this.listHistorySessions("codex");
-  }
-  async renameSession(_sessionId, _title) {
-  }
-  async deleteSession(_sessionId) {
-  }
-  async getModelContextLimit(model) {
-    return this.estimateModelContextLimit(model, 2e5);
-  }
-  async getSessionTokens(sessionId) {
-    return this.getHistorySessionTokens(sessionId);
-  }
-  async getUsageStats() {
-    return this.computeHistoryUsageStats("codex");
-  }
-  buildArgs(req) {
-    const s = this.plugin.settings;
-    const cfg = this.getConfig();
-    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
-    const finalPrompt = this.inlinePromptAttachments(
-      req.prompt,
-      req.fileAttachments,
-      cwd
-    );
-    const args = ["exec", "--json", "--skip-git-repo-check"];
-    const model = cfg.model.trim();
-    if (model) {
-      args.push("--model", model);
-    }
-    if (s.autoApprove) {
-      args.push("--full-auto");
-    } else {
-      const sandbox = cfg.options.sandbox || "workspace-write";
-      args.push("--sandbox", sandbox);
-    }
-    const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
-    if (sid) {
-      args.push("resume", sid, finalPrompt);
-    } else {
-      args.push(finalPrompt);
-    }
-    return args;
-  }
-  runStream(reqOrPrompt, fileAttachmentsOrCb, maybeCb) {
-    const { req, cb } = this.normalizeRunArgs(
-      reqOrPrompt,
-      fileAttachmentsOrCb,
-      maybeCb
-    );
-    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
-    const args = this.buildArgs({ ...req, cwd });
-    const bin = this.getBin();
-    const state = { accumulatedText: "" };
-    return this.spawnJsonlStream(
-      bin,
-      args,
-      cwd,
-      (line) => this.handleLine(line, cb, state),
-      cb
-    );
-  }
-  handleLine(line, cb, state = { accumulatedText: "" }) {
-    if (line.length > MAX_STREAM_LINE_BYTES) {
-      cb.onRaw?.(`[omitted event of ${line.length} bytes]
-`);
-      return;
-    }
-    let ev;
-    try {
-      ev = JSON.parse(line);
-    } catch {
-      cb.onRaw?.(line + "\n");
-      return;
-    }
-    if (ev.type === "thread.started") {
-      if (typeof ev.thread_id === "string" && ev.thread_id) {
-        cb.onSession(ev.thread_id);
-      }
-      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
-      return;
-    }
-    if (ev.type === "turn.started") {
-      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
-      return;
-    }
-    if ((ev.type === "item.started" || ev.type === "item.updated" ||
-      ev.type === "item.completed" || ev.type === "item.failed") && ev.item) {
-      this.handleItemEvent(ev.type, ev.item, cb, state);
-      return;
-    }
-    if (ev.type === "turn.completed") {
-      const u = ev.usage ?? {};
-      const input = Number(u.input_tokens ?? 0);
-      const cached = Number(u.cached_input_tokens ?? 0);
-      const output = Number(u.output_tokens ?? 0);
-      const reasoning = Number(u.reasoning_tokens ?? 0);
-      cb.onFinish({
-        tokens: {
-          total: input + output + reasoning,
-          input,
-          output,
-          reasoning,
-          cache: cached > 0 ? { read: cached, write: 0 } : void 0
-        }
-      });
-      return;
-    }
-    if (ev.type === "turn.failed" || ev.type === "error" || ev.error) {
-      const msg = typeof ev.error === "string" ? ev.error :
-        ev.error?.message || ev.message || JSON.stringify(ev.error || ev);
-      cb.onError(String(msg));
-    }
-  }
-  handleItemEvent(eventType, item, cb, state) {
-    const itemId = String(item.id || `item-${Date.now()}`);
-    const isCompleted = eventType === "item.completed";
-    const isFailed = eventType === "item.failed" || item.status === "failed" ||
-      typeof item.exit_code === "number" && item.exit_code !== 0;
-    if (item.type === "reasoning") {
-      if (typeof item.text === "string" && item.text) {
-        cb.onActivity?.(this.plugin.t("Thinking..."));
-        cb.onReasoning(item.text, itemId);
-      }
-      return;
-    }
-    if (item.type === "agent_message") {
-      if (typeof item.text === "string" && item.text) {
-        state.accumulatedText = item.text;
-        cb.onActivity?.(this.plugin.t("Writing response..."));
-        cb.onText(state.accumulatedText, itemId);
-      }
-      return;
-    }
-    if (item.type === "command_execution") {
-      const title = item.command?.trim() || "bash";
-      if (!isCompleted && !isFailed) {
-        cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
-      } else {
-        cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
-      }
-      cb.onStep({
-        id: itemId,
-        tool: "bash",
-        title,
-        state: isFailed ? "error" : isCompleted ? "completed" : "running",
-        input: item.command ? { command: item.command } : void 0,
-        output: item.aggregated_output
-      });
-      return;
-    }
-    if (item.type === "file_change") {
-      const firstPath = item.changes?.[0]?.path || "";
-      const title = firstPath ? (0, import_path5.basename)(firstPath) : "file";
-      cb.onStep({
-        id: itemId,
-        tool: "edit_file",
-        title,
-        state: isFailed ? "error" : isCompleted ? "completed" : "running",
-        input: item.changes
-      });
-      return;
-    }
-    if (item.type === "web_search") {
-      const title = item.query || "search_web";
-      cb.onStep({
-        id: itemId,
-        tool: "search_web",
-        title,
-        state: isFailed ? "error" : isCompleted ? "completed" : "running",
-        input: item.query ? { query: item.query } : void 0
-      });
-      return;
-    }
-    if (item.type === "mcp_tool_call") {
-      const toolName = item.tool || "tool";
-      const title = this.extractCommonToolTitle(toolName, item.arguments);
-      cb.onStep({
-        id: itemId,
-        tool: toolName,
-        title,
-        state: isFailed ? "error" : isCompleted ? "completed" : "running",
-        input: item.arguments,
-        output: item.result
-      });
-    }
-  }
-};
-
-// src/providers/hermes/runner.ts
-var import_fs5 = require("fs");
-var import_os5 = require("os");
-var import_path6 = require("path");
 var HERMES_DESCRIPTOR = {
   id: "hermes",
   displayName: "Hermes Agent CLI (Nous Research)",
@@ -5808,7 +5188,7 @@ var HermesRunner = class extends BaseCliRunner {
   }
   getHermesHome() {
     return process.env.HERMES_HOME ||
-      (0, import_path6.join)((0, import_os5.homedir)(), ".hermes");
+      (0, import_path4.join)((0, import_os3.homedir)(), ".hermes");
   }
   /**
    * Resolve the Python interpreter and checkout root of the user's Hermes
@@ -5818,35 +5198,35 @@ var HermesRunner = class extends BaseCliRunner {
    */
   resolveHermesPython() {
     const hermesHome = this.getHermesHome();
-    const repoRoot = (0, import_path6.join)(hermesHome, "hermes-agent");
-    if (!(0, import_fs5.existsSync)(repoRoot)) return null;
+    const repoRoot = (0, import_path4.join)(hermesHome, "hermes-agent");
+    if (!(0, import_fs3.existsSync)(repoRoot)) return null;
     const launcherCandidates = [
       this.getBin(),
-      (0, import_path6.join)(repoRoot, ".hermes", "bin", "hermes")
+      (0, import_path4.join)(repoRoot, ".hermes", "bin", "hermes")
     ];
     for (const candidate of launcherCandidates) {
       try {
-        if (!(0, import_fs5.existsSync)(candidate)) continue;
-        const text = (0, import_fs5.readFileSync)(candidate, "utf-8");
+        if (!(0, import_fs3.existsSync)(candidate)) continue;
+        const text = (0, import_fs3.readFileSync)(candidate, "utf-8");
         const execMatch = text.match(/exec\s+([^\s"']+\/python3?(?:\.\d+)?)\b/);
         if (execMatch && execMatch[1] &&
-          (0, import_fs5.existsSync)(execMatch[1])) {
+          (0, import_fs3.existsSync)(execMatch[1])) {
           return { pythonBin: execMatch[1], repoRoot };
         }
       } catch {
       }
     }
     try {
-      const toolsDir = (0, import_path6.join)(hermesHome, "tools");
-      if ((0, import_fs5.existsSync)(toolsDir)) {
-        for (const entry of (0, import_fs5.readdirSync)(toolsDir)) {
+      const toolsDir = (0, import_path4.join)(hermesHome, "tools");
+      if ((0, import_fs3.existsSync)(toolsDir)) {
+        for (const entry of (0, import_fs3.readdirSync)(toolsDir)) {
           if (entry.startsWith("python")) {
-            const py = (0, import_path6.join)(
+            const py = (0, import_path4.join)(
               toolsDir,
               entry,
               process.platform === "win32" ? "python.exe" : "bin/python3"
             );
-            if ((0, import_fs5.existsSync)(py)) {
+            if ((0, import_fs3.existsSync)(py)) {
               return { pythonBin: py, repoRoot };
             }
           }
@@ -5854,12 +5234,12 @@ var HermesRunner = class extends BaseCliRunner {
       }
     } catch {
     }
-    const venvPy = (0, import_path6.join)(
+    const venvPy = (0, import_path4.join)(
       repoRoot,
       ".venv",
       process.platform === "win32" ? "Scripts/python.exe" : "bin/python"
     );
-    if ((0, import_fs5.existsSync)(venvPy)) {
+    if ((0, import_fs3.existsSync)(venvPy)) {
       return { pythonBin: venvPy, repoRoot };
     }
     return null;
@@ -5965,9 +5345,9 @@ print(json.dumps({"models": models}))
     }
     const hermesHome = this.getHermesHome();
     try {
-      const cfgPath = (0, import_path6.join)(hermesHome, "config.yaml");
-      if ((0, import_fs5.existsSync)(cfgPath)) {
-        const raw = (0, import_fs5.readFileSync)(cfgPath, "utf-8");
+      const cfgPath = (0, import_path4.join)(hermesHome, "config.yaml");
+      if ((0, import_fs3.existsSync)(cfgPath)) {
+        const raw = (0, import_fs3.readFileSync)(cfgPath, "utf-8");
         const modelSection = raw.match(
           /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
         );
@@ -5990,10 +5370,10 @@ print(json.dumps({"models": models}))
     }
     try {
       const provCachePath =
-        (0, import_path6.join)(hermesHome, "provider_models_cache.json");
-      if ((0, import_fs5.existsSync)(provCachePath)) {
+        (0, import_path4.join)(hermesHome, "provider_models_cache.json");
+      if ((0, import_fs3.existsSync)(provCachePath)) {
         const parsed =
-          JSON.parse((0, import_fs5.readFileSync)(provCachePath, "utf-8"));
+          JSON.parse((0, import_fs3.readFileSync)(provCachePath, "utf-8"));
         const entries = Object.entries(parsed);
         entries.sort(
           ([, a], [, b]) => (a.fallback ? 1 : 0) - (b.fallback ? 1 : 0)
@@ -6011,10 +5391,10 @@ print(json.dumps({"models": models}))
     if (seen.size <= 1) {
       try {
         const catalogPath =
-          (0, import_path6.join)(hermesHome, "cache", "model_catalog.json");
-        if ((0, import_fs5.existsSync)(catalogPath)) {
+          (0, import_path4.join)(hermesHome, "cache", "model_catalog.json");
+        if ((0, import_fs3.existsSync)(catalogPath)) {
           const parsed =
-            JSON.parse((0, import_fs5.readFileSync)(catalogPath, "utf-8"));
+            JSON.parse((0, import_fs3.readFileSync)(catalogPath, "utf-8"));
           const providers = parsed.providers || {};
           for (const prov of Object.values(providers)) {
             for (const item of prov.models || []) {
@@ -6070,10 +5450,10 @@ print(json.dumps({"models": models}))
   readConfiguredDefaultModel() {
     try {
       const cfgPath =
-        (0, import_path6.join)((0, import_os5.homedir)(), ".hermes",
+        (0, import_path4.join)((0, import_os3.homedir)(), ".hermes",
           "config.yaml");
-      if ((0, import_fs5.existsSync)(cfgPath)) {
-        const raw = (0, import_fs5.readFileSync)(cfgPath, "utf-8");
+      if ((0, import_fs3.existsSync)(cfgPath)) {
+        const raw = (0, import_fs3.readFileSync)(cfgPath, "utf-8");
         const modelSection = raw.match(
           /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
         );
@@ -6343,7 +5723,7 @@ print(json.dumps({"models": models}))
 };
 
 // src/providers/pi/runner.ts
-var import_path7 = require("path");
+var import_path5 = require("path");
 var PI_DESCRIPTOR = {
   id: "pi",
   displayName: "Pi Coding Agent CLI",
@@ -6524,8 +5904,8 @@ var PiRunner = class extends BaseCliRunner {
       args.push("--thinking", thinking);
     }
     for (const f of req.fileAttachments) {
-      const fullPath = !(0, import_path7.isAbsolute)(f) && cwd ?
-        (0, import_path7.join)(cwd, f) : f;
+      const fullPath = !(0, import_path5.isAbsolute)(f) && cwd ?
+        (0, import_path5.join)(cwd, f) : f;
       args.push(`@${fullPath}`);
     }
     args.push(req.prompt);
@@ -7216,8 +6596,6 @@ var OpencodePlugin = class extends import_obsidian10.Plugin {
     this.registry = new ProviderRegistry();
     this.registry.register(this.opencodeRunner);
     this.registry.register(this.antigravityRunner);
-    this.registry.register(new ClaudeRunner(this));
-    this.registry.register(new CodexRunner(this));
     this.registry.register(new HermesRunner(this));
     this.registry.register(new PiRunner(this));
     for (const provider of this.registry.getAll()) {

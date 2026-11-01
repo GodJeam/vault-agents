@@ -6,12 +6,12 @@ An **Obsidian** plugin that integrates local AI agents into your vault: chat wit
 
 ## Features
 
-- **Multi-Agent Architecture**: Seamless support for **6 local AI CLI agents** (**Antigravity**, **OpenCode**, **Claude Code**, **OpenAI Codex**, **Hermes Agent**, and **Pi**), easily switchable directly from the interface with distinct provider icons.
+- **Multi-Agent Architecture**: Seamless support for **4 local AI CLI agents** (**Antigravity**, **OpenCode**, **Hermes Agent**, and **Pi**), easily switchable directly from the interface with distinct provider icons.
 - **Dedicated Agent & Grouped Model Switchers**:
   - **Agent Switcher** (`/agent` or the agent header pill): switch the active CLI engine per session and inspect each engine's current model.
   - **Grouped Model Switcher** (`/model` or the model header pill): collapsible provider groups, quick provider filter chips, real-time fuzzy search, live **Refresh** from the CLI, and **Custom model ID** entry for unlisted or custom endpoints.
 - **Universal Dynamic Model & Context Discovery**: Queries each CLI's native runtime/catalog (`hermes_cli.models` & `agent.model_metadata`, `pi --list-models`, `opencode models` & `/api/model`, `agy`, etc.) so any provider or subscription configured by the user works out of the box with accurate context window limits (including `1M` / `500K` / `256K` / `200K` models).
-- **Interactive Agent Questions**: When an agent asks clarifying questions (`question` in OpenCode, `ask_question` in Antigravity, `AskUserQuestion` in Claude/Hermes/Pi, `request_user_input` in Codex), an interactive card is rendered directly in the chat with single/multi-select options and custom answer inputs.
+- **Interactive Agent Questions**: When an agent asks clarifying questions (`question` in OpenCode, `ask_question` in Antigravity, `AskUserQuestion` in Hermes/Pi), an interactive card is rendered directly in the chat with single/multi-select options and custom answer inputs.
 - **Live Activity & Human-Readable Tool Steps**: Animated live status pill with phase descriptions, elapsed timer, and human-friendly tool badges (with target file/command, duration, and visual task checklists) instead of raw CLI tool keywords.
 - **Tool Inspection**: Interactive display of tool and command executions directly in the chat with expandable input/output details.
 - **Chat in Obsidian**: Fast pane chat with streaming responses and reasoning indicators.
@@ -30,8 +30,6 @@ An **Obsidian** plugin that integrates local AI agents into your vault: chat wit
 - At least **one** supported agent CLI installed and available on your `PATH`:
   - **Antigravity CLI** (`agy`), **1.3.x** (tested with 1.3.5).
   - **OpenCode CLI** (`opencode`), **2.x** (tested with 2.0.29).
-  - **Claude Code CLI** (`claude`), **1.x / 2.x**.
-  - **OpenAI Codex CLI** (`codex`), **0.100+**.
   - **Hermes Agent CLI** (`hermes`), **0.22+** (tested with 0.22.5).
   - **Pi Coding Agent CLI** (`pi` — `@mariozechner/pi-coding-agent`), **0.60+** (tested with 0.68.0).
 - **[sqlite3](https://sqlite.org/)** on your `PATH` — used by the Antigravity session manager and by the OpenCode database self-cleanup.
@@ -44,8 +42,6 @@ An **Obsidian** plugin that integrates local AI agents into your vault: chat wit
 | Obsidian | 1.5.7 | 1.5.0 | Desktop only (`isDesktopOnly: true`). |
 | Antigravity CLI (`agy`) | 1.3.5 | 1.3.x | Runs `agy --print --output-format stream-json --model … --effort …`. Model IDs already embed the reasoning effort (e.g. `gemini-3.8-flash-low`), so `--effort` is only sent for models without a suffix. |
 | OpenCode CLI (`opencode`) | 2.0.29 | 2.x | Uses `opencode run --format json`, `opencode models`, `opencode session …`, `opencode debug paths`, `sqlite3` on `opencode.db` for fast session context token lookups, and the local API (`opencode api GET /api/model`, `/api/experimental/session/stats`). |
-| Claude Code CLI (`claude`) | 1.x / 2.x | 1.x | Runs `claude -p … --output-format stream-json --verbose`, supports `--resume`, `--permission-mode`, `--effort`, and `--dangerously-skip-permissions`. |
-| OpenAI Codex CLI (`codex`) | 0.114+ | 0.100+ | Runs `codex exec --json` (and `codex exec resume`), supports `--sandbox`, `model_reasoning_effort`, and `--dangerously-bypass-approvals-and-sandbox`. |
 | Hermes Agent CLI (`hermes`) | 0.22.5 | 0.22.x | Runs `hermes chat -q … --format stream-json`, supports `--resume`, `--provider`, `--reasoning`, `--yolo`, and dynamically queries `hermes_cli.models` & `agent.model_metadata` for any authenticated provider (`openrouter`, `nous`, `anthropic`, `openai-codex`, `copilot`, `opencode-go`, `opencode-zen`, `ollama`, `lmstudio`, `custom`, etc.). |
 | Pi CLI (`pi`) | 0.68.0 | 0.60+ | Runs `pi --mode json -p …`, discovers models and exact context limits via `pi --list-models`, and supports `--provider`, `--model`, `--thinking`, and `--session` resumption. |
 | sqlite3 | 3.51.2 | any recent | Session management for Antigravity, context token lookups and database cleanup for OpenCode. |
@@ -110,8 +106,6 @@ src/
 ├── providers/
 │   ├── antigravity/             # Antigravity CLI descriptor, runner & stream parser
 │   ├── opencode/                # OpenCode CLI descriptor, runner & stream parser
-│   ├── claude/                  # Claude Code CLI descriptor, runner & stream parser
-│   ├── codex/                   # OpenAI Codex CLI descriptor, runner & stream parser
 │   ├── hermes/                  # Hermes Agent CLI descriptor, runner & stream parser
 │   ├── pi/                      # Pi Coding Agent CLI descriptor, runner & stream parser
 │   └── base.ts                  # Shared process execution, JSONL stream loop & CLI utilities
@@ -122,7 +116,7 @@ src/
 ├── i18n/                        # Internationalization (English, Italian)
 └── main.ts                      # Plugin lifecycle and command palette registration
 test/
-├── fixtures/                    # Recorded .ndjson stream fixtures for all 6 agents
+├── fixtures/                    # Recorded .ndjson stream fixtures for all 4 agents
 ├── mock-cli.mjs                 # Standalone Mock CLI Simulator for end-to-end testing
 └── suite.test.ts                # Unit & integration tests for stream parsers, settings migration, and CLI flags
 ```

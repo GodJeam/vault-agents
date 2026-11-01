@@ -3,7 +3,7 @@
   "name": "Vault Agents",
   "version": "0.4.0",
   "minAppVersion": "1.5.0",
-  "description": "Multi-agent AI orchestrator for Obsidian: connect local CLI agents (Antigravity, OpenCode, Claude Code, Codex, Hermes, Pi) directly to your vault.",
+  "description": "Multi-agent AI orchestrator: connect local CLI agents (Antigravity, OpenCode, Hermes, Pi) directly to your vault.",
   "author": "GodJeam",
   "isDesktopOnly": true
 }
