@@ -5796,6 +5796,7 @@ var HermesRunner = class extends BaseCliRunner {
   included = false;
   cachedModels = null;
   cachedModelsBin = null;
+  contextLimits = /* @__PURE__ */ new Map();
   constructor(plugin) {
     super(plugin);
   }
@@ -5804,6 +5805,89 @@ var HermesRunner = class extends BaseCliRunner {
   }
   getBin() {
     return this.resolveBinaryPath(this.getConfig().binary || "hermes");
+  }
+  getHermesHome() {
+    return process.env.HERMES_HOME ||
+      (0, import_path6.join)((0, import_os5.homedir)(), ".hermes");
+  }
+  /**
+   * Resolve the Python interpreter and checkout root of the user's Hermes
+   * installation so we can query Hermes' native model & context APIs directly
+   * for ANY provider the user has configured (OpenRouter, Nous, Anthropic,
+   * OpenAI, Copilot, OpenCode Go/Zen, Ollama, LM Studio, Bedrock, etc.).
+   */
+  resolveHermesPython() {
+    const hermesHome = this.getHermesHome();
+    const repoRoot = (0, import_path6.join)(hermesHome, "hermes-agent");
+    if (!(0, import_fs5.existsSync)(repoRoot)) return null;
+    const launcherCandidates = [
+      this.getBin(),
+      (0, import_path6.join)(repoRoot, ".hermes", "bin", "hermes")
+    ];
+    for (const candidate of launcherCandidates) {
+      try {
+        if (!(0, import_fs5.existsSync)(candidate)) continue;
+        const text = (0, import_fs5.readFileSync)(candidate, "utf-8");
+        const execMatch = text.match(/exec\s+([^\s"']+\/python3?(?:\.\d+)?)\b/);
+        if (execMatch && execMatch[1] &&
+          (0, import_fs5.existsSync)(execMatch[1])) {
+          return { pythonBin: execMatch[1], repoRoot };
+        }
+      } catch {
+      }
+    }
+    try {
+      const toolsDir = (0, import_path6.join)(hermesHome, "tools");
+      if ((0, import_fs5.existsSync)(toolsDir)) {
+        for (const entry of (0, import_fs5.readdirSync)(toolsDir)) {
+          if (entry.startsWith("python")) {
+            const py = (0, import_path6.join)(
+              toolsDir,
+              entry,
+              process.platform === "win32" ? "python.exe" : "bin/python3"
+            );
+            if ((0, import_fs5.existsSync)(py)) {
+              return { pythonBin: py, repoRoot };
+            }
+          }
+        }
+      }
+    } catch {
+    }
+    const venvPy = (0, import_path6.join)(
+      repoRoot,
+      ".venv",
+      process.platform === "win32" ? "Scripts/python.exe" : "bin/python"
+    );
+    if ((0, import_fs5.existsSync)(venvPy)) {
+      return { pythonBin: venvPy, repoRoot };
+    }
+    return null;
+  }
+  /**
+   * Run a short Python introspection snippet inside the Hermes runtime.
+   */
+  async execHermesPython(script, extraArgs = []) {
+    const runtime = this.resolveHermesPython();
+    if (!runtime) return null;
+    try {
+      const bootstrap = [
+        "import os, sys",
+        "os.environ.pop('PYTHONHOME', None)",
+        "os.environ.pop('PYTHONPATH', None)",
+        `sys.path.insert(0, ${JSON.stringify(runtime.repoRoot)})`,
+        "import hermes_bootstrap",
+        script
+      ].join("\n");
+      return await this.execCli(runtime.pythonBin, [
+        "-I",
+        "-c",
+        bootstrap,
+        ...extraArgs
+      ]);
+    } catch {
+      return null;
+    }
   }
   async getVersion() {
     const out = await this.execCli(this.getBin(), ["--version"]);
@@ -5824,10 +5908,64 @@ var HermesRunner = class extends BaseCliRunner {
         seen.add(clean);
       }
     };
+    const requestedProvider = this.getConfig().options.provider?.trim() || "";
+    const pyScript = `
+import json, sys
+from hermes_cli.config import load_config
+from hermes_cli.models import list_available_providers,
+  cached_provider_model_ids, provider_model_ids
+
+req_prov = sys.argv[1] if len(sys.argv) > 1 else ""
+force = sys.argv[2] == "1" if len(sys.argv) > 2 else False
+cfg = load_config()
+m = cfg.get("model") if isinstance(cfg, dict) else {}
+default_model =
+  (m.get("default") or m.get("model") or "") if isinstance(m,
+    dict) else (m if isinstance(m, str) else "")
+cfg_provider =
+  req_prov or ((m.get("provider") or "") if isinstance(m, dict) else "")
+
+providers = []
+if cfg_provider and cfg_provider != "auto":
+    providers.append(cfg_provider)
+for p in list_available_providers():
+    pid = p.get("id")
+    if p.get("authenticated") and pid and pid not in providers:
+        providers.append(pid)
+
+models = []
+if default_model:
+    models.append(str(default_model).strip())
+
+for pid in providers:
+    try:
+        rows =
+          provider_model_ids(pid,
+            force_refresh=force) if force else (cached_provider_model_ids(
+              pid) or provider_model_ids(pid))
+        for mid in (rows or []):
+            models.append(str(mid).strip())
+    except Exception:
+        pass
+
+print(json.dumps({"models": models}))
+`;
+    const pyOut = await this.execHermesPython(pyScript, [
+      requestedProvider,
+      forceRefresh ? "1" : "0"
+    ]);
+    if (pyOut) {
+      try {
+        const parsed = JSON.parse(pyOut.trim());
+        for (const m of parsed.models || []) {
+          addModel(m);
+        }
+      } catch {
+      }
+    }
+    const hermesHome = this.getHermesHome();
     try {
-      const cfgPath =
-        (0, import_path6.join)((0, import_os5.homedir)(), ".hermes",
-          "config.yaml");
+      const cfgPath = (0, import_path6.join)(hermesHome, "config.yaml");
       if ((0, import_fs5.existsSync)(cfgPath)) {
         const raw = (0, import_fs5.readFileSync)(cfgPath, "utf-8");
         const modelSection = raw.match(
@@ -5851,11 +5989,8 @@ var HermesRunner = class extends BaseCliRunner {
     } catch {
     }
     try {
-      const provCachePath = (0, import_path6.join)(
-        (0, import_os5.homedir)(),
-        ".hermes",
-        "provider_models_cache.json"
-      );
+      const provCachePath =
+        (0, import_path6.join)(hermesHome, "provider_models_cache.json");
       if ((0, import_fs5.existsSync)(provCachePath)) {
         const parsed =
           JSON.parse((0, import_fs5.readFileSync)(provCachePath, "utf-8"));
@@ -5873,26 +6008,24 @@ var HermesRunner = class extends BaseCliRunner {
       }
     } catch {
     }
-    try {
-      const catalogPath = (0, import_path6.join)(
-        (0, import_os5.homedir)(),
-        ".hermes",
-        "cache",
-        "model_catalog.json"
-      );
-      if ((0, import_fs5.existsSync)(catalogPath)) {
-        const parsed =
-          JSON.parse((0, import_fs5.readFileSync)(catalogPath, "utf-8"));
-        const providers = parsed.providers || {};
-        for (const prov of Object.values(providers)) {
-          for (const item of prov.models || []) {
-            if (typeof item.id === "string") {
-              addModel(item.id);
+    if (seen.size <= 1) {
+      try {
+        const catalogPath =
+          (0, import_path6.join)(hermesHome, "cache", "model_catalog.json");
+        if ((0, import_fs5.existsSync)(catalogPath)) {
+          const parsed =
+            JSON.parse((0, import_fs5.readFileSync)(catalogPath, "utf-8"));
+          const providers = parsed.providers || {};
+          for (const prov of Object.values(providers)) {
+            for (const item of prov.models || []) {
+              if (typeof item.id === "string") {
+                addModel(item.id);
+              }
             }
           }
         }
+      } catch {
       }
-    } catch {
     }
     if (seen.size === 0) {
       try {
@@ -5966,6 +6099,54 @@ var HermesRunner = class extends BaseCliRunner {
   async getModelContextLimit(model) {
     const effective = model.trim() || this.getConfig().model.trim() ||
       this.readConfiguredDefaultModel();
+    const configuredProvider = (this.getConfig().options.provider ?? "").trim();
+    const cacheKey = `${configuredProvider}:${effective}`;
+    const cached = this.contextLimits.get(cacheKey) ??
+      this.contextLimits.get(effective);
+    if (cached && cached > 0) return cached;
+    try {
+      const script = [
+        "import json, sys",
+        "from agent.model_metadata import get_model_context_length",
+        "from hermes_cli.runtime_provider import resolve_runtime_provider",
+        "from hermes_cli.models import PROVIDER_REGISTRY",
+        "mod = sys.argv[1] if len(sys.argv) > 1 else ''",
+        "req_prov = sys.argv[2] if len(sys.argv) > 2 else ''",
+        "if '/' in mod and not req_prov:",
+        "    prefix, rest = mod.split('/', 1)",
+        "    if prefix in PROVIDER_REGISTRY and prefix != 'openrouter':",
+        "        req_prov = prefix",
+        "        mod = rest",
+          "rt = resolve_runtime_provider(requested=req_prov or None, " +
+          "target_model=mod or None)",
+        "eff_mod = mod or rt.get('model') or ''",
+        "ctx = get_model_context_length(",
+        "    eff_mod,",
+        "    base_url=rt.get('base_url', '') or '',",
+        "    api_key=rt.get('api_key', '') or '',",
+        "    provider=rt.get('provider', '') or req_prov,",
+        ")",
+        "print(json.dumps({'context_length': ctx, 'model': eff_mod}))"
+      ].join("\n");
+      const out = await this.execHermesPython(script, [
+        effective,
+        configuredProvider
+      ]);
+      if (out) {
+        const parsed = JSON.parse(out);
+        if (typeof parsed.context_length === "number" &&
+          parsed.context_length > 0) {
+          this.contextLimits.set(cacheKey, parsed.context_length);
+          if (effective) this.contextLimits.set(effective,
+            parsed.context_length);
+          if (parsed.model) {
+            this.contextLimits.set(parsed.model, parsed.context_length);
+          }
+          return parsed.context_length;
+        }
+      }
+    } catch {
+    }
     return this.estimateModelContextLimit(effective, 256e3);
   }
   async getSessionTokens(sessionId) {
@@ -6215,6 +6396,7 @@ var PiRunner = class extends BaseCliRunner {
   included = false;
   cachedModels = null;
   cachedModelsBin = "";
+  contextLimits = /* @__PURE__ */ new Map();
   constructor(plugin) {
     super(plugin);
   }
@@ -6223,6 +6405,13 @@ var PiRunner = class extends BaseCliRunner {
   }
   getBin() {
     return this.resolveBinaryPath(this.getConfig().binary || "pi");
+  }
+  parseContextWindowToken(raw) {
+    const m = raw.trim().match(/^(\d+(?:\.\d+)?)\s*([kKmM])$/);
+    if (!m) return 0;
+    const val = parseFloat(m[1]);
+    const unit = m[2].toUpperCase();
+    return Math.round(val * (unit === "M" ? 1e6 : 1e3));
   }
   async getVersion() {
     const out = await this.execCli(this.getBin(), ["--version"]);
@@ -6257,6 +6446,13 @@ var PiRunner = class extends BaseCliRunner {
             /^[a-zA-Z0-9_.:/+-]+$/.test(mod)) {
             const full = mod.includes("/") ? mod : `${prov}/${mod}`;
             if (!models.includes(full)) models.push(full);
+            if (cols[2]) {
+              const ctx = this.parseContextWindowToken(cols[2]);
+              if (ctx > 0) {
+                this.contextLimits.set(full, ctx);
+                this.contextLimits.set(mod, ctx);
+              }
+            }
             continue;
           }
         }
@@ -6285,7 +6481,20 @@ var PiRunner = class extends BaseCliRunner {
   async deleteSession(_sessionId) {
   }
   async getModelContextLimit(model) {
-    return this.estimateModelContextLimit(model, 2e5);
+    const target = model.trim() || this.getConfig().model.trim();
+    if (target) {
+      if (this.contextLimits.size === 0) {
+        await this.listModels().catch(() => {
+        });
+      }
+      const exact = this.contextLimits.get(target);
+      if (exact && exact > 0) return exact;
+      const bare = target.includes("/") ? target.slice(target.indexOf("/") +
+        1) : target;
+      const byBare = this.contextLimits.get(bare);
+      if (byBare && byBare > 0) return byBare;
+    }
+    return this.estimateModelContextLimit(target, 2e5);
   }
   async getSessionTokens(sessionId) {
     return this.getHistorySessionTokens(sessionId);
