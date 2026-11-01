@@ -10,15 +10,16 @@ import type { AgentProvider } from "../../core/provider";
 import type {
   FinishInfo,
   RunHandle,
-  SessionInfo,
   EngineType,
 } from "../../core/types";
 import { substitute } from "../../i18n";
 import {
+  AgentSuggestModal,
   ConfirmModal,
   ModelSuggestModal,
   RenameModal,
   StatsModal,
+  type AgentItem,
   type ModelItem,
 } from "../../shared/modals";
 import type { TurnContext, SessionStats } from "./types";
@@ -30,6 +31,10 @@ import {
 } from "./messageBubble";
 import { SuggestPopup } from "./suggestPopup";
 import { AttachmentManager } from "./attachmentManager";
+import {
+  buildLocalContinuationPrompt,
+  fetchDisplayedSessions,
+} from "./sessionControls";
 
 export const CHAT_VIEW_TYPE = "opencode-chat-view";
 
@@ -44,6 +49,7 @@ export class ChatView extends ItemView {
   private pinBtn!: HTMLButtonElement;
   private renameBtn!: HTMLButtonElement;
   private deleteBtn!: HTMLButtonElement;
+  private agentBtn!: HTMLButtonElement;
   private modelBtn!: HTMLButtonElement;
   private sendBtn!: HTMLButtonElement;
   private stopBtn!: HTMLButtonElement;
@@ -102,9 +108,11 @@ export class ChatView extends ItemView {
 
   assistantLabel(): string {
     const desc = this.getRunner().descriptor;
-    return desc.id === "opencode"
-      ? this.plugin.t(desc.shortName)
-      : desc.shortName;
+    return this.plugin.t(desc.shortName);
+  }
+
+  assistantIcon(): string {
+    return this.getRunner().descriptor.icon || "bot";
   }
 
   getViewType(): string {
@@ -257,7 +265,9 @@ export class ChatView extends ItemView {
     const attachBtn = this.contextBar.createEl("button", {
       cls: "opencode-add-note-btn",
     });
-    attachBtn.setText("＋ " + this.plugin.t("Attach file"));
+    const attachIcon = attachBtn.createSpan({ cls: "opencode-btn-icon" });
+    setIcon(attachIcon, "paperclip");
+    attachBtn.createSpan({ text: this.plugin.t("Attach file") });
     attachBtn.addEventListener("click", () =>
       this.attachmentManager.openFilePicker()
     );
@@ -265,7 +275,9 @@ export class ChatView extends ItemView {
     const add = this.contextBar.createEl("button", {
       cls: "opencode-add-note-btn",
     });
-    add.setText("+ " + this.plugin.t("Current note"));
+    const addIcon = add.createSpan({ cls: "opencode-btn-icon" });
+    setIcon(addIcon, "file-plus");
+    add.createSpan({ text: this.plugin.t("Current note") });
     add.addEventListener("click", () => this.attachCurrentNote());
 
     this.updateContextBar();
@@ -378,60 +390,12 @@ export class ChatView extends ItemView {
     newOpt.value = "";
     newOpt.textContent = "＋ " + this.plugin.t("New session");
     try {
-      const providers = this.plugin.registry.getAll();
-      const results = await Promise.allSettled(
-        providers.map((p) => p.listSessions())
+      const displayed = await fetchDisplayedSessions(
+        this.plugin,
+        this.viewSession,
+        this.sessionEngine()
       );
-      const all: SessionInfo[] = [];
-      const seen = new Set<string>();
-
-      results.forEach((res, i) => {
-        if (res.status === "fulfilled") {
-          const providerId = providers[i].id;
-          for (const s of res.value) {
-            if (!seen.has(s.id)) {
-              seen.add(s.id);
-              const engine = s.engine || providerId;
-              all.push({ ...s, engine });
-              if (!this.plugin.settings.sessionEngines) {
-                this.plugin.settings.sessionEngines = {};
-              }
-              if (!this.plugin.settings.sessionEngines[s.id]) {
-                this.plugin.settings.sessionEngines[s.id] = engine;
-              }
-            }
-          }
-        }
-      });
-
-      all.sort((a, b) => (b.updated ?? 0) - (a.updated ?? 0));
       const pinnedSet = new Set(this.plugin.settings.pinned ?? []);
-      const pinned = all.filter((s) => pinnedSet.has(s.id));
-      const recent = all.filter((s) => !pinnedSet.has(s.id)).slice(0, 20);
-      const displayed = [...pinned, ...recent];
-
-      // Always include the currently active session so its name is shown
-      const hasActive = displayed.some((s) => s.id === this.viewSession);
-      if (this.viewSession && !hasActive) {
-        const found = all.find((s) => s.id === this.viewSession);
-        if (found) {
-          displayed.push(found);
-        } else {
-          const hist = this.plugin.getHistory(this.viewSession);
-          const firstUser = hist.find(
-            (m) => m.role === "user" && m.text.trim()
-          );
-          const fallbackTitle = firstUser
-            ? firstUser.text.trim().replace(/\s+/g, " ").slice(0, 40)
-            : this.viewSession;
-          displayed.push({
-            id: this.viewSession,
-            title: fallbackTitle,
-            updated: Date.now(),
-            engine: this.sessionEngine(),
-          });
-        }
-      }
 
       for (const s of displayed) {
         const o = sel.createEl("option");
@@ -590,6 +554,7 @@ export class ChatView extends ItemView {
       this.app,
       this.plugin,
       {
+        onOpenAgentList: () => this.openAgentList(),
         onOpenModelList: () => void this.openModelList(),
         onStartNewSession: () => this.startNewSession(),
         onAttachCurrentNote: () => void this.attachCurrentNote(),
@@ -615,18 +580,34 @@ export class ChatView extends ItemView {
 
     const buttons = inputArea.createDiv({ cls: "opencode-buttons" });
 
-    this.modelBtn = buttons.createEl("button", { cls: "opencode-model-btn" });
-    this.updateModelBtn();
+    const selectorGroup = buttons.createDiv({
+      cls: "opencode-selector-group",
+    });
+
+    this.agentBtn = selectorGroup.createEl("button", {
+      cls: "opencode-agent-btn",
+    });
+    this.agentBtn.addEventListener("click", () => this.openAgentList());
+
+    this.modelBtn = selectorGroup.createEl("button", {
+      cls: "opencode-model-btn",
+    });
     this.modelBtn.addEventListener("click", () => void this.openModelList());
+
+    this.updateModelBtn();
 
     buttons.createSpan({ cls: "opencode-buttons-spacer" });
 
     this.sendBtn = buttons.createEl("button", { cls: "opencode-send-btn" });
-    this.sendBtn.setText(this.plugin.t("Send"));
+    const sendIcon = this.sendBtn.createSpan({ cls: "opencode-btn-icon" });
+    setIcon(sendIcon, "send");
+    this.sendBtn.createSpan({ text: this.plugin.t("Send") });
     this.sendBtn.addEventListener("click", () => void this.send());
 
     this.stopBtn = buttons.createEl("button", { cls: "opencode-stop-btn" });
-    this.stopBtn.setText(this.plugin.t("Stop"));
+    const stopIcon = this.stopBtn.createSpan({ cls: "opencode-btn-icon" });
+    setIcon(stopIcon, "square");
+    this.stopBtn.createSpan({ text: this.plugin.t("Stop") });
     this.stopBtn.addClass("hidden");
     this.stopBtn.addEventListener("click", () => {
       this.stoppedByUser = true;
@@ -646,74 +627,171 @@ export class ChatView extends ItemView {
   }
 
   private updateModelBtn(): void {
-    if (!this.modelBtn) return;
     const engine = this.sessionEngine();
+    const provider = this.plugin.registry.get(engine);
+    const shortName = provider?.descriptor.shortName || engine;
     const m = this.activeModelFor(engine);
-    this.modelBtn.setText(m.length > 30 ? m.slice(0, 27) + "…" : m);
-    this.modelBtn.setAttribute("title", `${m} (${this.engineLabel(engine)})`);
-  }
 
-  private async openModelList(): Promise<void> {
-    const activeEngine = this.sessionEngine();
-    const cur = this.activeModelFor(activeEngine);
-
-    try {
-      const providers = this.plugin.registry.getAll();
-      // Place the currently active engine first
-      const orderedProviders = [
-        ...providers.filter((p) => p.id === activeEngine),
-        ...providers.filter((p) => p.id !== activeEngine),
-      ];
-
-      const results = await Promise.allSettled(
-        orderedProviders.map((p) => p.listModels())
+    if (this.agentBtn) {
+      this.agentBtn.empty();
+      const iconEl = this.agentBtn.createSpan({ cls: "opencode-chip-icon" });
+      setIcon(iconEl, provider?.descriptor.icon || "bot");
+      this.agentBtn.createSpan({
+        text: this.plugin.t(shortName),
+        cls: "opencode-chip-text",
+      });
+      const chevEl = this.agentBtn.createSpan({ cls: "opencode-chip-chevron" });
+      setIcon(chevEl, "chevron-down");
+      this.agentBtn.setAttribute(
+        "title",
+        `${this.plugin.t("AI Engine")}: ${this.engineLabel(engine)}`
       );
-      const items: ModelItem[] = [];
+    }
 
-      orderedProviders.forEach((provider, idx) => {
-        const res = results[idx];
-        const models = res.status === "fulfilled" ? res.value : [];
-        const providerLabel =
-          provider.costNote || provider.descriptor.shortName;
-        for (const m of models) {
-          items.push({
-            id: m,
-            engine: provider.id,
-            provider: providerLabel,
-            isActive: provider.id === activeEngine && m === cur,
-          });
-        }
+    if (this.modelBtn) {
+      this.modelBtn.empty();
+      const iconEl = this.modelBtn.createSpan({ cls: "opencode-chip-icon" });
+      setIcon(iconEl, "cpu");
+
+      const slashIdx = m.indexOf("/");
+      const shortModel =
+        m && slashIdx > 0 ? m.slice(slashIdx + 1) : m || this.plugin.t("Default");
+      const vendor = m && slashIdx > 0 ? m.slice(0, slashIdx) : "";
+
+      if (vendor) {
+        this.modelBtn.createSpan({
+          text: vendor,
+          cls: "opencode-chip-vendor",
+        });
+      }
+
+      const display =
+        shortModel.length > 26 ? shortModel.slice(0, 24) + "…" : shortModel;
+      this.modelBtn.createSpan({
+        text: display,
+        cls: "opencode-chip-text",
       });
 
-      new ModelSuggestModal(this.app, this.plugin, items, (item) => {
-        const engineChanged = item.engine !== activeEngine;
-        this.plugin.settings.engine = item.engine;
-        const cfg = this.plugin.getEngineConfig(item.engine);
-        cfg.model = item.id;
+      const chevEl = this.modelBtn.createSpan({ cls: "opencode-chip-chevron" });
+      setIcon(chevEl, "chevron-down");
+      this.modelBtn.setAttribute(
+        "title",
+        `${this.plugin.t("Model")}: ${m || this.plugin.t("(CLI default)")}`
+      );
+    }
+  }
 
-        const setPrefix = this.plugin.t("Model set:");
-        if (this.viewSession && engineChanged) {
-          // The open session belongs to another engine: start a fresh session
-          this.viewSession = "";
-          this.plugin.settings.sessionId = "";
-          void this.plugin.saveSettings();
-          this.loadHistoryForSession("");
-          new Notice(`${setPrefix} ${item.id} (${item.provider})`);
-          return;
-        }
-        if (this.viewSession) {
-          if (!this.plugin.settings.sessionEngines) {
-            this.plugin.settings.sessionEngines = {};
-          }
-          this.plugin.settings.sessionEngines[this.viewSession] = item.engine;
-        }
+  private openAgentList(): void {
+    const activeEngine = this.sessionEngine();
+    const providers = this.plugin.registry.getAll();
+    const items: AgentItem[] = providers.map((p) => {
+      const cfg = this.plugin.getEngineConfig(p.id);
+      const installed = p.isAvailable ? p.isAvailable() : true;
+      return {
+        id: p.id,
+        shortName: this.plugin.t(p.descriptor.shortName),
+        displayName: this.plugin.t(p.descriptor.displayName),
+        icon: p.descriptor.icon || "bot",
+        binary: cfg.binary || p.descriptor.defaultBinary,
+        activeModel: cfg.model || p.descriptor.defaultModel || "",
+        installed,
+        isActive: p.id === activeEngine,
+      };
+    });
+
+    new AgentSuggestModal(this.app, this.plugin, items, (item) => {
+      const engineChanged = item.id !== activeEngine;
+      this.plugin.settings.engine = item.id;
+      if (this.viewSession && engineChanged) {
+        this.viewSession = "";
+        this.plugin.settings.sessionId = "";
+        void this.plugin.saveSettings();
+        this.loadHistoryForSession("");
+      } else {
         void this.plugin.saveSettings();
         this.updateModelBtn();
         this.updateStatsBar();
         this.contextLimit = 0;
         void this.refreshContext();
-        new Notice(`${setPrefix} ${item.id} (${item.provider})`);
-      }).open();
+      }
+      new Notice(
+        `${this.plugin.t("AI Engine")}: ${item.shortName} (${item.activeModel || this.plugin.t("default")})`
+      );
+    }).open();
+  }
+
+  private async openModelList(): Promise<void> {
+    const activeEngine = this.sessionEngine();
+    const cur = this.activeModelFor(activeEngine);
+    const provider = this.plugin.registry.resolveProvider(activeEngine);
+
+    try {
+      const models = await provider.listModels();
+      const providerLabel =
+        provider.costNote || this.plugin.t(provider.descriptor.shortName);
+      const items: ModelItem[] = [];
+      const seen = new Set<string>();
+
+      if (!provider.descriptor.defaultModel) {
+        items.push({
+          id: "",
+          label: substitute(
+            this.plugin.t("(default from $1)"),
+            provider.descriptor.shortName
+          ),
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: cur === "",
+          isDefault: true,
+        });
+        seen.add("");
+      }
+
+      if (cur && !seen.has(cur)) {
+        items.push({
+          id: cur,
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: true,
+        });
+        seen.add(cur);
+      }
+
+      for (const m of models) {
+        if (seen.has(m)) continue;
+        seen.add(m);
+        items.push({
+          id: m,
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: m === cur,
+        });
+      }
+
+      new ModelSuggestModal(
+        this.app,
+        this.plugin,
+        items,
+        activeEngine,
+        (item) => {
+          const cfg = this.plugin.getEngineConfig(activeEngine);
+          cfg.model = item.id;
+          if (this.viewSession) {
+            if (!this.plugin.settings.sessionEngines) {
+              this.plugin.settings.sessionEngines = {};
+            }
+            this.plugin.settings.sessionEngines[this.viewSession] = activeEngine;
+          }
+          void this.plugin.saveSettings();
+          this.updateModelBtn();
+          this.updateStatsBar();
+          this.contextLimit = 0;
+          void this.refreshContext();
+          const shownModel = item.label || item.id;
+          const setPrefix = this.plugin.t("Model set:");
+          new Notice(`${setPrefix} ${shownModel} (${item.provider})`);
+        }
+      ).open();
     } catch (e) {
       new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`);
     }
@@ -834,30 +912,10 @@ export class ChatView extends ItemView {
   }
 
   private buildLocalContinuation(sessionId: string): string {
-    const history = this.plugin.getHistory(sessionId);
-    const recent = history.slice(-24);
-    if (recent.length === 0) {
-      return this.plugin.t(
-        "The previous session has no saved history. " +
-          "Continue the work from here."
-      );
-    }
-    const assistantWho = this.assistantLabel();
-    const lines: string[] = [];
-    for (const rec of recent) {
-      const who = rec.role === "user" ? this.plugin.t("User") : assistantWho;
-      const text =
-        rec.text.length > 800 ? rec.text.slice(0, 800) + "…" : rec.text;
-      lines.push(`${who}: ${text}`);
-    }
-    return (
-      this.plugin.t("[RECENT HISTORY OF THE PREVIOUS SESSION]") +
-      "\n" +
-      lines.join("\n\n") +
-      "\n\n---\n\n" +
-      this.plugin.t(
-        "Continue the work from here, keeping the context above in mind."
-      )
+    return buildLocalContinuationPrompt(
+      this.plugin,
+      sessionId,
+      this.assistantLabel()
     );
   }
 
@@ -875,7 +933,8 @@ export class ChatView extends ItemView {
       this.assistantLabel(),
       () => text,
       (t) => this.copyText(t),
-      this.plugin.t("Copy text")
+      this.plugin.t("Copy text"),
+      this.assistantIcon()
     );
     row.createDiv({ text, cls: "opencode-bubble" });
   }
@@ -1108,7 +1167,8 @@ export class ChatView extends ItemView {
       (t) => this.copyText(t),
       (total, input, output, cost) =>
         this.fmtTokens(total, input, output, cost, this.sessionEngine()),
-      (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer)
+      (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer),
+      this.assistantIcon()
     );
     this.activeBubble = bubble;
     this.scrollToBottom();
@@ -1225,11 +1285,15 @@ export class ChatView extends ItemView {
           this.assistantLabel(),
           () => rec.text,
           (t) => this.copyText(t),
-          this.plugin.t("Copy text")
+          this.plugin.t("Copy text"),
+          this.assistantIcon()
         );
         if (rec.reasoning) {
           const det = row.createEl("details", { cls: "opencode-reasoning" });
-          det.createEl("summary", { text: this.plugin.t("Reasoning") });
+          const summary = det.createEl("summary");
+          const brainIcon = summary.createSpan({ cls: "opencode-reasoning-icon" });
+          setIcon(brainIcon, "brain");
+          summary.createSpan({ text: this.plugin.t("Reasoning") });
           det.createDiv({
             cls: "opencode-reasoning-content",
             text: rec.reasoning,

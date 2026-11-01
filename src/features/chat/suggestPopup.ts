@@ -1,10 +1,11 @@
-import type { App } from "obsidian";
+import { setIcon, type App } from "obsidian";
 import type OpencodePlugin from "../../main";
 import type { SuggestItem } from "./types";
 
 const MAX_SUGGEST = 50;
 
 export interface SuggestPopupCallbacks {
+  onOpenAgentList: () => void;
   onOpenModelList: () => void;
   onStartNewSession: () => void;
   onAttachCurrentNote: () => void;
@@ -173,6 +174,7 @@ export class SuggestPopup {
         {
           label: "/prompt",
           desc: this.plugin.t("No saved prompts — add them in Settings"),
+          icon: "bookmark-plus",
           action: () => this.removeTrigger(),
         },
       ];
@@ -184,6 +186,7 @@ export class SuggestPopup {
     return list.map((p) => ({
       label: p.name,
       desc: p.text.length > 80 ? p.text.slice(0, 77) + "…" : p.text,
+      icon: "bookmark",
       action: () => this.replaceTriggerWith(p.text),
     }));
   }
@@ -222,8 +225,18 @@ export class SuggestPopup {
   private commandItems(): SuggestItem[] {
     return [
       {
+        label: this.plugin.t("/agent"),
+        desc: this.plugin.t("Change the AI agent"),
+        icon: "bot",
+        action: () => {
+          this.removeTrigger();
+          this.cb.onOpenAgentList();
+        },
+      },
+      {
         label: this.plugin.t("/model"),
         desc: this.plugin.t("Change the model"),
+        icon: "cpu",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenModelList();
@@ -232,6 +245,7 @@ export class SuggestPopup {
       {
         label: this.plugin.t("/new"),
         desc: this.plugin.t("New session"),
+        icon: "plus-circle",
         action: () => {
           this.removeTrigger();
           this.cb.onStartNewSession();
@@ -240,6 +254,7 @@ export class SuggestPopup {
       {
         label: this.plugin.t("/note"),
         desc: this.plugin.t("Attach the current note"),
+        icon: "file-plus",
         action: () => {
           this.removeTrigger();
           this.cb.onAttachCurrentNote();
@@ -248,6 +263,7 @@ export class SuggestPopup {
       {
         label: this.plugin.t("/attach"),
         desc: this.plugin.t("Attach a file"),
+        icon: "paperclip",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenFilePicker();
@@ -256,6 +272,7 @@ export class SuggestPopup {
       {
         label: this.plugin.t("/stats"),
         desc: this.plugin.t("Token and cost statistics"),
+        icon: "bar-chart-3",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenStats();
@@ -264,6 +281,7 @@ export class SuggestPopup {
       {
         label: this.plugin.t("/pin"),
         desc: this.plugin.t("Pin/Unpin session"),
+        icon: "pin",
         action: () => {
           this.removeTrigger();
           this.cb.onTogglePin();
@@ -272,6 +290,7 @@ export class SuggestPopup {
       {
         label: this.plugin.t("/rename"),
         desc: this.plugin.t("Rename session"),
+        icon: "pencil",
         action: () => {
           this.removeTrigger();
           this.cb.onRenameSession();
@@ -280,6 +299,7 @@ export class SuggestPopup {
       {
         label: this.plugin.t("/prompt"),
         desc: this.plugin.t("Insert a saved prompt"),
+        icon: "bookmark",
         action: () => {
           this.startPromptSelection();
         },
@@ -303,9 +323,11 @@ export class SuggestPopup {
     for (let i = 0; i < paths.length && items.length < MAX_SUGGEST; i++) {
       if (q && !lower[i].includes(q)) continue;
       const p = paths[i];
+      const isImg = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(p);
       items.push({
         label: p,
         desc,
+        icon: isImg ? "image" : "file-text",
         action: () => {
           this.removeTrigger();
           this.cb.onAddAttachment(p);
@@ -320,6 +342,7 @@ export class SuggestPopup {
       {
         label: this.plugin.t("current note"),
         desc: this.plugin.t("Attach the open note as context"),
+        icon: "file-plus",
         action: () => {
           this.removeTrigger();
           this.cb.onAttachCurrentNote();
@@ -328,6 +351,7 @@ export class SuggestPopup {
       {
         label: this.plugin.t("attach file"),
         desc: this.plugin.t("Pick a file to attach"),
+        icon: "paperclip",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenFilePicker();
@@ -336,6 +360,7 @@ export class SuggestPopup {
       {
         label: this.plugin.t("new session"),
         desc: this.plugin.t("Start from an empty session"),
+        icon: "plus-circle",
         action: () => {
           this.removeTrigger();
           this.cb.onStartNewSession();
@@ -344,6 +369,7 @@ export class SuggestPopup {
       {
         label: this.plugin.t("statistics"),
         desc: this.plugin.t("Tokens and costs (5h, week, month)"),
+        icon: "bar-chart-3",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenStats();
@@ -352,14 +378,25 @@ export class SuggestPopup {
       {
         label: this.plugin.t("pin/unpin session"),
         desc: this.plugin.t("Pin the session in the list"),
+        icon: "pin",
         action: () => {
           this.removeTrigger();
           this.cb.onTogglePin();
         },
       },
       {
+        label: this.plugin.t("active agent"),
+        desc: this.plugin.t("Change the AI agent"),
+        icon: "bot",
+        action: () => {
+          this.removeTrigger();
+          this.cb.onOpenAgentList();
+        },
+      },
+      {
         label: this.plugin.t("active model"),
         desc: this.plugin.t("Change the model"),
+        icon: "cpu",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenModelList();
@@ -379,9 +416,14 @@ export class SuggestPopup {
     for (let i = 0; i < this.suggestItems.length; i++) {
       const it = this.suggestItems[i];
       const row = this.suggestEl.createDiv({ cls: "opencode-suggest-item" });
-      row.createDiv({ text: it.label, cls: "opencode-suggest-label" });
+      if (it.icon) {
+        const iconEl = row.createSpan({ cls: "opencode-suggest-icon" });
+        setIcon(iconEl, it.icon);
+      }
+      const textCol = row.createDiv({ cls: "opencode-suggest-content" });
+      textCol.createDiv({ text: it.label, cls: "opencode-suggest-label" });
       if (it.desc) {
-        row.createDiv({ text: it.desc, cls: "opencode-suggest-desc" });
+        textCol.createDiv({ text: it.desc, cls: "opencode-suggest-desc" });
       }
       row.addEventListener("mousedown", (e) => {
         e.preventDefault();

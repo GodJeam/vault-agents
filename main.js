@@ -24,10 +24,10 @@ __export(main_exports, {
   default: () => OpencodePlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian8 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 
 // src/features/chat/view.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 
 // src/i18n/index.ts
 var IT = {
@@ -257,6 +257,9 @@ var IT = {
   "User": "Utente",
   "Unknown error": "Errore sconosciuto",
   // --- suggestions ---
+  "/agent": "/agente",
+  "Change the AI agent": "Cambia l'agente AI",
+  "active agent": "agente attivo",
   "/model": "/modello",
   "Change the model": "Cambia il modello",
   "/new": "/nuova",
@@ -339,9 +342,68 @@ var IT = {
   "Extra high": "Extra alto",
   "Max": "Massimo",
   "Antigravity found:": "Antigravity trovato:",
+  "$1 settings": "Impostazioni $1",
+  "$1 found:": "$1 trovato:",
+  "Run '$1 --version' to verify the binary is reachable.":
+    "Esegue '$1 --version' per verificare che il binario sia raggiungibile.",
   "Run 'agy --version' to verify the binary is reachable.":
     "Esegue 'agy --version' per verificare che il binario sia " +
     "raggiungibile.",
+  "Claude Code CLI": "Claude Code CLI",
+  "OpenAI Codex CLI": "OpenAI Codex CLI",
+  "Hermes Agent CLI (Nous Research)": "Hermes Agent CLI (Nous Research)",
+  "Pi Coding Agent CLI": "Pi Coding Agent CLI",
+  ["Command or full path to the claude executable. Usually 'claude' is " +
+    "enough if it is on your PATH."]:
+    "Comando o percorso completo dell'eseguibile claude. Di solito basta " +
+    "'claude' se è nel PATH.",
+  ["Pick a Claude model (e.g. claude-sonnet-4-5, claude-opus-4-5, claude-" +
+    "haiku-4-5)."]:
+    "Scegli un modello Claude (es. claude-sonnet-4-5, claude-opus-4-5, " +
+    "claude-haiku-4-5).",
+  "Reasoning effort level passed to Claude Code.":
+    "Livello di ragionamento (effort) passato a Claude Code.",
+  ["Command or full path to the codex executable. Usually 'codex' is " +
+    "enough if it is on your PATH."]:
+    "Comando o percorso completo dell'eseguibile codex. Di solito basta " +
+    "'codex' se è nel PATH.",
+  "Pick an OpenAI Codex model (e.g. gpt-5-codex, o3, o4-mini).":
+    "Scegli un modello OpenAI Codex (es. gpt-5-codex, o3, o4-mini).",
+  "Sandbox mode": "Modalità sandbox",
+  "Filesystem sandbox policy when auto-approve is disabled.":
+    "Policy della sandbox sul filesystem quando l'auto-approve è " +
+    "disattivato.",
+  "Read-only": "Sola lettura",
+  "Workspace write": "Scrittura nel workspace",
+  "Full access": "Accesso completo",
+  ["Command or full path to the hermes executable. Default is 'hermes' " +
+    "or '~/.hermes/bin/hermes'."]:
+    "Comando o percorso completo dell'eseguibile hermes. Il default è " +
+    "'hermes' o '~/.hermes/bin/hermes'.",
+  ["Pick a model for Hermes Agent (e.g. anthropic/claude-sonnet-4, nous/" +
+    "hermes-4-405b)."]:
+    "Scegli un modello per Hermes Agent (es. anthropic/claude-sonnet-4, " +
+    "nous/hermes-4-405b).",
+  "Provider": "Provider",
+  "Optional Hermes backend provider (e.g. openrouter, nous, anthropic).":
+    "Provider backend opzionale per Hermes (es. openrouter, nous, " +
+    "anthropic).",
+  "e.g. openrouter": "es. openrouter",
+  ["Command or full path to the pi executable. Usually 'pi' is enough if " +
+    "it is on your PATH."]:
+    "Comando o percorso completo dell'eseguibile pi. Di solito basta 'pi' " +
+    "se è nel PATH.",
+  ["Pick a model for the Pi coding agent (e.g. claude-sonnet-4-5, gpt-5, " +
+    "gemini-2.5-pro)."]:
+    "Scegli un modello per l'agente Pi (es. claude-sonnet-4-5, gpt-5, " +
+    "gemini-2.5-pro).",
+  "Optional model provider for Pi (e.g. anthropic, openai, google).":
+    "Provider opzionale per Pi (es. anthropic, openai, google).",
+  "e.g. anthropic": "es. anthropic",
+  "Thinking level passed to Pi (--thinking).":
+    "Livello di ragionamento passato a Pi (--thinking).",
+  "Off": "Disattivato",
+  "Minimal": "Minimo",
   ["Automatically allow tool permissions (bash, file edits, etc.). Turn " +
     "it off for extra safety."]:
     "Concede automaticamente i permessi degli strumenti (bash, edit file, " +
@@ -364,7 +426,45 @@ var IT = {
   "Included ($0.00)": "Incluso ($0.00)",
   "Search models... (e.g. gemini, claude, flash, deepseek)":
     "Cerca modelli... (es. gemini, claude, flash, deepseek)",
+  "Search or type a custom model ID... (e.g. sonnet, gpt-5, gemini)":
+    "Cerca o digita un ID modello personalizzato... (es. sonnet, gpt-5, " +
+    "gemini)",
+  "Custom model ID": "ID modello personalizzato",
+  ["Type any exact model ID or alias manually. Leave empty to use the " +
+    "CLI's own configured default model."]:
+    "Digita manualmente qualsiasi ID modello o alias esatto. Lascia vuoto " +
+    "per usare il modello predefinito configurato nella CLI.",
+  "(CLI default)": "(default della CLI)",
+  "(default from $1)": "(default di $1)",
+  "(default)": "(default)",
+  "default": "default",
+  ["Leave on default to use your Claude CLI config, or pick an alias " +
+    "(sonnet, opus, haiku) / enter an exact model ID."]:
+    "Lascia su default per usare la configurazione della tua CLI Claude, " +
+    "oppure scegli un alias (sonnet, opus, haiku) o inserisci un ID " +
+    "modello.",
+  ["Leave on default to use your ~/.codex/config.toml model, or enter an " +
+    "OpenAI model ID."]:
+    "Lascia su default per usare il modello in ~/.codex/config.toml, " +
+    "oppure inserisci un ID modello OpenAI.",
+  ["Leave on default to use your ~/.hermes/config.yaml model, or enter a " +
+    "provider/model ID."]:
+    "Lascia su default per usare il modello in ~/.hermes/config.yaml, " +
+    "oppure inserisci un ID provider/modello.",
+  ["Leave on default to use your Pi config, or pick a model from 'pi --" +
+    "list-models'."]:
+    "Lascia su default per usare la configurazione di Pi, oppure scegli un " +
+    "modello da 'pi --list-models'.",
   "select": "seleziona",
+  "Select an AI Agent...": "Seleziona un Agente AI...",
+  "Search $1 models or type a custom ID...":
+    "Cerca i modelli di $1 o digita un ID personalizzato...",
+  "Installed": "Installato",
+  "Not found": "Non trovato",
+  "Default": "Default",
+  "Custom ID": "ID personalizzato",
+  "Select model...": "Scegli modello...",
+  "Reset to default": "Ripristina default",
   // --- live activity, human-friendly tools & interactive questions ---
   "Read file": "Lettura file",
   "Write file": "Scrittura file",
@@ -409,168 +509,10 @@ function substitute(template, ...args) {
 }
 
 // src/shared/modals.ts
+var import_obsidian2 = require("obsidian");
+
+// src/shared/suggestModals.ts
 var import_obsidian = require("obsidian");
-var RenameModal = class extends import_obsidian.Modal {
-  constructor(app, plugin, current, onSubmit) {
-    super(app);
-    this.plugin = plugin;
-    this.current = current;
-    this.onSubmit = onSubmit;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    const t = (s) => this.plugin.t(s);
-    contentEl.empty();
-    contentEl.createEl("h3", { text: t("Rename session") });
-    let input;
-    new import_obsidian.Setting(contentEl).setName(t("New title")).addText(
-      (txt) => {
-      input = txt.inputEl;
-      txt.setValue(this.current);
-      txt.inputEl.select();
-    });
-    new import_obsidian.Setting(contentEl).addButton(
-      (b) => b.setButtonText(t("Save")).setCta().onClick(() => {
-        if (!input) return;
-        const v = input.value.trim();
-        if (!v) {
-          new import_obsidian.Notice(t("The title cannot be empty."));
-          return;
-        }
-        this.onSubmit(v);
-        this.close();
-      })
-    ).addButton(
-      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
-    );
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-var StatsModal = class extends import_obsidian.Modal {
-  constructor(app, plugin, engine) {
-    super(app);
-    this.plugin = plugin;
-    this.engine = engine;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    const t = (s) => this.plugin.t(s);
-    contentEl.empty();
-    contentEl.createEl("h3", { text: t("Token usage and costs") });
-    const status = contentEl.createDiv({
-      cls: "opencode-stats-loading",
-      text: t("Loading...")
-    });
-    this.plugin.registry.resolveProvider(this.engine).getUsageStats().then(
-      (s) => {
-      status.remove();
-      this.renderWindow(contentEl, t("Last 5 hours"), s.h5);
-      this.renderWindow(contentEl, t("Last week"), s.week);
-      this.renderWindow(contentEl, t("Last month"), s.month);
-    }).catch((e) => {
-      status.setText(`${t("Error:")} ${e.message}`);
-    });
-  }
-  renderWindow(container, label, w) {
-    const locale = this.plugin.settings.language === "it" ? "it-IT" : "en-US";
-    const t = (s) => this.plugin.t(s);
-    container.createEl("h4", { text: label });
-    new import_obsidian.Setting(container).setName(t("Input tokens")).setDesc(
-      w.input.toLocaleString(locale));
-    new import_obsidian.Setting(container).setName(t("Output tokens")).setDesc(
-      w.output.toLocaleString(locale));
-    new import_obsidian.Setting(container).setName(t("Total tokens")).setDesc((
-      w.input + w.output).toLocaleString(locale));
-    const provider = this.plugin.registry.resolveProvider(this.engine);
-    const incKey = provider.costNote ? t("Included with $1 ($0.00)") :
-      t("Included ($0.00)");
-    const costDesc = provider.included ?
-      substitute(incKey, provider.costNote ?? "") : `${w.cost.toFixed(4)} $`;
-    new import_obsidian.Setting(container).setName(t("Cost")).setDesc(costDesc);
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-var ConfirmModal = class extends import_obsidian.Modal {
-  constructor(app, plugin, title, message, confirmLabel, onConfirm) {
-    super(app);
-    this.plugin = plugin;
-    this.title = title;
-    this.message = message;
-    this.confirmLabel = confirmLabel;
-    this.onConfirm = onConfirm;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    const t = (s) => this.plugin.t(s);
-    contentEl.empty();
-    contentEl.createEl("h3", { text: this.title });
-    contentEl.createDiv({
-      cls: "opencode-confirm-message",
-      text: this.message
-    });
-    new import_obsidian.Setting(contentEl).addButton(
-      (b) => b.setButtonText(this.confirmLabel).setWarning().onClick(() => {
-        this.onConfirm();
-        this.close();
-      })
-    ).addButton(
-      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
-    );
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-var PromptModal = class extends import_obsidian.Modal {
-  constructor(app, plugin, initialName, initialText, onSave) {
-    super(app);
-    this.plugin = plugin;
-    this.initialName = initialName;
-    this.initialText = initialText;
-    this.onSave = onSave;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    const t = (s) => this.plugin.t(s);
-    contentEl.empty();
-    contentEl.createEl("h3", { text: t("Prompt") });
-    let nameInput;
-    let textArea;
-    new import_obsidian.Setting(contentEl).setName(t("Prompt name")).addText(
-      (x) => {
-      nameInput = x.inputEl;
-      x.setValue(this.initialName);
-    });
-    new import_obsidian.Setting(contentEl).setName(t("Prompt text"))
-      .addTextArea((x) => {
-      textArea = x.inputEl;
-      x.setValue(this.initialText);
-      x.inputEl.rows = 10;
-    });
-    new import_obsidian.Setting(contentEl).addButton(
-      (b) => b.setButtonText(t("Save")).setCta().onClick(() => {
-        if (!nameInput || !textArea) return;
-        const name = nameInput.value.trim();
-        const text = textArea.value;
-        if (!name || !text) {
-          new import_obsidian.Notice(t("The prompt cannot be empty."));
-          return;
-        }
-        this.onSave(name, text);
-        this.close();
-      })
-    ).addButton(
-      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
-    );
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
 var FileSuggestModal = class extends import_obsidian.SuggestModal {
   constructor(app, plugin, onPick) {
     super(app);
@@ -605,16 +547,14 @@ var FileSuggestModal = class extends import_obsidian.SuggestModal {
     this.onPick(file);
   }
 };
-var ModelSuggestModal = class extends import_obsidian.SuggestModal {
+var AgentSuggestModal = class extends import_obsidian.SuggestModal {
   constructor(app, plugin, items, onPick) {
     super(app);
     this.plugin = plugin;
     this.items = items;
     this.onPick = onPick;
     const t = (s) => this.plugin.t(s);
-    this.setPlaceholder(
-      t("Search models... (e.g. gemini, claude, flash, deepseek)")
-    );
+    this.setPlaceholder(t("Select an AI Agent..."));
     this.setInstructions([
       { command: "↑↓", purpose: t("navigate") },
       { command: "↵", purpose: t("select") },
@@ -626,30 +566,166 @@ var ModelSuggestModal = class extends import_obsidian.SuggestModal {
   }
   getSuggestions(query) {
     const q = query.trim().toLowerCase();
-    if (!q) {
-      return this.items.slice(0, 30);
-    }
-    const filtered = this.items.filter(
-      (item) => item.id.toLowerCase().includes(q) ||
-        item.provider.toLowerCase().includes(q) ||
-          item.engine.toLowerCase().includes(q)
+    if (!q) return this.items;
+    return this.items.filter(
+      (item) => item.shortName.toLowerCase().includes(q) ||
+        item.displayName.toLowerCase().includes(q) ||
+          item.id.toLowerCase().includes(q) ||
+            item.activeModel.toLowerCase().includes(q)
     );
-    return filtered.slice(0, 30);
   }
   renderSuggestion(item, el) {
-    el.addClass("opencode-model-suggest-item");
-    const titleEl = el.createDiv({ cls: "opencode-model-suggest-title" });
-    titleEl.createSpan({ text: item.id, cls: "opencode-model-suggest-name" });
+    const t = (s) => this.plugin.t(s);
+    el.addClass("opencode-agent-suggest-item");
+    if (item.isActive) el.addClass("is-selected");
+    const topRow = el.createDiv({ cls: "opencode-agent-suggest-top" });
+    const leftGroup = topRow.createDiv({ cls: "opencode-agent-suggest-left" });
+    const iconEl = leftGroup.createSpan({ cls: "opencode-agent-suggest-icon" });
+    (0, import_obsidian.setIcon)(iconEl, item.icon || "bot");
+    leftGroup.createSpan({
+      text: item.shortName,
+      cls: "opencode-agent-suggest-name"
+    });
+    leftGroup.createSpan({
+      text: item.displayName,
+      cls: "opencode-agent-suggest-fullname"
+    });
+    const rightGroup =
+      topRow.createDiv({ cls: "opencode-agent-suggest-right" });
+    const statusBadge = rightGroup.createSpan({
+      cls:
+        "opencode-suggest-" +
+        "badge " + (item.installed ? "opencode-suggest-badge--ok" : "opencode-suggest-badge--muted"),
+      text: item.installed ? t("Installed") : t("Not found")
+    });
+    statusBadge.setAttribute("title", item.binary);
     if (item.isActive) {
-      titleEl.createSpan({ text: "  ✓", cls: "opencode-model-suggest-check" });
+      rightGroup.createSpan({
+        text: "✓",
+        cls: "opencode-model-suggest-check"
+      });
     }
-    const activeSuffix = item.isActive ?
-      ` · ${this.plugin.t("active model")}` : "";
-    const descCls =
-      `opencode-model-suggest-desc opencode-model-suggest-desc--${item.engine}`;
+    const bottomRow = el.createDiv({ cls: "opencode-agent-suggest-bottom" });
+    bottomRow.createSpan({
+      text: `${t("Model")}: `,
+      cls: "opencode-agent-suggest-meta-label"
+    });
+    bottomRow.createSpan({
+      text: item.activeModel || t("(CLI default)"),
+      cls: "opencode-agent-suggest-meta-val"
+    });
+  }
+  onChooseSuggestion(item) {
+    this.onPick(item);
+  }
+};
+var ModelSuggestModal = class extends import_obsidian.SuggestModal {
+  constructor(app, plugin, items, activeEngine, onPick) {
+    super(app);
+    this.plugin = plugin;
+    this.items = items;
+    this.activeEngine = activeEngine;
+    this.onPick = onPick;
+    const t = (s) => this.plugin.t(s);
+    const provider = this.plugin.registry.get(this.activeEngine);
+    const agentName = provider?.descriptor.shortName || this.activeEngine;
+    this.setPlaceholder(
+      substitute(
+        t("Search $1 models or type a custom ID..."),
+        agentName
+      )
+    );
+    this.setInstructions([
+      { command: "↑↓", purpose: t("navigate") },
+      { command: "↵", purpose: t("select") },
+      { command: "esc", purpose: t("close") }
+    ]);
+  }
+  getItems() {
+    return this.items;
+  }
+  getSuggestions(query) {
+    const raw = query.trim();
+    const q = raw.toLowerCase();
+    if (!q) {
+      return this.items.slice(0, 60);
+    }
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const filtered = this.items.filter((item) => {
+      const hay =
+        `${item.id} ${item.label ?? ""} ${item.provider}`.toLowerCase();
+      return tokens.every((tok) => hay.includes(tok));
+    }).slice(0, 59);
+    const exactExists = this.items.some(
+      (item) => item.id.toLowerCase() === q
+    );
+    if (!exactExists && /^[a-zA-Z0-9_.:/+-]+$/.test(raw)) {
+      const provider = this.plugin.registry.get(this.activeEngine);
+      const providerLabel = provider?.descriptor.shortName || this.activeEngine;
+      filtered.push({
+        id: raw,
+        label: raw,
+        engine: this.activeEngine,
+        provider: providerLabel,
+        isActive: false,
+        isCustom: true
+      });
+    }
+    return filtered;
+  }
+  renderSuggestion(item, el) {
+    const t = (s) => this.plugin.t(s);
+    el.addClass("opencode-model-suggest-item");
+    if (item.isActive) el.addClass("is-selected");
+    const slashIdx = item.id.indexOf("/");
+    const vendorPrefix = !item.isDefault && !item.isCustom && slashIdx > 0 ?
+      item.id.slice(0, slashIdx) : "";
+    const shortModelName = vendorPrefix && slashIdx > 0 ?
+      item.id.slice(slashIdx + 1) : item.label || item.id;
+    const titleEl = el.createDiv({ cls: "opencode-model-suggest-title" });
+    const leftEl = titleEl.createDiv({ cls: "opencode-model-suggest-left" });
+    const iconEl = leftEl.createSpan({ cls: "opencode-model-suggest-icon" });
+    (0, import_obsidian.setIcon)(
+      iconEl,
+      item.isDefault ? "sparkles" : item.isCustom ? "edit-3" : "cpu"
+    );
+    leftEl.createSpan({
+      text: shortModelName,
+      cls: "opencode-model-suggest-name"
+    });
+    const rightEl = titleEl.createDiv({ cls: "opencode-model-suggest-right" });
+    if (vendorPrefix) {
+      rightEl.createSpan({
+        text: vendorPrefix,
+        cls: "opencode-suggest-badge opencode-suggest-badge--vendor"
+      });
+    } else if (item.isDefault) {
+      rightEl.createSpan({
+        text: t("Default"),
+        cls: "opencode-suggest-badge opencode-suggest-badge--accent"
+      });
+    } else if (item.isCustom) {
+      rightEl.createSpan({
+        text: t("Custom ID"),
+        cls: "opencode-suggest-badge opencode-suggest-badge--accent"
+      });
+    }
+    if (item.isActive) {
+      rightEl.createSpan({ text: "✓", cls: "opencode-model-suggest-check" });
+    }
+    const subTextParts = [];
+    if (vendorPrefix) {
+      subTextParts.push(item.id);
+    } else {
+      subTextParts.push(item.provider);
+    }
+    if (item.isActive) {
+      subTextParts.push(t("active model"));
+    }
     el.createDiv({
-      cls: descCls,
-      text: item.provider + activeSuffix
+      cls:
+        `opencode-model-suggest-desc opencode-model-suggest-desc--${item.engine}`,
+      text: subTextParts.join(" · ")
     });
   }
   onChooseSuggestion(item) {
@@ -657,11 +733,175 @@ var ModelSuggestModal = class extends import_obsidian.SuggestModal {
   }
 };
 
+// src/shared/modals.ts
+var RenameModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin, current, onSubmit) {
+    super(app);
+    this.plugin = plugin;
+    this.current = current;
+    this.onSubmit = onSubmit;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    const t = (s) => this.plugin.t(s);
+    contentEl.empty();
+    contentEl.createEl("h3", { text: t("Rename session") });
+    let input;
+    new import_obsidian2.Setting(contentEl).setName(t("New title")).addText(
+      (txt) => {
+      input = txt.inputEl;
+      txt.setValue(this.current);
+      txt.inputEl.select();
+    });
+    new import_obsidian2.Setting(contentEl).addButton(
+      (b) => b.setButtonText(t("Save")).setCta().onClick(() => {
+        if (!input) return;
+        const v = input.value.trim();
+        if (!v) {
+          new import_obsidian2.Notice(t("The title cannot be empty."));
+          return;
+        }
+        this.onSubmit(v);
+        this.close();
+      })
+    ).addButton(
+      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var StatsModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin, engine) {
+    super(app);
+    this.plugin = plugin;
+    this.engine = engine;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    const t = (s) => this.plugin.t(s);
+    contentEl.empty();
+    contentEl.createEl("h3", { text: t("Token usage and costs") });
+    const status = contentEl.createDiv({
+      cls: "opencode-stats-loading",
+      text: t("Loading...")
+    });
+    this.plugin.registry.resolveProvider(this.engine).getUsageStats().then(
+      (s) => {
+      status.remove();
+      this.renderWindow(contentEl, t("Last 5 hours"), s.h5);
+      this.renderWindow(contentEl, t("Last week"), s.week);
+      this.renderWindow(contentEl, t("Last month"), s.month);
+    }).catch((e) => {
+      status.setText(`${t("Error:")} ${e.message}`);
+    });
+  }
+  renderWindow(container, label, w) {
+    const locale = this.plugin.settings.language === "it" ? "it-IT" : "en-US";
+    const t = (s) => this.plugin.t(s);
+    container.createEl("h4", { text: label });
+    new import_obsidian2.Setting(container).setName(t("Input tokens")).setDesc(
+      w.input.toLocaleString(locale));
+    new import_obsidian2.Setting(container).setName(t("Output tokens")).setDesc(
+      w.output.toLocaleString(locale));
+    new import_obsidian2.Setting(container).setName(t("Total tokens")).setDesc((
+      w.input + w.output).toLocaleString(locale));
+    const provider = this.plugin.registry.resolveProvider(this.engine);
+    const incKey = provider.costNote ? t("Included with $1 ($0.00)") :
+      t("Included ($0.00)");
+    const costDesc = provider.included ?
+      substitute(incKey, provider.costNote ?? "") : `${w.cost.toFixed(4)} $`;
+    new import_obsidian2.Setting(container).setName(t("Cost")).setDesc(
+      costDesc);
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var ConfirmModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin, title, message, confirmLabel, onConfirm) {
+    super(app);
+    this.plugin = plugin;
+    this.title = title;
+    this.message = message;
+    this.confirmLabel = confirmLabel;
+    this.onConfirm = onConfirm;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    const t = (s) => this.plugin.t(s);
+    contentEl.empty();
+    contentEl.createEl("h3", { text: this.title });
+    contentEl.createDiv({
+      cls: "opencode-confirm-message",
+      text: this.message
+    });
+    new import_obsidian2.Setting(contentEl).addButton(
+      (b) => b.setButtonText(this.confirmLabel).setWarning().onClick(() => {
+        this.onConfirm();
+        this.close();
+      })
+    ).addButton(
+      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var PromptModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin, initialName, initialText, onSave) {
+    super(app);
+    this.plugin = plugin;
+    this.initialName = initialName;
+    this.initialText = initialText;
+    this.onSave = onSave;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    const t = (s) => this.plugin.t(s);
+    contentEl.empty();
+    contentEl.createEl("h3", { text: t("Prompt") });
+    let nameInput;
+    let textArea;
+    new import_obsidian2.Setting(contentEl).setName(t("Prompt name")).addText(
+      (x) => {
+      nameInput = x.inputEl;
+      x.setValue(this.initialName);
+    });
+    new import_obsidian2.Setting(contentEl).setName(t("Prompt text"))
+      .addTextArea((x) => {
+      textArea = x.inputEl;
+      x.setValue(this.initialText);
+      x.inputEl.rows = 10;
+    });
+    new import_obsidian2.Setting(contentEl).addButton(
+      (b) => b.setButtonText(t("Save")).setCta().onClick(() => {
+        if (!nameInput || !textArea) return;
+        const name = nameInput.value.trim();
+        const text = textArea.value;
+        if (!name || !text) {
+          new import_obsidian2.Notice(t("The prompt cannot be empty."));
+          return;
+        }
+        this.onSave(name, text);
+        this.close();
+      })
+    ).addButton(
+      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+
 // src/features/chat/messageBubble.ts
-var import_obsidian4 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 
 // src/features/chat/stepWidget.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 var TOOL_PRESENTATION_MAP = {
   read: { labelKey: "Read file", icon: "file-text" },
   view_file: { labelKey: "Read file", icon: "file-text" },
@@ -671,23 +911,40 @@ var TOOL_PRESENTATION_MAP = {
   write_file: { labelKey: "Write file", icon: "file-plus" },
   edit: { labelKey: "Edit file", icon: "file-edit" },
   edit_file: { labelKey: "Edit file", icon: "file-edit" },
+  patch: { labelKey: "Edit file", icon: "file-edit" },
+  multiedit: { labelKey: "Edit file", icon: "file-edit" },
+  notebookedit: { labelKey: "Edit file", icon: "file-edit" },
   replace_file_content: { labelKey: "Edit file", icon: "file-edit" },
   multi_replace_file_content: { labelKey: "Edit file", icon: "file-edit" },
   bash: { labelKey: "Run command", icon: "terminal" },
+  terminal: { labelKey: "Run command", icon: "terminal" },
+  shell: { labelKey: "Run command", icon: "terminal" },
   run_command: { labelKey: "Run command", icon: "terminal" },
+  code_execution: { labelKey: "Run command", icon: "terminal" },
   grep: { labelKey: "Search text", icon: "search" },
   grep_search: { labelKey: "Search text", icon: "search" },
+  search_files: { labelKey: "Search text", icon: "search" },
   glob: { labelKey: "Find files", icon: "folder-search" },
   find_by_name: { labelKey: "Find files", icon: "folder-search" },
+  ls: { labelKey: "List folder", icon: "folder" },
   list_dir: { labelKey: "List folder", icon: "folder" },
   webfetch: { labelKey: "Web search", icon: "globe" },
+  websearch: { labelKey: "Web search", icon: "globe" },
+  web_search: { labelKey: "Web search", icon: "globe" },
+  web_extract: { labelKey: "Web search", icon: "globe" },
   search_web: { labelKey: "Web search", icon: "globe" },
   read_url_content: { labelKey: "Web search", icon: "globe" },
   todowrite: { labelKey: "Task list", icon: "list-todo" },
+  todoread: { labelKey: "Task list", icon: "list-todo" },
+  todo_list: { labelKey: "Task list", icon: "list-todo" },
   task: { labelKey: "Subagent", icon: "bot" },
+  agent: { labelKey: "Subagent", icon: "bot" },
   invoke_subagent: { labelKey: "Subagent", icon: "bot" },
+  delegate_task: { labelKey: "Subagent", icon: "bot" },
   question: { labelKey: "Question", icon: "help-circle" },
-  ask_question: { labelKey: "Question", icon: "help-circle" }
+  ask_question: { labelKey: "Question", icon: "help-circle" },
+  askuserquestion: { labelKey: "Question", icon: "help-circle" },
+  clarify: { labelKey: "Question", icon: "help-circle" }
 };
 function formatToolAction(tool, rawTitle, t) {
   const key = (tool || "").toLowerCase();
@@ -747,7 +1004,7 @@ var StepManager = class {
       rec.row.removeClass("opencode-step--running");
       rec.row.addClass(doneCls);
       rec.icon.empty();
-      (0, import_obsidian2.setIcon)(rec.icon, isErr ? "x" : toolIcon);
+      (0, import_obsidian3.setIcon)(rec.icon, isErr ? "x" : toolIcon);
       this.renderStepTitle(rec.titleEl, step);
       this.updateDuration(rec.durationEl, step.durationMs);
       if (this.showIO) {
@@ -762,7 +1019,7 @@ var StepManager = class {
         cls: `opencode-step ${doneCls}`
       });
       const icon = row.createSpan({ cls: "opencode-step-icon" });
-      (0, import_obsidian2.setIcon)(icon, isErr ? "x" : toolIcon);
+      (0, import_obsidian3.setIcon)(icon, isErr ? "x" : toolIcon);
       const main = row.createDiv({ cls: "opencode-step-main" });
       const header = main.createDiv({ cls: "opencode-step-header" });
       const titleEl = header.createDiv({ cls: "opencode-step-title" });
@@ -791,7 +1048,7 @@ var StepManager = class {
         rec.row.removeClass("opencode-step--running");
         rec.row.addClass("opencode-step--done");
         rec.icon.empty();
-        (0, import_obsidian2.setIcon)(rec.icon, "check");
+        (0, import_obsidian3.setIcon)(rec.icon, "check");
       }
     }
   }
@@ -857,7 +1114,7 @@ var StepManager = class {
 };
 
 // src/features/chat/questionCard.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 function formatQuestionAnswers(questions, selectedByIdx, customByIdx, t) {
   const lines = [];
   if (questions.length > 1) {
@@ -886,7 +1143,7 @@ function renderQuestionCard(container, questions, t, onSubmit,
   const card = container.createDiv({ cls: "opencode-question-card" });
   const headerRow = card.createDiv({ cls: "opencode-question-card-header" });
   const iconSpan = headerRow.createSpan({ cls: "opencode-question-card-icon" });
-  (0, import_obsidian3.setIcon)(iconSpan, "help-circle");
+  (0, import_obsidian4.setIcon)(iconSpan, "help-circle");
   headerRow.createSpan({
     cls: "opencode-question-card-title",
     text: t("Agent question")
@@ -917,7 +1174,8 @@ function renderQuestionCard(container, questions, t, onSubmit,
         attr: { type: "button" }
       });
       const checkSpan = btn.createSpan({ cls: "opencode-question-opt-check" });
-      checkSpan.setText(q.multiple ? "☐" : "○");
+      (0, import_obsidian4.setIcon)(checkSpan, q.multiple ? "square" :
+        "circle");
       const textCol = btn.createDiv({ cls: "opencode-question-opt-content" });
       textCol.createDiv({
         cls: "opencode-question-opt-label",
@@ -935,22 +1193,28 @@ function renderQuestionCard(container, questions, t, onSubmit,
           if (selected.has(opt.label)) {
             selected.delete(opt.label);
             btn.removeClass("is-selected");
-            checkSpan.setText("☐");
+            checkSpan.empty();
+            (0, import_obsidian4.setIcon)(checkSpan, "square");
           } else {
             selected.add(opt.label);
             btn.addClass("is-selected");
-            checkSpan.setText("☑");
+            checkSpan.empty();
+            (0, import_obsidian4.setIcon)(checkSpan, "check-square");
           }
         } else {
           selected.clear();
           for (const b of blockBtns) {
             b.removeClass("is-selected");
             const c = b.querySelector(".opencode-question-opt-check");
-            if (c) c.setText("○");
+            if (c) {
+              c.empty();
+              (0, import_obsidian4.setIcon)(c, "circle");
+            }
           }
           selected.add(opt.label);
           btn.addClass("is-selected");
-          checkSpan.setText("●");
+          checkSpan.empty();
+          (0, import_obsidian4.setIcon)(checkSpan, "check-circle-2");
         }
       });
       blockBtns.push(btn);
@@ -990,7 +1254,7 @@ function renderQuestionCard(container, questions, t, onSubmit,
       t
     );
     if (!formatted) {
-      new import_obsidian3.Notice(t(
+      new import_obsidian4.Notice(t(
         "Please select or type an answer before sending."));
       return;
     }
@@ -1005,27 +1269,30 @@ function renderQuestionCard(container, questions, t, onSubmit,
 }
 
 // src/features/chat/messageBubble.ts
-function metaWithCopy(row, label, getText, onCopy, copyTitle) {
+function metaWithCopy(row, label, getText, onCopy, copyTitle, iconName =
+  "bot") {
   const meta = row.createDiv({ cls: "opencode-meta" });
-  meta.createSpan({ text: label });
+  const iconEl = meta.createSpan({ cls: "opencode-meta-icon" });
+  (0, import_obsidian5.setIcon)(iconEl, iconName);
+  meta.createSpan({ text: label, cls: "opencode-meta-label" });
   meta.createSpan({ cls: "opencode-meta-spacer" });
   const btn = meta.createEl("button", {
     cls: "opencode-icon-btn",
     attr: { title: copyTitle }
   });
-  (0, import_obsidian4.setIcon)(btn, "copy");
+  (0, import_obsidian5.setIcon)(btn, "copy");
   btn.addEventListener("click", () => onCopy(getText()));
 }
 function renderUserBubble(container, text, ctxLabel, t, onCopy) {
   const row = container.createDiv({
     cls: "opencode-message opencode-message--user"
   });
-  metaWithCopy(row, t("You"), () => text, onCopy, t("Copy text"));
+  metaWithCopy(row, t("You"), () => text, onCopy, t("Copy text"), "user");
   if (ctxLabel) {
-    row.createDiv({
-      cls: "opencode-context-hint",
-      text: `${t("with context:")} ${ctxLabel}`
-    });
+    const ctxHint = row.createDiv({ cls: "opencode-context-hint" });
+    const ctxIcon = ctxHint.createSpan({ cls: "opencode-context-hint-icon" });
+    (0, import_obsidian5.setIcon)(ctxIcon, "file-text");
+    ctxHint.createSpan({ text: `${t("with context:")} ${ctxLabel}` });
   }
   row.createDiv({ cls: "opencode-bubble", text });
 }
@@ -1033,12 +1300,19 @@ function renderErrorBubble(container, msg, t, onCopy) {
   const row = container.createDiv({
     cls: "opencode-message opencode-message--error"
   });
-  metaWithCopy(row, t("Error"), () => msg, onCopy, t("Copy text"));
+  metaWithCopy(
+    row,
+    t("Error"),
+    () => msg,
+    onCopy,
+    t("Copy text"),
+    "alert-triangle"
+  );
   row.createDiv({ cls: "opencode-bubble", text: msg });
 }
 var AssistantBubble = class {
   constructor(row, app, component, assistantLabel, t, showIO, onScrollRequest,
-    onCopy, fmtTokens, onAnswerQuestion) {
+    onCopy, fmtTokens, onAnswerQuestion, assistantIcon = "bot") {
     this.row = row;
     this.app = app;
     this.component = component;
@@ -1049,18 +1323,22 @@ var AssistantBubble = class {
     this.onCopy = onCopy;
     this.fmtTokens = fmtTokens;
     this.onAnswerQuestion = onAnswerQuestion;
+    this.assistantIcon = assistantIcon;
     metaWithCopy(
       this.row,
       this.assistantLabel,
       () => this.rawText,
       this.onCopy,
-      this.t("Copy text")
+      this.t("Copy text"),
+      this.assistantIcon
     );
     this.reasoningEl = this.row.createEl("details", {
       cls: "opencode-reasoning hidden"
     });
     const summary = this.reasoningEl.createEl("summary");
-    summary.setText(this.t("Reasoning"));
+    const brainIcon = summary.createSpan({ cls: "opencode-reasoning-icon" });
+    (0, import_obsidian5.setIcon)(brainIcon, "brain");
+    summary.createSpan({ text: this.t("Reasoning") });
     this.reasoningContent = this.reasoningEl.createDiv({
       cls: "opencode-reasoning-content"
     });
@@ -1186,7 +1464,7 @@ var AssistantBubble = class {
     }
     this.contentEl.empty();
     if (this.rawText.trim()) {
-      import_obsidian4.MarkdownRenderer.render(
+      import_obsidian5.MarkdownRenderer.render(
         this.app,
         this.rawText,
         this.contentEl,
@@ -1277,7 +1555,7 @@ var AssistantBubble = class {
     if (this.rawText.trim()) {
       this.contentEl.removeClass("hidden");
       if (this.rawText.length <= 3e4) {
-        import_obsidian4.MarkdownRenderer.render(
+        import_obsidian5.MarkdownRenderer.render(
           this.app,
           this.rawText,
           this.contentEl,
@@ -1306,6 +1584,7 @@ var AssistantBubble = class {
 };
 
 // src/features/chat/suggestPopup.ts
+var import_obsidian6 = require("obsidian");
 var MAX_SUGGEST = 50;
 var SuggestPopup = class {
   constructor(container, inputEl, app, plugin, cb) {
@@ -1443,6 +1722,7 @@ var SuggestPopup = class {
         {
           label: "/prompt",
           desc: this.plugin.t("No saved prompts — add them in Settings"),
+          icon: "bookmark-plus",
           action: () => this.removeTrigger()
         }
       ];
@@ -1453,6 +1733,7 @@ var SuggestPopup = class {
     return list.map((p) => ({
       label: p.name,
       desc: p.text.length > 80 ? p.text.slice(0, 77) + "…" : p.text,
+      icon: "bookmark",
       action: () => this.replaceTriggerWith(p.text)
     }));
   }
@@ -1488,8 +1769,18 @@ var SuggestPopup = class {
   commandItems() {
     return [
       {
+        label: this.plugin.t("/agent"),
+        desc: this.plugin.t("Change the AI agent"),
+        icon: "bot",
+        action: () => {
+          this.removeTrigger();
+          this.cb.onOpenAgentList();
+        }
+      },
+      {
         label: this.plugin.t("/model"),
         desc: this.plugin.t("Change the model"),
+        icon: "cpu",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenModelList();
@@ -1498,6 +1789,7 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("/new"),
         desc: this.plugin.t("New session"),
+        icon: "plus-circle",
         action: () => {
           this.removeTrigger();
           this.cb.onStartNewSession();
@@ -1506,6 +1798,7 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("/note"),
         desc: this.plugin.t("Attach the current note"),
+        icon: "file-plus",
         action: () => {
           this.removeTrigger();
           this.cb.onAttachCurrentNote();
@@ -1514,6 +1807,7 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("/attach"),
         desc: this.plugin.t("Attach a file"),
+        icon: "paperclip",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenFilePicker();
@@ -1522,6 +1816,7 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("/stats"),
         desc: this.plugin.t("Token and cost statistics"),
+        icon: "bar-chart-3",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenStats();
@@ -1530,6 +1825,7 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("/pin"),
         desc: this.plugin.t("Pin/Unpin session"),
+        icon: "pin",
         action: () => {
           this.removeTrigger();
           this.cb.onTogglePin();
@@ -1538,6 +1834,7 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("/rename"),
         desc: this.plugin.t("Rename session"),
+        icon: "pencil",
         action: () => {
           this.removeTrigger();
           this.cb.onRenameSession();
@@ -1546,6 +1843,7 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("/prompt"),
         desc: this.plugin.t("Insert a saved prompt"),
+        icon: "bookmark",
         action: () => {
           this.startPromptSelection();
         }
@@ -1566,9 +1864,11 @@ var SuggestPopup = class {
     for (let i = 0; i < paths.length && items.length < MAX_SUGGEST; i++) {
       if (q && !lower[i].includes(q)) continue;
       const p = paths[i];
+      const isImg = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(p);
       items.push({
         label: p,
         desc,
+        icon: isImg ? "image" : "file-text",
         action: () => {
           this.removeTrigger();
           this.cb.onAddAttachment(p);
@@ -1582,6 +1882,7 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("current note"),
         desc: this.plugin.t("Attach the open note as context"),
+        icon: "file-plus",
         action: () => {
           this.removeTrigger();
           this.cb.onAttachCurrentNote();
@@ -1590,6 +1891,7 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("attach file"),
         desc: this.plugin.t("Pick a file to attach"),
+        icon: "paperclip",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenFilePicker();
@@ -1598,6 +1900,7 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("new session"),
         desc: this.plugin.t("Start from an empty session"),
+        icon: "plus-circle",
         action: () => {
           this.removeTrigger();
           this.cb.onStartNewSession();
@@ -1606,6 +1909,7 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("statistics"),
         desc: this.plugin.t("Tokens and costs (5h, week, month)"),
+        icon: "bar-chart-3",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenStats();
@@ -1614,14 +1918,25 @@ var SuggestPopup = class {
       {
         label: this.plugin.t("pin/unpin session"),
         desc: this.plugin.t("Pin the session in the list"),
+        icon: "pin",
         action: () => {
           this.removeTrigger();
           this.cb.onTogglePin();
         }
       },
       {
+        label: this.plugin.t("active agent"),
+        desc: this.plugin.t("Change the AI agent"),
+        icon: "bot",
+        action: () => {
+          this.removeTrigger();
+          this.cb.onOpenAgentList();
+        }
+      },
+      {
         label: this.plugin.t("active model"),
         desc: this.plugin.t("Change the model"),
+        icon: "cpu",
         action: () => {
           this.removeTrigger();
           this.cb.onOpenModelList();
@@ -1640,9 +1955,14 @@ var SuggestPopup = class {
     for (let i = 0; i < this.suggestItems.length; i++) {
       const it = this.suggestItems[i];
       const row = this.suggestEl.createDiv({ cls: "opencode-suggest-item" });
-      row.createDiv({ text: it.label, cls: "opencode-suggest-label" });
+      if (it.icon) {
+        const iconEl = row.createSpan({ cls: "opencode-suggest-icon" });
+        (0, import_obsidian6.setIcon)(iconEl, it.icon);
+      }
+      const textCol = row.createDiv({ cls: "opencode-suggest-content" });
+      textCol.createDiv({ text: it.label, cls: "opencode-suggest-label" });
       if (it.desc) {
-        row.createDiv({ text: it.desc, cls: "opencode-suggest-desc" });
+        textCol.createDiv({ text: it.desc, cls: "opencode-suggest-desc" });
       }
       row.addEventListener("mousedown", (e) => {
         e.preventDefault();
@@ -1677,7 +1997,7 @@ var SuggestPopup = class {
 };
 
 // src/features/chat/attachmentManager.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 var import_promises = require("fs/promises");
 var DOC_RE = /\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|epub|html?)$/i;
 var AttachmentManager = class {
@@ -1704,7 +2024,7 @@ var AttachmentManager = class {
     this.attachments.push({ path, label: path, image: isImage });
     this.updateBar();
     if (isImage) {
-      new import_obsidian5.Notice(
+      new import_obsidian7.Notice(
         this.plugin.t(
             "Image attached: check that the selected model supports images " +
             "(vision)."
@@ -1727,7 +2047,7 @@ var AttachmentManager = class {
       } catch (e) {
         const errMsg = e.message;
         const failLabel = this.plugin.t("anydoc conversion failed");
-        new import_obsidian5.Notice(`${failLabel}: ${a.label} (${errMsg})`);
+        new import_obsidian7.Notice(`${failLabel}: ${a.label} (${errMsg})`);
         const maxMB = this.plugin.settings.maxAttachMB || 20;
         try {
           if (abs) {
@@ -1736,7 +2056,7 @@ var AttachmentManager = class {
               const skipKey = 
                 "Attachment skipped: the file is larger than $1 MB and " +
                 "could not be converted, so it was not attached.";
-              new import_obsidian5.Notice(substitute(this.plugin.t(skipKey),
+              new import_obsidian7.Notice(substitute(this.plugin.t(skipKey),
                 maxMB));
               return null;
             }
@@ -1751,7 +2071,7 @@ var AttachmentManager = class {
   }
   resolveVaultFile(relPath) {
     const adapter = this.app.vault.adapter;
-    if (adapter instanceof import_obsidian5.FileSystemAdapter) {
+    if (adapter instanceof import_obsidian7.FileSystemAdapter) {
       return adapter.getFullPath(relPath);
     }
     return null;
@@ -1768,10 +2088,10 @@ var AttachmentManager = class {
         cls: "opencode-attachment-chip"
       });
       const icon = chip.createSpan({ cls: "opencode-attachment-icon" });
-      (0, import_obsidian5.setIcon)(icon, a.image ? "image" : "file-text");
+      (0, import_obsidian7.setIcon)(icon, a.image ? "image" : "file-text");
       chip.createSpan({ text: a.label, cls: "opencode-attachment-label" });
       const rm = chip.createEl("button", { cls: "opencode-icon-btn" });
-      (0, import_obsidian5.setIcon)(rm, "x");
+      (0, import_obsidian7.setIcon)(rm, "x");
       rm.addEventListener("click", () => {
         this.attachments = this.attachments.filter((x) => x.path !== a.path);
         this.updateBar();
@@ -1780,9 +2100,83 @@ var AttachmentManager = class {
   }
 };
 
+// src/features/chat/sessionControls.ts
+async function fetchDisplayedSessions(plugin, viewSession, fallbackEngine) {
+  const providers = plugin.registry.getAll();
+  const results = await Promise.allSettled(
+    providers.map((p) => p.listSessions())
+  );
+  const all = [];
+  const seen = /* @__PURE__ */ new Set();
+  results.forEach((res, i) => {
+    if (res.status === "fulfilled") {
+      const providerId = providers[i].id;
+      for (const s of res.value) {
+        if (!seen.has(s.id)) {
+          seen.add(s.id);
+          const engine = s.engine || providerId;
+          all.push({ ...s, engine });
+          if (!plugin.settings.sessionEngines) {
+            plugin.settings.sessionEngines = {};
+          }
+          if (!plugin.settings.sessionEngines[s.id]) {
+            plugin.settings.sessionEngines[s.id] = engine;
+          }
+        }
+      }
+    }
+  });
+  all.sort((a, b) => (b.updated ?? 0) - (a.updated ?? 0));
+  const pinnedSet = new Set(plugin.settings.pinned ?? []);
+  const pinned = all.filter((s) => pinnedSet.has(s.id));
+  const recent = all.filter((s) => !pinnedSet.has(s.id)).slice(0, 20);
+  const displayed = [...pinned, ...recent];
+  const hasActive = displayed.some((s) => s.id === viewSession);
+  if (viewSession && !hasActive) {
+    const found = all.find((s) => s.id === viewSession);
+    if (found) {
+      displayed.push(found);
+    } else {
+      const hist = plugin.getHistory(viewSession);
+      const firstUser = hist.find(
+        (m) => m.role === "user" && m.text.trim()
+      );
+      const fallbackTitle = firstUser ?
+        firstUser.text.trim().replace(/\s+/g, " ").slice(0, 40) : viewSession;
+      displayed.push({
+        id: viewSession,
+        title: fallbackTitle,
+        updated: Date.now(),
+        engine: fallbackEngine
+      });
+    }
+  }
+  return displayed;
+}
+function buildLocalContinuationPrompt(plugin, sessionId, assistantLabel) {
+  const history = plugin.getHistory(sessionId);
+  const recent = history.slice(-24);
+  if (recent.length === 0) {
+    return plugin.t(
+      "The previous session has no saved history. Continue the work from here."
+    );
+  }
+  const lines = [];
+  for (const rec of recent) {
+    const who = rec.role === "user" ? plugin.t("User") : assistantLabel;
+    const text = rec.text.length > 800 ? rec.text.slice(0, 800) + "…" :
+      rec.text;
+    lines.push(`${who}: ${text}`);
+  }
+  return plugin.t("[RECENT HISTORY OF THE PREVIOUS SESSION]") + "\n" +
+    lines.join("\n\n") + "\n\n---\n\n" + plugin.t(
+    "Continue the work from here, keeping the context above in mind."
+  );
+}
+
 // src/features/chat/view.ts
 var CHAT_VIEW_TYPE = "opencode-chat-view";
-var ChatView = class extends import_obsidian6.ItemView {
+var ChatView = class extends import_obsidian8.ItemView {
   plugin;
   messagesEl;
   inputEl;
@@ -1793,6 +2187,7 @@ var ChatView = class extends import_obsidian6.ItemView {
   pinBtn;
   renameBtn;
   deleteBtn;
+  agentBtn;
   modelBtn;
   sendBtn;
   stopBtn;
@@ -1845,8 +2240,10 @@ var ChatView = class extends import_obsidian6.ItemView {
   }
   assistantLabel() {
     const desc = this.getRunner().descriptor;
-    return desc.id === "opencode" ? this.plugin.t(desc.shortName) :
-      desc.shortName;
+    return this.plugin.t(desc.shortName);
+  }
+  assistantIcon() {
+    return this.getRunner().descriptor.icon || "bot";
   }
   getViewType() {
     return CHAT_VIEW_TYPE;
@@ -1911,7 +2308,7 @@ var ChatView = class extends import_obsidian6.ItemView {
     void this.populateSessionSelect();
     this.loadHistoryForSession("");
     if (!silent) {
-      new import_obsidian6.Notice(
+      new import_obsidian8.Notice(
         this.plugin.t("New session: the next message will start from scratch.")
       );
     }
@@ -1925,7 +2322,7 @@ var ChatView = class extends import_obsidian6.ItemView {
       cls: "opencode-icon-btn hidden",
       attr: { title: this.plugin.t("Remove the attached context") }
     });
-    (0, import_obsidian6.setIcon)(this.contextClearBtn, "x");
+    (0, import_obsidian8.setIcon)(this.contextClearBtn, "x");
     this.contextClearBtn.addEventListener("click", () => {
       this.context = null;
       this.updateContextBar();
@@ -1948,13 +2345,13 @@ var ChatView = class extends import_obsidian6.ItemView {
       cls: "opencode-icon-btn",
       attr: { title: this.plugin.t("Pin/Unpin session") }
     });
-    (0, import_obsidian6.setIcon)(this.pinBtn, "pin");
+    (0, import_obsidian8.setIcon)(this.pinBtn, "pin");
     this.pinBtn.addEventListener("click", () => this.togglePin());
     this.renameBtn = this.contextBar.createEl("button", {
       cls: "opencode-icon-btn",
       attr: { title: this.plugin.t("Rename session") }
     });
-    (0, import_obsidian6.setIcon)(this.renameBtn, "pencil");
+    (0, import_obsidian8.setIcon)(this.renameBtn, "pencil");
     this.renameBtn.addEventListener(
       "click",
       () => this.renameCurrentSession()
@@ -1963,7 +2360,7 @@ var ChatView = class extends import_obsidian6.ItemView {
       cls: "opencode-icon-btn",
       attr: { title: this.plugin.t("Delete session") }
     });
-    (0, import_obsidian6.setIcon)(this.deleteBtn, "trash");
+    (0, import_obsidian8.setIcon)(this.deleteBtn, "trash");
     this.deleteBtn.addEventListener(
       "click",
       () => this.deleteCurrentSession()
@@ -1972,7 +2369,7 @@ var ChatView = class extends import_obsidian6.ItemView {
       cls: "opencode-icon-btn",
       attr: { title: this.plugin.t("Token and cost statistics") }
     });
-    (0, import_obsidian6.setIcon)(statsBtn, "bar-chart-3");
+    (0, import_obsidian8.setIcon)(statsBtn, "bar-chart-3");
     statsBtn.addEventListener(
       "click",
       () => new StatsModal(this.app, this.plugin, this.sessionEngine()).open()
@@ -1980,7 +2377,9 @@ var ChatView = class extends import_obsidian6.ItemView {
     const attachBtn = this.contextBar.createEl("button", {
       cls: "opencode-add-note-btn"
     });
-    attachBtn.setText("＋ " + this.plugin.t("Attach file"));
+    const attachIcon = attachBtn.createSpan({ cls: "opencode-btn-icon" });
+    (0, import_obsidian8.setIcon)(attachIcon, "paperclip");
+    attachBtn.createSpan({ text: this.plugin.t("Attach file") });
     attachBtn.addEventListener(
       "click",
       () => this.attachmentManager.openFilePicker()
@@ -1988,14 +2387,16 @@ var ChatView = class extends import_obsidian6.ItemView {
     const add = this.contextBar.createEl("button", {
       cls: "opencode-add-note-btn"
     });
-    add.setText("+ " + this.plugin.t("Current note"));
+    const addIcon = add.createSpan({ cls: "opencode-btn-icon" });
+    (0, import_obsidian8.setIcon)(addIcon, "file-plus");
+    add.createSpan({ text: this.plugin.t("Current note") });
     add.addEventListener("click", () => this.attachCurrentNote());
     this.updateContextBar();
   }
   togglePin() {
     const id = this.viewSession;
     if (!id) {
-      new import_obsidian6.Notice(this.plugin.t("Select a session to pin."));
+      new import_obsidian8.Notice(this.plugin.t("Select a session to pin."));
       return;
     }
     const pinned = this.plugin.settings.pinned ?? [];
@@ -2007,29 +2408,29 @@ var ChatView = class extends import_obsidian6.ItemView {
     void this.populateSessionSelect();
     const msg = idx >= 0 ? this.plugin.t("Session unpinned.") :
       this.plugin.t("Session pinned.");
-    new import_obsidian6.Notice(msg);
+    new import_obsidian8.Notice(msg);
   }
   renameCurrentSession() {
     const id = this.viewSession;
     if (!id) {
-      new import_obsidian6.Notice(this.plugin.t("Select a session to rename."));
+      new import_obsidian8.Notice(this.plugin.t("Select a session to rename."));
       return;
     }
     const current = this.sessionSelect.selectedOptions[0]?.textContent ?? id;
     new RenameModal(this.app, this.plugin, current, (newTitle) => {
       this.getRunner().renameSession(id, newTitle).then(() => {
         void this.populateSessionSelect();
-        new import_obsidian6.Notice(this.plugin.t("Session renamed."));
+        new import_obsidian8.Notice(this.plugin.t("Session renamed."));
       }).catch(
         (e) =>
-          new import_obsidian6.Notice(`${this.plugin.t("Error:")} ${e.message}`)
+          new import_obsidian8.Notice(`${this.plugin.t("Error:")} ${e.message}`)
       );
     }).open();
   }
   deleteCurrentSession() {
     const id = this.viewSession;
     if (!id) {
-      new import_obsidian6.Notice(this.plugin.t("Select a session to delete."));
+      new import_obsidian8.Notice(this.plugin.t("Select a session to delete."));
       return;
     }
     const title = this.sessionSelect.selectedOptions[0]?.textContent ?? id;
@@ -2060,10 +2461,10 @@ var ChatView = class extends import_obsidian6.ItemView {
           await this.plugin.saveSettings();
           await this.populateSessionSelect();
           this.loadHistoryForSession(this.viewSession);
-          new import_obsidian6.Notice(this.plugin.t("Session deleted."));
+          new import_obsidian8.Notice(this.plugin.t("Session deleted."));
         }).catch(
           (e) =>
-            new import_obsidian6.Notice(
+            new import_obsidian8.Notice(
               `${this.plugin.t("Error:")} ${e.message}`)
         );
       }
@@ -2090,56 +2491,12 @@ var ChatView = class extends import_obsidian6.ItemView {
     newOpt.value = "";
     newOpt.textContent = "＋ " + this.plugin.t("New session");
     try {
-      const providers = this.plugin.registry.getAll();
-      const results = await Promise.allSettled(
-        providers.map((p) => p.listSessions())
+      const displayed = await fetchDisplayedSessions(
+        this.plugin,
+        this.viewSession,
+        this.sessionEngine()
       );
-      const all = [];
-      const seen = /* @__PURE__ */ new Set();
-      results.forEach((res, i) => {
-        if (res.status === "fulfilled") {
-          const providerId = providers[i].id;
-          for (const s of res.value) {
-            if (!seen.has(s.id)) {
-              seen.add(s.id);
-              const engine = s.engine || providerId;
-              all.push({ ...s, engine });
-              if (!this.plugin.settings.sessionEngines) {
-                this.plugin.settings.sessionEngines = {};
-              }
-              if (!this.plugin.settings.sessionEngines[s.id]) {
-                this.plugin.settings.sessionEngines[s.id] = engine;
-              }
-            }
-          }
-        }
-      });
-      all.sort((a, b) => (b.updated ?? 0) - (a.updated ?? 0));
       const pinnedSet = new Set(this.plugin.settings.pinned ?? []);
-      const pinned = all.filter((s) => pinnedSet.has(s.id));
-      const recent = all.filter((s) => !pinnedSet.has(s.id)).slice(0, 20);
-      const displayed = [...pinned, ...recent];
-      const hasActive = displayed.some((s) => s.id === this.viewSession);
-      if (this.viewSession && !hasActive) {
-        const found = all.find((s) => s.id === this.viewSession);
-        if (found) {
-          displayed.push(found);
-        } else {
-          const hist = this.plugin.getHistory(this.viewSession);
-          const firstUser = hist.find(
-            (m) => m.role === "user" && m.text.trim()
-          );
-          const fallbackTitle = firstUser ?
-            firstUser.text.trim().replace(/\s+/g, " ").slice(0, 40) :
-              this.viewSession;
-          displayed.push({
-            id: this.viewSession,
-            title: fallbackTitle,
-            updated: Date.now(),
-            engine: this.sessionEngine()
-          });
-        }
-      }
       for (const s of displayed) {
         const o = sel.createEl("option");
         o.value = s.id;
@@ -2258,13 +2615,13 @@ var ChatView = class extends import_obsidian6.ItemView {
   async attachCurrentNote() {
     const file = this.app.workspace.getActiveFile();
     if (!file) {
-      new import_obsidian6.Notice(this.plugin.t("No active note"));
+      new import_obsidian8.Notice(this.plugin.t("No active note"));
       return;
     }
     const content = await this.app.vault.cachedRead(file);
     this.context = { label: file.path, content };
     this.updateContextBar();
-    new import_obsidian6.Notice(this.plugin.t("Note added to context."));
+    new import_obsidian8.Notice(this.plugin.t("Note added to context."));
   }
   buildInputArea(container) {
     const inputArea = container.createDiv({ cls: "opencode-input-area" });
@@ -2283,6 +2640,7 @@ var ChatView = class extends import_obsidian6.ItemView {
       this.app,
       this.plugin,
       {
+        onOpenAgentList: () => this.openAgentList(),
         onOpenModelList: () => void this.openModelList(),
         onStartNewSession: () => this.startNewSession(),
         onAttachCurrentNote: () => void this.attachCurrentNote(),
@@ -2306,15 +2664,28 @@ var ChatView = class extends import_obsidian6.ItemView {
       () => this.suggestPopup.onInputChange()
     );
     const buttons = inputArea.createDiv({ cls: "opencode-buttons" });
-    this.modelBtn = buttons.createEl("button", { cls: "opencode-model-btn" });
-    this.updateModelBtn();
+    const selectorGroup = buttons.createDiv({
+      cls: "opencode-selector-group"
+    });
+    this.agentBtn = selectorGroup.createEl("button", {
+      cls: "opencode-agent-btn"
+    });
+    this.agentBtn.addEventListener("click", () => this.openAgentList());
+    this.modelBtn = selectorGroup.createEl("button", {
+      cls: "opencode-model-btn"
+    });
     this.modelBtn.addEventListener("click", () => void this.openModelList());
+    this.updateModelBtn();
     buttons.createSpan({ cls: "opencode-buttons-spacer" });
     this.sendBtn = buttons.createEl("button", { cls: "opencode-send-btn" });
-    this.sendBtn.setText(this.plugin.t("Send"));
+    const sendIcon = this.sendBtn.createSpan({ cls: "opencode-btn-icon" });
+    (0, import_obsidian8.setIcon)(sendIcon, "send");
+    this.sendBtn.createSpan({ text: this.plugin.t("Send") });
     this.sendBtn.addEventListener("click", () => void this.send());
     this.stopBtn = buttons.createEl("button", { cls: "opencode-stop-btn" });
-    this.stopBtn.setText(this.plugin.t("Stop"));
+    const stopIcon = this.stopBtn.createSpan({ cls: "opencode-btn-icon" });
+    (0, import_obsidian8.setIcon)(stopIcon, "square");
+    this.stopBtn.createSpan({ text: this.plugin.t("Stop") });
     this.stopBtn.addClass("hidden");
     this.stopBtn.addEventListener("click", () => {
       this.stoppedByUser = true;
@@ -2333,81 +2704,172 @@ var ChatView = class extends import_obsidian6.ItemView {
     });
   }
   updateModelBtn() {
-    if (!this.modelBtn) return;
     const engine = this.sessionEngine();
+    const provider = this.plugin.registry.get(engine);
+    const shortName = provider?.descriptor.shortName || engine;
     const m = this.activeModelFor(engine);
-    this.modelBtn.setText(m.length > 30 ? m.slice(0, 27) + "…" : m);
-    this.modelBtn.setAttribute("title", `${m} (${this.engineLabel(engine)})`);
-  }
-  async openModelList() {
-    const activeEngine = this.sessionEngine();
-    const cur = this.activeModelFor(activeEngine);
-    try {
-      const providers = this.plugin.registry.getAll();
-      const orderedProviders = [
-        ...providers.filter((p) => p.id === activeEngine),
-        ...providers.filter((p) => p.id !== activeEngine)
-      ];
-      const results = await Promise.allSettled(
-        orderedProviders.map((p) => p.listModels())
-      );
-      const items = [];
-      orderedProviders.forEach((provider, idx) => {
-        const res = results[idx];
-        const models = res.status === "fulfilled" ? res.value : [];
-        const providerLabel = provider.costNote ||
-          provider.descriptor.shortName;
-        for (const m of models) {
-          items.push({
-            id: m,
-            engine: provider.id,
-            provider: providerLabel,
-            isActive: provider.id === activeEngine && m === cur
-          });
-        }
+    if (this.agentBtn) {
+      this.agentBtn.empty();
+      const iconEl = this.agentBtn.createSpan({ cls: "opencode-chip-icon" });
+      (0, import_obsidian8.setIcon)(iconEl, provider?.descriptor.icon || "bot");
+      this.agentBtn.createSpan({
+        text: this.plugin.t(shortName),
+        cls: "opencode-chip-text"
       });
-      new ModelSuggestModal(this.app, this.plugin, items, (item) => {
-        const engineChanged = item.engine !== activeEngine;
-        this.plugin.settings.engine = item.engine;
-        const cfg = this.plugin.getEngineConfig(item.engine);
-        cfg.model = item.id;
-        const setPrefix = this.plugin.t("Model set:");
-        if (this.viewSession && engineChanged) {
-          this.viewSession = "";
-          this.plugin.settings.sessionId = "";
-          void this.plugin.saveSettings();
-          this.loadHistoryForSession("");
-          new import_obsidian6.Notice(
-            `${setPrefix} ${item.id} (${item.provider})`);
-          return;
-        }
-        if (this.viewSession) {
-          if (!this.plugin.settings.sessionEngines) {
-            this.plugin.settings.sessionEngines = {};
-          }
-          this.plugin.settings.sessionEngines[this.viewSession] = item.engine;
-        }
+      const chevEl = this.agentBtn.createSpan({ cls: "opencode-chip-chevron" });
+      (0, import_obsidian8.setIcon)(chevEl, "chevron-down");
+      this.agentBtn.setAttribute(
+        "title",
+        `${this.plugin.t("AI Engine")}: ${this.engineLabel(engine)}`
+      );
+    }
+    if (this.modelBtn) {
+      this.modelBtn.empty();
+      const iconEl = this.modelBtn.createSpan({ cls: "opencode-chip-icon" });
+      (0, import_obsidian8.setIcon)(iconEl, "cpu");
+      const slashIdx = m.indexOf("/");
+      const shortModel = m && slashIdx > 0 ? m.slice(slashIdx + 1) : m ||
+        this.plugin.t("Default");
+      const vendor = m && slashIdx > 0 ? m.slice(0, slashIdx) : "";
+      if (vendor) {
+        this.modelBtn.createSpan({
+          text: vendor,
+          cls: "opencode-chip-vendor"
+        });
+      }
+      const display = shortModel.length > 26 ? shortModel.slice(0, 24) + "…" :
+        shortModel;
+      this.modelBtn.createSpan({
+        text: display,
+        cls: "opencode-chip-text"
+      });
+      const chevEl = this.modelBtn.createSpan({ cls: "opencode-chip-chevron" });
+      (0, import_obsidian8.setIcon)(chevEl, "chevron-down");
+      this.modelBtn.setAttribute(
+        "title",
+        `${this.plugin.t("Model")}: ${m || this.plugin.t("(CLI default)")}`
+      );
+    }
+  }
+  openAgentList() {
+    const activeEngine = this.sessionEngine();
+    const providers = this.plugin.registry.getAll();
+    const items = providers.map((p) => {
+      const cfg = this.plugin.getEngineConfig(p.id);
+      const installed = p.isAvailable ? p.isAvailable() : true;
+      return {
+        id: p.id,
+        shortName: this.plugin.t(p.descriptor.shortName),
+        displayName: this.plugin.t(p.descriptor.displayName),
+        icon: p.descriptor.icon || "bot",
+        binary: cfg.binary || p.descriptor.defaultBinary,
+        activeModel: cfg.model || p.descriptor.defaultModel || "",
+        installed,
+        isActive: p.id === activeEngine
+      };
+    });
+    new AgentSuggestModal(this.app, this.plugin, items, (item) => {
+      const engineChanged = item.id !== activeEngine;
+      this.plugin.settings.engine = item.id;
+      if (this.viewSession && engineChanged) {
+        this.viewSession = "";
+        this.plugin.settings.sessionId = "";
+        void this.plugin.saveSettings();
+        this.loadHistoryForSession("");
+      } else {
         void this.plugin.saveSettings();
         this.updateModelBtn();
         this.updateStatsBar();
         this.contextLimit = 0;
         void this.refreshContext();
-        new import_obsidian6.Notice(
-          `${setPrefix} ${item.id} (${item.provider})`);
-      }).open();
+      }
+      new import_obsidian8.Notice(
+        `${this.plugin.t("AI Engine")}: ${item.shortName} (${item.activeModel || this.plugin.t("default")})`
+      );
+    }).open();
+  }
+  async openModelList() {
+    const activeEngine = this.sessionEngine();
+    const cur = this.activeModelFor(activeEngine);
+    const provider = this.plugin.registry.resolveProvider(activeEngine);
+    try {
+      const models = await provider.listModels();
+      const providerLabel = provider.costNote ||
+        this.plugin.t(provider.descriptor.shortName);
+      const items = [];
+      const seen = /* @__PURE__ */ new Set();
+      if (!provider.descriptor.defaultModel) {
+        items.push({
+          id: "",
+          label: substitute(
+            this.plugin.t("(default from $1)"),
+            provider.descriptor.shortName
+          ),
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: cur === "",
+          isDefault: true
+        });
+        seen.add("");
+      }
+      if (cur && !seen.has(cur)) {
+        items.push({
+          id: cur,
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: true
+        });
+        seen.add(cur);
+      }
+      for (const m of models) {
+        if (seen.has(m)) continue;
+        seen.add(m);
+        items.push({
+          id: m,
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: m === cur
+        });
+      }
+      new ModelSuggestModal(
+        this.app,
+        this.plugin,
+        items,
+        activeEngine,
+        (item) => {
+          const cfg = this.plugin.getEngineConfig(activeEngine);
+          cfg.model = item.id;
+          if (this.viewSession) {
+            if (!this.plugin.settings.sessionEngines) {
+              this.plugin.settings.sessionEngines = {};
+            }
+            this.plugin.settings.sessionEngines[this.viewSession] =
+              activeEngine;
+          }
+          void this.plugin.saveSettings();
+          this.updateModelBtn();
+          this.updateStatsBar();
+          this.contextLimit = 0;
+          void this.refreshContext();
+          const shownModel = item.label || item.id;
+          const setPrefix = this.plugin.t("Model set:");
+          new import_obsidian8.Notice(
+            `${setPrefix} ${shownModel} (${item.provider})`);
+        }
+      ).open();
     } catch (e) {
-      new import_obsidian6.Notice(`${this.plugin.t("Error:")} ${e.message}`);
+      new import_obsidian8.Notice(`${this.plugin.t("Error:")} ${e.message}`);
     }
   }
   continueInNewSession() {
     if (this.running) {
-      new import_obsidian6.Notice(this.plugin.t(
+      new import_obsidian8.Notice(this.plugin.t(
         "There is already a request in progress."));
       return;
     }
     const oldSession = this.viewSession;
     if (!oldSession) {
-      new import_obsidian6.Notice(this.plugin.t(
+      new import_obsidian8.Notice(this.plugin.t(
         "Select first the session to summarize."));
       return;
     }
@@ -2505,28 +2967,13 @@ var ChatView = class extends import_obsidian6.ItemView {
     this.loadHistoryForSession("");
     this.inputEl.value = prompt;
     this.inputEl.focus();
-    new import_obsidian6.Notice(notice);
+    new import_obsidian8.Notice(notice);
   }
   buildLocalContinuation(sessionId) {
-    const history = this.plugin.getHistory(sessionId);
-    const recent = history.slice(-24);
-    if (recent.length === 0) {
-      return this.plugin.t(
-          "The previous session has no saved history. Continue the work " +
-          "from here."
-      );
-    }
-    const assistantWho = this.assistantLabel();
-    const lines = [];
-    for (const rec of recent) {
-      const who = rec.role === "user" ? this.plugin.t("User") : assistantWho;
-      const text = rec.text.length > 800 ? rec.text.slice(0, 800) + "…" :
-        rec.text;
-      lines.push(`${who}: ${text}`);
-    }
-    return this.plugin.t("[RECENT HISTORY OF THE PREVIOUS SESSION]") + "\n" +
-      lines.join("\n\n") + "\n\n---\n\n" + this.plugin.t(
-      "Continue the work from here, keeping the context above in mind."
+    return buildLocalContinuationPrompt(
+      this.plugin,
+      sessionId,
+      this.assistantLabel()
     );
   }
   addWelcome() {
@@ -2543,7 +2990,8 @@ var ChatView = class extends import_obsidian6.ItemView {
       this.assistantLabel(),
       () => text,
       (t) => this.copyText(t),
-      this.plugin.t("Copy text")
+      this.plugin.t("Copy text"),
+      this.assistantIcon()
     );
     row.createDiv({ text, cls: "opencode-bubble" });
   }
@@ -2584,7 +3032,7 @@ ${this.context.content}
       this.doRun(prompt, filePaths);
     } catch (e) {
       this.dispatching = false;
-      new import_obsidian6.Notice(`${this.plugin.t("Error:")} ${e.message}`);
+      new import_obsidian8.Notice(`${this.plugin.t("Error:")} ${e.message}`);
     }
   }
   doRun(prompt, fileAttachments) {
@@ -2764,7 +3212,8 @@ ${this.context.content}
       (t) => this.copyText(t),
       (total, input, output, cost) =>
         this.fmtTokens(total, input, output, cost, this.sessionEngine()),
-      (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer)
+      (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer),
+      this.assistantIcon()
     );
     this.activeBubble = bubble;
     this.scrollToBottom();
@@ -2793,7 +3242,7 @@ ${this.context.content}
   }
   copyText(text) {
     void navigator.clipboard.writeText(text);
-    new import_obsidian6.Notice(this.plugin.t("Text copied."));
+    new import_obsidian8.Notice(this.plugin.t("Text copied."));
   }
   handleStreamError(err) {
     const isImageError = /does not support image/i.test(err) ||
@@ -2868,11 +3317,16 @@ ${this.context.content}
           this.assistantLabel(),
           () => rec.text,
           (t) => this.copyText(t),
-          this.plugin.t("Copy text")
+          this.plugin.t("Copy text"),
+          this.assistantIcon()
         );
         if (rec.reasoning) {
           const det = row.createEl("details", { cls: "opencode-reasoning" });
-          det.createEl("summary", { text: this.plugin.t("Reasoning") });
+          const summary = det.createEl("summary");
+          const brainIcon =
+            summary.createSpan({ cls: "opencode-reasoning-icon" });
+          (0, import_obsidian8.setIcon)(brainIcon, "brain");
+          summary.createSpan({ text: this.plugin.t("Reasoning") });
           det.createDiv({
             cls: "opencode-reasoning-content",
             text: rec.reasoning
@@ -2882,7 +3336,7 @@ ${this.context.content}
           cls: "opencode-bubble opencode-bubble--assistant"
         });
         if (rec.text.length <= 3e4) {
-          import_obsidian6.MarkdownRenderer.render(this.app, rec.text, bubble,
+          import_obsidian8.MarkdownRenderer.render(this.app, rec.text, bubble,
             "", this);
         } else {
           bubble.textContent = rec.text;
@@ -2948,6 +3402,12 @@ var import_promises2 = require("fs/promises");
 var import_path = require("path");
 var import_os = require("os");
 var MAX_STREAM_LINE_BYTES = 2e7;
+var MAX_INLINE_ATTACHMENT_BYTES = 256 * 1024;
+var BINARY_EXT_REGEX = new RegExp(
+    "\\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|7z|rar|bin|exe|dmg|" +
+    "iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$",
+  "i"
+);
 var BaseCliRunner = class {
   plugin;
   resolvedBinaries = /* @__PURE__ */ new Map();
@@ -3015,12 +3475,30 @@ var BaseCliRunner = class {
    */
   spawnBinary(bin, args, cwd, extraEnv) {
     const isWin = process.platform === "win32";
-    const env = cwd || extraEnv ? Object.assign(
+    const env = Object.assign(
       {},
       process.env,
       cwd ? { PWD: cwd } : void 0,
       extraEnv
-    ) : process.env;
+    );
+    if (!isWin) {
+      const home = (0, import_os.homedir)();
+      const extraDirs = [
+        (0, import_path.join)(home, ".local", "bin"),
+        (0, import_path.join)(home, ".opencode", "bin"),
+        (0, import_path.join)(home, ".gemini", "antigravity-cli", "bin"),
+        (0, import_path.join)(home, ".hermes", "bin"),
+        (0, import_path.join)(home, ".claude", "local"),
+        "/usr/local/bin",
+        "/usr/bin"
+      ];
+      const curPath = env.PATH || "";
+      const parts = curPath.split(":").filter(Boolean);
+      for (const d of extraDirs) {
+        if (!parts.includes(d)) parts.push(d);
+      }
+      env.PATH = parts.join(":");
+    }
     const options = {
       cwd,
       shell: isWin && (bin.endsWith(".cmd") || bin.endsWith(".bat")),
@@ -3113,6 +3591,15 @@ var BaseCliRunner = class {
     });
   }
   /**
+   * Check whether the CLI executable is installed and reachable on the system
+   */
+  isAvailable() {
+    const cfg = this.plugin.getEngineConfig(this.descriptor.id);
+    const binName = cfg.binary || this.descriptor.defaultBinary;
+    const bin = this.resolveBinaryPath(binName);
+    return (0, import_fs.existsSync)(bin);
+  }
+  /**
    * Resolve full path to a CLI executable, checking PATH and candidate folders
    */
   resolveBinaryPath(bin, candidatePaths = []) {
@@ -3134,10 +3621,18 @@ var BaseCliRunner = class {
       (0, import_path.join)((0, import_os.homedir)(), ".opencode", "bin", bin),
       (0, import_path.join)((0, import_os.homedir)(), ".gemini",
         "antigravity-cli", "bin", bin),
+      (0, import_path.join)((0, import_os.homedir)(), ".hermes", "bin", bin),
+      (0, import_path.join)((0, import_os.homedir)(), ".hermes",
+        "hermes-agent", ".hermes", "bin", bin),
+      (0, import_path.join)((0, import_os.homedir)(), ".claude", "local", bin),
       `/usr/local/bin/${bin}`,
       `/usr/bin/${bin}`
     ];
-    const allCandidates = [...candidatePaths, ...defaultCandidates];
+    const pathDirs = (process.env.PATH ??
+      "").split(process.platform === "win32" ? ";" :
+        ":").filter(Boolean).map((dir) => (0, import_path.join)(dir, bin));
+    const allCandidates =
+      [...candidatePaths, ...defaultCandidates, ...pathDirs];
     for (const p of allCandidates) {
       if ((0, import_fs.existsSync)(p)) {
         this.resolvedBinaries.set(bin, p);
@@ -3188,6 +3683,304 @@ var BaseCliRunner = class {
    */
   getVaultPath() {
     return this.plugin.getVaultPath();
+  }
+  /**
+   * Inline small text attachments into the prompt and pass larger/binary files
+   * by path. Used by CLI providers without a dedicated `--file` flag.
+   */
+  inlinePromptAttachments(prompt, fileAttachments, cwd) {
+    const s = this.plugin.settings;
+    let finalPrompt = prompt;
+    const maxInlineBytes = Math.min(
+      MAX_INLINE_ATTACHMENT_BYTES,
+      Math.max(1, s.maxAttachMB || 20) * 1024 * 1024
+    );
+    for (const p of fileAttachments) {
+      const fullPath = !(0, import_path.isAbsolute)(p) && cwd ?
+        (0, import_path.join)(cwd, p) : p;
+      if (BINARY_EXT_REGEX.test(fullPath)) {
+        finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
+
+---
+
+` + finalPrompt;
+      } else {
+        try {
+          const st = (0, import_fs.statSync)(fullPath);
+          if (st.size > maxInlineBytes) {
+            finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
+
+---
+
+` + finalPrompt;
+          } else {
+            const content = (0, import_fs.readFileSync)(fullPath, "utf-8");
+            const filename = (0, import_path.basename)(fullPath);
+            finalPrompt = `[ATTACHMENT: ${filename}]
+${content}
+
+---
+
+` + finalPrompt;
+          }
+        } catch {
+          finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
+
+---
+
+` + finalPrompt;
+        }
+      }
+    }
+    return finalPrompt;
+  }
+  /**
+   * List sessions saved in Obsidian histories for a given engine.
+   */
+  listHistorySessions(engineId, seenIds =
+    /* @__PURE__ */ new Set(), legacyIdMatcher) {
+    const sessions = [];
+    const histories = this.plugin.histories ?? {};
+    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
+    for (const [id, msgs] of Object.entries(histories)) {
+      if (seenIds.has(id)) continue;
+      const matchesEngine = sessionEngines[id] === engineId ||
+        !sessionEngines[id] && Boolean(legacyIdMatcher?.test(id));
+      if (matchesEngine) {
+        const firstUser = msgs.find((m) => m.role === "user" && m.text.trim());
+        const rawTitle = firstUser?.text ?
+          firstUser.text.trim().replace(/\s+/g, " ") : id;
+        const title = rawTitle.length > 44 ? rawTitle.slice(0, 41) + "…" :
+          rawTitle;
+        const lastTs = msgs[msgs.length - 1]?.timestamp ?? Date.now();
+        sessions.push({
+          id,
+          title,
+          updated: lastTs,
+          engine: engineId
+        });
+        seenIds.add(id);
+      }
+    }
+    return sessions;
+  }
+  /**
+   * Read the last turn's token usage from saved Obsidian history.
+   */
+  getHistorySessionTokens(sessionId) {
+    const history = this.plugin.getHistory(sessionId);
+    for (let i = history.length - 1; i >= 0; i--) {
+      const msg = history[i];
+      if (msg.role === "assistant" && msg.tokens) {
+        const tk = msg.tokens;
+        const input = Number(tk.input ?? 0) + Number(tk.cache?.read ?? 0) +
+          Number(tk.cache?.write ?? 0);
+        const output = Number(tk.output ?? 0);
+        if (input > 0 || output > 0) {
+          return { input, output };
+        }
+      }
+    }
+    return { input: 0, output: 0 };
+  }
+  /**
+   * Compute 5h / week / month usage statistics from saved Obsidian histories.
+   */
+  computeHistoryUsageStats(engineId, legacyIdMatcher) {
+    const now = Date.now();
+    const h5Cutoff = now - 5 * 3600 * 1e3;
+    const weekCutoff = now - 7 * 24 * 3600 * 1e3;
+    const monthCutoff = now - 30 * 24 * 3600 * 1e3;
+    const h5 = { input: 0, output: 0, cost: 0 };
+    const week = { input: 0, output: 0, cost: 0 };
+    const month = { input: 0, output: 0, cost: 0 };
+    const histories = this.plugin.histories ?? {};
+    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
+    for (const [id, msgs] of Object.entries(histories)) {
+      const matchesEngine = sessionEngines[id] === engineId ||
+        !sessionEngines[id] && Boolean(legacyIdMatcher?.test(id));
+      if (!matchesEngine) continue;
+      for (const msg of msgs) {
+        if (msg.role === "assistant" && msg.tokens) {
+          const inp = msg.tokens.input ?? 0;
+          const out = msg.tokens.output ?? 0;
+          const cost = msg.cost ?? 0;
+          const ts = msg.timestamp;
+          if (!ts || ts >= monthCutoff) {
+            month.input += inp;
+            month.output += out;
+            month.cost += cost;
+          }
+          if (!ts || ts >= weekCutoff) {
+            week.input += inp;
+            week.output += out;
+            week.cost += cost;
+          }
+          if (!ts || ts >= h5Cutoff) {
+            h5.input += inp;
+            h5.output += out;
+            h5.cost += cost;
+          }
+        }
+      }
+    }
+    return { h5, week, month };
+  }
+  /**
+   * Estimate model context window limit from well-known model family names.
+   */
+  estimateModelContextLimit(model, defaultLimit = 128e3) {
+    const m = (model || "").toLowerCase();
+    if (m.includes("deepseek-v4") || m.includes("deepseek-flash") ||
+      m.includes("deepseek-chat") || m.includes("deepseek-reasoner")) {
+      return 1e6;
+    }
+    if (m.includes("gemini")) return 1048576;
+    if (m.includes("claude-fable") || m.includes("claude-opus-5") ||
+      m.includes("claude-sonnet-5") || m.includes("claude-opus-4-8") ||
+        m.includes("claude-opus-4.8") || m.includes("claude-opus-4-6") ||
+          m.includes("claude-opus-4.6") || m.includes("claude-sonnet-4-6") ||
+            m.includes("claude-sonnet-4.6") || m.includes("claude-haiku-5")) {
+      return 1e6;
+    }
+    if (m.includes("claude")) return 2e5;
+    if (m.includes("gpt-6") || m.includes("gpt-5.6") ||
+      m.includes("gpt-5.5") || m.includes("gpt-5.4") && !m.includes("mini") &&
+        !m.includes("nano")) {
+      return 105e4;
+    }
+    if (m.includes("gpt-5") || m.includes("codex")) return 256e3;
+    if (m.includes("gpt-4.1")) return 1047576;
+    if (m.includes("o3") || m.includes("o4") || m.includes("gpt-4")) {
+      return 2e5;
+    }
+    if (m.includes("glm-5.3") || m.includes("glm-5.2") &&
+      !m.includes(":free") || m.includes("kimi-k3") ||
+        m.includes("mimo-v2.5") || m.includes("mimo-v2.6") ||
+          m.includes("minimax-m3") || m.includes("qwen3.6") ||
+            m.includes("qwen3.7") || m.includes("qwen3.8") ||
+              m.includes("muse-spark") || m.includes("hy4") ||
+                m.includes("beam") || m.includes("longcat") ||
+                  m.includes("step-5")) {
+      return 1e6;
+    }
+    if (m.includes("grok-4.7") || m.includes("grok-4.6") ||
+      m.includes("grok-4.5")) {
+      return 5e5;
+    }
+    if (m.includes("hermes") || m.includes("deepseek")) return 128e3;
+    return defaultLimit;
+  }
+  /**
+   * Extract a human-friendly target title from arbitrary tool parameters.
+   */
+  extractCommonToolTitle(toolName, input, stateTitle) {
+    const inp = input && typeof input === "object" ? input : null;
+    if (inp) {
+      if (typeof inp.toolSummary === "string" && inp.toolSummary.trim()) {
+        return inp.toolSummary.trim();
+      }
+      for (const key of [
+        "filePath",
+        "file_path",
+        "TargetFile",
+        "AbsolutePath",
+        "Path",
+        "path"
+      ]) {
+        const val = inp[key];
+        if (typeof val === "string" && val.trim()) {
+          return (0, import_path.basename)(val.trim()) || val.trim();
+        }
+      }
+      if (typeof inp.DirectoryPath === "string" && inp.DirectoryPath.trim()) {
+        const dp = inp.DirectoryPath.trim();
+        return (0, import_path.basename)(dp) || dp;
+      }
+      if (typeof inp.SearchDirectory === "string" &&
+        inp.SearchDirectory.trim()) {
+        const dirName = (0, import_path.basename)(inp.SearchDirectory.trim());
+        const q = typeof inp.Query === "string" ? inp.Query.trim() : "";
+        return q ? `"${q}" in ${dirName}` : dirName;
+      }
+      if (typeof inp.Query === "string" && inp.Query.trim()) {
+        return `"${inp.Query.trim()}"`;
+      }
+      for (const key of [
+        "description",
+        "command",
+        "CommandLine",
+        "cmd",
+        "pattern",
+        "Pattern",
+        "url",
+        "query",
+        "Role",
+        "toolAction"
+      ]) {
+        const val = inp[key];
+        if (typeof val === "string" && val.trim()) {
+          return val.trim();
+        }
+      }
+      if (Array.isArray(inp.todos) && inp.todos.length > 0) {
+        const doneCount = inp.todos.filter(
+          (t) => t && typeof t === "object" && t.status === "completed"
+        ).length;
+        const tasksWord = this.plugin.t("tasks");
+        const doneWord = this.plugin.t("done");
+        return `${inp.todos.length} ${tasksWord} (${doneCount} ${doneWord})`;
+      }
+    }
+    if (stateTitle && stateTitle.trim() &&
+      stateTitle.trim().toLowerCase() !== toolName.toLowerCase()) {
+      return stateTitle.trim();
+    }
+    return toolName;
+  }
+  /**
+   * Parse interactive agent questions from tool parameters across providers.
+   */
+  parseCommonQuestions(input) {
+    if (!input || typeof input !== "object") return [];
+    const params = input;
+    let rawQuestions = params.questions;
+    if (typeof rawQuestions === "string") {
+      try {
+        rawQuestions = JSON.parse(rawQuestions);
+      } catch {
+        return [];
+      }
+    }
+    if (!Array.isArray(rawQuestions)) return [];
+    const result = [];
+    for (const item of rawQuestions) {
+      if (!item || typeof item !== "object") continue;
+      const qObj = item;
+      const question = typeof qObj.question === "string" ?
+        qObj.question.trim() : "";
+      if (!question) continue;
+      const header = typeof qObj.header === "string" ? qObj.header.trim() :
+        void 0;
+      const multiple = Boolean(qObj.is_multi_select ?? qObj.multiple);
+      const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
+      const options = [];
+      for (const opt of rawOpts) {
+        if (typeof opt === "string" && opt.trim()) {
+          options.push({ label: opt.trim() });
+        } else if (opt && typeof opt === "object") {
+          const o = opt;
+          const label = typeof o.label === "string" ? o.label.trim() : "";
+          if (label) {
+            const desc = typeof o.description === "string" ?
+              o.description.trim() : void 0;
+            options.push({ label, description: desc });
+          }
+        }
+      }
+      result.push({ header, question, options, multiple });
+    }
+    return result;
   }
   /**
    * Convert a document (PDF, Word, Excel, etc.) to Markdown using anydoc
@@ -3267,11 +4060,11 @@ var import_fs2 = require("fs");
 var import_path2 = require("path");
 var import_os2 = require("os");
 var ANTIGRAVITY_ID_HINT = /-/;
-var MAX_INLINE_ATTACHMENT_BYTES = 256 * 1024;
 var ANTIGRAVITY_DESCRIPTOR = {
   id: "antigravity",
   displayName: "Antigravity CLI (Google AI Pro)",
   shortName: "Antigravity",
+  icon: "sparkles",
   defaultBinary: "agy",
   defaultModel: "gemini-3.8-flash-high",
   binaryDesc:
@@ -3425,24 +4218,9 @@ var AntigravityRunner = class extends BaseCliRunner {
         }
       }
     }
-    const histories = this.plugin.histories ?? {};
-    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
-    for (const [id, msgs] of Object.entries(histories)) {
-      if (seenIds.has(id)) continue;
-      const isAgy = sessionEngines[id] === "antigravity" ||
-        !sessionEngines[id] && ANTIGRAVITY_ID_HINT.test(id);
-      if (isAgy) {
-        const firstUser = msgs.find((m) => m.role === "user");
-        const title = firstUser?.text ? firstUser.text.slice(0, 40) : id;
-        sessions.push({
-          id,
-          title,
-          updated: Date.now(),
-          engine: "antigravity"
-        });
-        seenIds.add(id);
-      }
-    }
+    sessions.push(
+      ...this.listHistorySessions("antigravity", seenIds, ANTIGRAVITY_ID_HINT)
+    );
     return sessions;
   }
   async renameSession(sessionId, title) {
@@ -3476,59 +4254,13 @@ var AntigravityRunner = class extends BaseCliRunner {
     }
   }
   async getModelContextLimit(model) {
-    const m = model.toLowerCase();
-    if (m.includes("gemini")) return 1048576;
-    if (m.includes("claude")) return 2e5;
-    return 128e3;
+    return this.estimateModelContextLimit(model, 128e3);
   }
   async getSessionTokens(sessionId) {
-    const history = this.plugin.getHistory(sessionId);
-    for (let i = history.length - 1; i >= 0; i--) {
-      const msg = history[i];
-      if (msg.role === "assistant" && msg.tokens) {
-        return {
-          input: msg.tokens.input ?? 0,
-          output: msg.tokens.output ?? 0
-        };
-      }
-    }
-    return { input: 0, output: 0 };
+    return this.getHistorySessionTokens(sessionId);
   }
   async getUsageStats() {
-    const now = Date.now();
-    const h5Cutoff = now - 5 * 3600 * 1e3;
-    const weekCutoff = now - 7 * 24 * 3600 * 1e3;
-    const monthCutoff = now - 30 * 24 * 3600 * 1e3;
-    const h5 = { input: 0, output: 0, cost: 0 };
-    const week = { input: 0, output: 0, cost: 0 };
-    const month = { input: 0, output: 0, cost: 0 };
-    const histories = this.plugin.histories ?? {};
-    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
-    for (const [id, msgs] of Object.entries(histories)) {
-      const isAgy = sessionEngines[id] === "antigravity" ||
-        !sessionEngines[id] && ANTIGRAVITY_ID_HINT.test(id);
-      if (!isAgy) continue;
-      for (const msg of msgs) {
-        if (msg.role === "assistant" && msg.tokens) {
-          const inp = msg.tokens.input ?? 0;
-          const out = msg.tokens.output ?? 0;
-          const ts = msg.timestamp;
-          if (!ts || ts >= monthCutoff) {
-            month.input += inp;
-            month.output += out;
-          }
-          if (!ts || ts >= weekCutoff) {
-            week.input += inp;
-            week.output += out;
-          }
-          if (!ts || ts >= h5Cutoff) {
-            h5.input += inp;
-            h5.output += out;
-          }
-        }
-      }
-    }
-    return { h5, week, month };
+    return this.computeHistoryUsageStats("antigravity", ANTIGRAVITY_ID_HINT);
   }
   /**
    * Build CLI arguments for an Antigravity invocation (exposed for testing)
@@ -3537,53 +4269,11 @@ var AntigravityRunner = class extends BaseCliRunner {
     const s = this.plugin.settings;
     const cfg = this.getConfig();
     const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
-    let finalPrompt = req.prompt;
-    const BINARY_EXT_REGEX = new RegExp(
-        "\\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|7z|rar|bin|exe|" +
-        "dmg|iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$",
-      "i"
+    const finalPrompt = this.inlinePromptAttachments(
+      req.prompt,
+      req.fileAttachments,
+      cwd
     );
-    const maxInlineBytes = Math.min(
-      MAX_INLINE_ATTACHMENT_BYTES,
-      Math.max(1, s.maxAttachMB || 20) * 1024 * 1024
-    );
-    for (const p of req.fileAttachments) {
-      const fullPath = !(0, import_path2.isAbsolute)(p) && cwd ?
-        (0, import_path2.join)(cwd, p) : p;
-      if (BINARY_EXT_REGEX.test(fullPath)) {
-        finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
-
----
-
-` + finalPrompt;
-      } else {
-        try {
-          const st = (0, import_fs2.statSync)(fullPath);
-          if (st.size > maxInlineBytes) {
-            finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
-
----
-
-` + finalPrompt;
-          } else {
-            const content = (0, import_fs2.readFileSync)(fullPath, "utf-8");
-            const filename = (0, import_path2.basename)(fullPath);
-            finalPrompt = `[ATTACHMENT: ${filename}]
-${content}
-
----
-
-` + finalPrompt;
-          }
-        } catch {
-          finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
-
----
-
-` + finalPrompt;
-        }
-      }
-    }
     const args = ["-p", finalPrompt, "--output-format", "stream-json"];
     if (s.autoApprove) {
       args.push("--dangerously-skip-permissions");
@@ -3682,7 +4372,7 @@ ${content}
           su.duration_seconds > 0 ? Math.round(su.duration_seconds * 1e3) :
             void 0;
         if (toolName === "ask_question" || toolName === "question") {
-          const questions = this.parseAntigravityQuestions(params);
+          const questions = this.parseCommonQuestions(params);
           const qSummary = questions[0]?.question ||
             this.plugin.t("Agent question");
           const stepKey = String(stepIndex ?? qSummary);
@@ -3707,7 +4397,7 @@ ${content}
           });
           return;
         }
-        const title = this.extractAntigravityToolTitle(toolName, params);
+        const title = this.extractCommonToolTitle(toolName, params);
         if (!isDone) {
           cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
         } else {
@@ -3755,94 +4445,6 @@ ${content}
       cb.onError(String(msg));
     }
   }
-  extractAntigravityToolTitle(toolName, params) {
-    if (params && typeof params === "object") {
-      if (typeof params.toolSummary === "string" && params.toolSummary.trim()) {
-        return params.toolSummary.trim();
-      }
-      if (typeof params.TargetFile === "string" && params.TargetFile.trim()) {
-        return (0, import_path2.basename)(params.TargetFile.trim());
-      }
-      if (typeof params.AbsolutePath === "string" &&
-        params.AbsolutePath.trim()) {
-        return (0, import_path2.basename)(params.AbsolutePath.trim());
-      }
-      if (typeof params.Path === "string" && params.Path.trim()) {
-        return (0, import_path2.basename)(params.Path.trim());
-      }
-      if (typeof params.DirectoryPath === "string" &&
-        params.DirectoryPath.trim()) {
-        const dp = params.DirectoryPath.trim();
-        return (0, import_path2.basename)(dp) || dp;
-      }
-      if (typeof params.SearchDirectory === "string" &&
-        params.SearchDirectory.trim()) {
-        const dirName =
-          (0, import_path2.basename)(params.SearchDirectory.trim());
-        const q = typeof params.Query === "string" ? params.Query.trim() : "";
-        return q ? `"${q}" in ${dirName}` : dirName;
-      }
-      if (typeof params.Query === "string" && params.Query.trim()) {
-        return `"${params.Query.trim()}"`;
-      }
-      if (typeof params.query === "string" && params.query.trim()) {
-        return params.query.trim();
-      }
-      if (typeof params.Pattern === "string" && params.Pattern.trim()) {
-        return params.Pattern.trim();
-      }
-      if (typeof params.CommandLine === "string" && params.CommandLine.trim()) {
-        return params.CommandLine.trim();
-      }
-      if (typeof params.Role === "string" && params.Role.trim()) {
-        return params.Role.trim();
-      }
-      if (typeof params.toolAction === "string" && params.toolAction.trim()) {
-        return params.toolAction.trim();
-      }
-    }
-    return toolName;
-  }
-  parseAntigravityQuestions(params) {
-    if (!params || typeof params !== "object") return [];
-    let rawQuestions = params.questions;
-    if (typeof rawQuestions === "string") {
-      try {
-        rawQuestions = JSON.parse(rawQuestions);
-      } catch {
-        return [];
-      }
-    }
-    if (!Array.isArray(rawQuestions)) return [];
-    const result = [];
-    for (const item of rawQuestions) {
-      if (!item || typeof item !== "object") continue;
-      const qObj = item;
-      const question = typeof qObj.question === "string" ?
-        qObj.question.trim() : "";
-      if (!question) continue;
-      const header = typeof qObj.header === "string" ? qObj.header.trim() :
-        void 0;
-      const multiple = Boolean(qObj.is_multi_select ?? qObj.multiple);
-      const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
-      const options = [];
-      for (const opt of rawOpts) {
-        if (typeof opt === "string" && opt.trim()) {
-          options.push({ label: opt.trim() });
-        } else if (opt && typeof opt === "object") {
-          const o = opt;
-          const label = typeof o.label === "string" ? o.label.trim() : "";
-          if (label) {
-            const desc = typeof o.description === "string" ?
-              o.description.trim() : void 0;
-            options.push({ label, description: desc });
-          }
-        }
-      }
-      result.push({ header, question, options, multiple });
-    }
-    return result;
-  }
   execSqlite(dbPath, query) {
     return this.execCli("sqlite3", [dbPath, query]);
   }
@@ -3874,23 +4476,52 @@ var DEFAULT_ENGINE_CONFIGS = {
     options: {
       agent: ""
     }
+  },
+  claude: {
+    binary: "claude",
+    model: "",
+    options: {
+      effort: ""
+    }
+  },
+  codex: {
+    binary: "codex",
+    model: "",
+    options: {
+      sandbox: "workspace-write"
+    }
+  },
+  hermes: {
+    binary: "hermes",
+    model: "",
+    options: {
+      provider: ""
+    }
+  },
+  pi: {
+    binary: "pi",
+    model: "",
+    options: {
+      provider: "",
+      thinking: ""
+    }
   }
 };
+function createDefaultEnginesMap() {
+  const map = {};
+  for (const [id, def] of Object.entries(DEFAULT_ENGINE_CONFIGS)) {
+    map[id] = {
+      binary: def.binary,
+      model: def.model,
+      options: { ...def.options }
+    };
+  }
+  return map;
+}
 var DEFAULT_SETTINGS = {
   language: "en",
   engine: "antigravity",
-  engines: {
-    antigravity: {
-      binary: DEFAULT_ENGINE_CONFIGS.antigravity.binary,
-      model: DEFAULT_ENGINE_CONFIGS.antigravity.model,
-      options: { ...DEFAULT_ENGINE_CONFIGS.antigravity.options }
-    },
-    opencode: {
-      binary: DEFAULT_ENGINE_CONFIGS.opencode.binary,
-      model: DEFAULT_ENGINE_CONFIGS.opencode.model,
-      options: { ...DEFAULT_ENGINE_CONFIGS.opencode.options }
-    }
-  },
+  engines: createDefaultEnginesMap(),
   binaryPath: "opencode",
   model: "opencode-go/deepseek-v4.1-flash",
   agent: "",
@@ -3943,18 +4574,7 @@ function migrateSettings(raw) {
     {},
     DEFAULT_SETTINGS,
     {
-      engines: {
-        antigravity: {
-          binary: DEFAULT_ENGINE_CONFIGS.antigravity.binary,
-          model: DEFAULT_ENGINE_CONFIGS.antigravity.model,
-          options: { ...DEFAULT_ENGINE_CONFIGS.antigravity.options }
-        },
-        opencode: {
-          binary: DEFAULT_ENGINE_CONFIGS.opencode.binary,
-          model: DEFAULT_ENGINE_CONFIGS.opencode.model,
-          options: { ...DEFAULT_ENGINE_CONFIGS.opencode.options }
-        }
-      },
+      engines: createDefaultEnginesMap(),
       sessionEngines: {},
       pinned: [],
       prompts: []
@@ -4015,6 +4635,7 @@ var OPENCODE_DESCRIPTOR = {
   id: "opencode",
   displayName: "OpenCode CLI",
   shortName: "Opencode",
+  icon: "terminal-square",
   defaultBinary: "opencode",
   defaultModel: "opencode-go/deepseek-v4.1-flash",
   binaryDesc:
@@ -4135,23 +4756,7 @@ var OpencodeRunner = class extends BaseCliRunner {
       } catch {
       }
     }
-    const histories = this.plugin.histories ?? {};
-    const sessionEngines = this.plugin.settings.sessionEngines ?? {};
-    for (const [id, msgs] of Object.entries(histories)) {
-      if (seenIds.has(id)) continue;
-      const isOc = sessionEngines[id] === "opencode" || !sessionEngines[id] &&
-        /^ses_/.test(id);
-      if (isOc) {
-        const lastTs = msgs[msgs.length - 1]?.timestamp ?? Date.now();
-        sessions.push({
-          id,
-          title: this.fallbackSessionTitle(id),
-          updated: lastTs,
-          engine: "opencode"
-        });
-        seenIds.add(id);
-      }
-    }
+    sessions.push(...this.listHistorySessions("opencode", seenIds, /^ses_/));
     return sessions;
   }
   fallbackSessionTitle(sessionId) {
@@ -4482,7 +5087,7 @@ var OpencodeRunner = class extends BaseCliRunner {
             typeof endMs === "number" && endMs >= startMs ? endMs - startMs :
               void 0;
           if (toolName === "question" || toolName === "ask_question") {
-            const questions = this.parseOpencodeQuestions(input);
+            const questions = this.parseCommonQuestions(input);
             const qTitle = questions[0]?.question ||
               this.plugin.t("Agent question");
             if (questions.length > 0) {
@@ -4500,7 +5105,7 @@ var OpencodeRunner = class extends BaseCliRunner {
             });
             break;
           }
-          const title = this.extractOpencodeToolTitle(
+          const title = this.extractCommonToolTitle(
             toolName,
             input,
             part.state?.title
@@ -4556,84 +5161,1534 @@ var OpencodeRunner = class extends BaseCliRunner {
       cb.onReasoning(part.text, String(part.id));
     }
   }
-  extractOpencodeToolTitle(toolName, input, stateTitle) {
-    const inp = input && typeof input === "object" ? input : null;
-    if (inp) {
-      if (typeof inp.filePath === "string" && inp.filePath.trim()) {
-        return (0, import_path3.basename)(inp.filePath.trim());
-      }
-      if (typeof inp.path === "string" && inp.path.trim()) {
-        return (0, import_path3.basename)(inp.path.trim()) || inp.path.trim();
-      }
-      if (typeof inp.description === "string" && inp.description.trim()) {
-        return inp.description.trim();
-      }
-      if (typeof inp.command === "string" && inp.command.trim()) {
-        return inp.command.trim();
-      }
-      if (typeof inp.pattern === "string" && inp.pattern.trim()) {
-        return inp.pattern.trim();
-      }
-      if (typeof inp.url === "string" && inp.url.trim()) {
-        return inp.url.trim();
-      }
-      if (typeof inp.query === "string" && inp.query.trim()) {
-        return inp.query.trim();
-      }
-      if (Array.isArray(inp.todos) && inp.todos.length > 0) {
-        const doneCount = inp.todos.filter(
-          (t) => t && typeof t === "object" && t.status === "completed"
-        ).length;
-        const tasksWord = this.plugin.t("tasks");
-        const doneWord = this.plugin.t("done");
-        return `${inp.todos.length} ${tasksWord} (${doneCount} ${doneWord})`;
-      }
-    }
-    if (stateTitle && stateTitle.trim() &&
-      stateTitle.trim().toLowerCase() !== toolName.toLowerCase()) {
-      return stateTitle.trim();
-    }
-    return toolName;
-  }
-  parseOpencodeQuestions(input) {
-    if (!input || typeof input !== "object") return [];
-    const inp = input;
-    const rawQuestions = inp.questions;
-    if (!Array.isArray(rawQuestions)) return [];
-    const result = [];
-    for (const item of rawQuestions) {
-      if (!item || typeof item !== "object") continue;
-      const qObj = item;
-      const question = typeof qObj.question === "string" ?
-        qObj.question.trim() : "";
-      if (!question) continue;
-      const header = typeof qObj.header === "string" ? qObj.header.trim() :
-        void 0;
-      const multiple = Boolean(qObj.multiple ?? qObj.is_multi_select);
-      const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
-      const options = [];
-      for (const opt of rawOpts) {
-        if (typeof opt === "string" && opt.trim()) {
-          options.push({ label: opt.trim() });
-        } else if (opt && typeof opt === "object") {
-          const o = opt;
-          const label = typeof o.label === "string" ? o.label.trim() : "";
-          if (label) {
-            const desc = typeof o.description === "string" ?
-              o.description.trim() : void 0;
-            options.push({ label, description: desc });
-          }
-        }
-      }
-      result.push({ header, question, options, multiple });
-    }
-    return result;
-  }
   errorMessage(err) {
     if (!err) return this.plugin.t("Unknown error");
     const e = err;
     const msg = e.data?.message || e.message || JSON.stringify(err);
     return String(msg);
+  }
+};
+
+// src/providers/claude/runner.ts
+var import_fs3 = require("fs");
+var import_os3 = require("os");
+var import_path4 = require("path");
+var CLAUDE_DESCRIPTOR = {
+  id: "claude",
+  displayName: "Claude Code CLI",
+  shortName: "Claude",
+  icon: "brain-circuit",
+  defaultBinary: "claude",
+  defaultModel: "",
+  binaryDesc:
+    "Command or full path to the claude executable. Usually 'claude' is " +
+    "enough if it is on your PATH.",
+  modelDesc:
+    "Leave on default to use your Claude CLI config, or pick an alias " +
+    "(sonnet, opus, haiku) / enter an exact model ID.",
+  included: false,
+  supportsSessions: "local-db",
+  supportsUsageStats: true,
+  supportsDbCleanup: false,
+  options: [
+    {
+      key: "effort",
+      label: "Reasoning effort",
+      desc: "Reasoning effort level passed to Claude Code.",
+      type: "select",
+      default: "",
+      choices: [
+        { value: "", label: "(default)" },
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium" },
+        { value: "high", label: "High" }
+      ]
+    }
+  ]
+};
+var ClaudeRunner = class extends BaseCliRunner {
+  descriptor = CLAUDE_DESCRIPTOR;
+  id = "claude";
+  displayName = "Claude Code CLI";
+  engine = "claude";
+  included = false;
+  cachedModels = null;
+  constructor(plugin) {
+    super(plugin);
+  }
+  getConfig() {
+    return this.plugin.getEngineConfig("claude");
+  }
+  getBin() {
+    return this.resolveBinaryPath(this.getConfig().binary || "claude");
+  }
+  async getVersion() {
+    const out = await this.execCli(this.getBin(), ["--version"]);
+    const first = out.trim().split("\n")[0];
+    if (!first) throw new Error("Empty output from claude --version");
+    return first;
+  }
+  async listModels(forceRefresh = false) {
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+      return this.cachedModels;
+    }
+    const models = ["sonnet", "opus", "haiku", "opusplan"];
+    try {
+      const cfgPath =
+        (0, import_path4.join)((0, import_os3.homedir)(), ".claude",
+          "settings.json");
+      if ((0, import_fs3.existsSync)(cfgPath)) {
+        const parsed =
+          JSON.parse((0, import_fs3.readFileSync)(cfgPath, "utf-8"));
+        if (typeof parsed.model === "string" && parsed.model.trim() &&
+          !models.includes(parsed.model.trim())) {
+          models.unshift(parsed.model.trim());
+        }
+      }
+    } catch {
+    }
+    this.cachedModels = models;
+    return models;
+  }
+  async listSessions() {
+    return this.listHistorySessions("claude");
+  }
+  async renameSession(_sessionId, _title) {
+  }
+  async deleteSession(_sessionId) {
+  }
+  async getModelContextLimit(model) {
+    return this.estimateModelContextLimit(model, 2e5);
+  }
+  async getSessionTokens(sessionId) {
+    return this.getHistorySessionTokens(sessionId);
+  }
+  async getUsageStats() {
+    return this.computeHistoryUsageStats("claude");
+  }
+  buildArgs(req) {
+    const s = this.plugin.settings;
+    const cfg = this.getConfig();
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const finalPrompt = this.inlinePromptAttachments(
+      req.prompt,
+      req.fileAttachments,
+      cwd
+    );
+    const args = [
+      "-p",
+      finalPrompt,
+      "--output-format",
+      "stream-json",
+      "--verbose"
+    ];
+    if (s.autoApprove) {
+      args.push("--dangerously-skip-permissions");
+    }
+    const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
+    if (sid) {
+      args.push("--resume", sid);
+    }
+    const model = cfg.model.trim();
+    if (model) {
+      args.push("--model", model);
+    }
+    const effort = cfg.options.effort;
+    if (effort) {
+      args.push("--effort", effort);
+    }
+    return args;
+  }
+  createStreamState() {
+    return {
+      accumulatedText: "",
+      accumulatedReasoning: "",
+      toolNames: /* @__PURE__ */ new Map(),
+      emittedQuestions: /* @__PURE__ */ new Set()
+    };
+  }
+  runStream(reqOrPrompt, fileAttachmentsOrCb, maybeCb) {
+    const { req, cb } = this.normalizeRunArgs(
+      reqOrPrompt,
+      fileAttachmentsOrCb,
+      maybeCb
+    );
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const args = this.buildArgs({ ...req, cwd });
+    const bin = this.getBin();
+    const state = this.createStreamState();
+    return this.spawnJsonlStream(
+      bin,
+      args,
+      cwd,
+      (line) => this.handleLine(line, cb, state),
+      cb
+    );
+  }
+  handleLine(line, cb, state = this.createStreamState()) {
+    if (line.length > MAX_STREAM_LINE_BYTES) {
+      cb.onRaw?.(`[omitted event of ${line.length} bytes]
+`);
+      return;
+    }
+    let ev;
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      cb.onRaw?.(line + "\n");
+      return;
+    }
+    if (typeof ev.session_id === "string" && ev.session_id) {
+      cb.onSession(ev.session_id);
+    }
+    if (ev.type === "system") {
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if (ev.type === "stream_event" && ev.event) {
+      const delta = ev.event.delta;
+      if (delta?.type === "text_delta" && typeof delta.text === "string") {
+        state.accumulatedText += delta.text;
+        cb.onActivity?.(this.plugin.t("Writing response..."));
+        cb.onText(state.accumulatedText, String(ev.event.index ?? 0));
+      } else if (delta?.type === "thinking_delta" &&
+        typeof delta.thinking === "string") {
+        state.accumulatedReasoning += delta.thinking;
+        cb.onActivity?.(this.plugin.t("Thinking..."));
+        cb.onReasoning(state.accumulatedReasoning, String(ev.event.index ?? 0));
+      }
+      return;
+    }
+    if (ev.type === "assistant" && ev.message) {
+      const blocks = Array.isArray(ev.message.content) ? ev.message.content :
+        [];
+      for (const block of blocks) {
+        if (!block || typeof block !== "object") continue;
+        if (block.type === "thinking" && typeof block.thinking === "string") {
+          state.accumulatedReasoning = block.thinking;
+          cb.onActivity?.(this.plugin.t("Thinking..."));
+          cb.onReasoning(block.thinking, String(block.id ?? "thinking"));
+        } else if (block.type === "text" && typeof block.text === "string") {
+          state.accumulatedText = block.text;
+          cb.onActivity?.(this.plugin.t("Writing response..."));
+          cb.onText(block.text, String(block.id ?? "text"));
+        } else if (block.type === "tool_use") {
+          const toolName = String(block.name || "tool");
+          const stepId = String(block.id || `step-${Date.now()}-${toolName}`);
+          const input = block.input;
+          if (toolName === "AskUserQuestion" || toolName === "ask_question" ||
+            toolName === "question") {
+            const questions = this.parseCommonQuestions(input);
+            const qTitle = questions[0]?.question ||
+              this.plugin.t("Agent question");
+            if (questions.length > 0 && !state.emittedQuestions.has(stepId)) {
+              state.emittedQuestions.add(stepId);
+              cb.onQuestion?.(questions);
+            }
+            cb.onActivity?.(this.plugin.t("Waiting for your answer..."));
+            cb.onStep({
+              id: stepId,
+              tool: toolName,
+              title: qTitle,
+              state: "completed",
+              input
+            });
+            continue;
+          }
+          const title = this.extractCommonToolTitle(toolName, input);
+          state.toolNames.set(stepId, { name: toolName, title, input });
+          cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
+          cb.onStep({
+            id: stepId,
+            tool: toolName,
+            title,
+            state: "running",
+            input
+          });
+        }
+      }
+      return;
+    }
+    if (ev.type === "user" && ev.message) {
+      const blocks = Array.isArray(ev.message.content) ? ev.message.content :
+        [];
+      for (const block of blocks) {
+        if (block?.type === "tool_result" && block.tool_use_id) {
+          const stepId = String(block.tool_use_id);
+          const meta = state.toolNames.get(stepId);
+          const toolName = meta?.name || "tool";
+          const title = meta?.title || toolName;
+          const isErr = Boolean(block.is_error);
+          cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+          cb.onStep({
+            id: stepId,
+            tool: toolName,
+            title,
+            state: isErr ? "error" : "completed",
+            input: meta?.input,
+            output: block.content
+          });
+        }
+      }
+      return;
+    }
+    if (ev.type === "result") {
+      if (ev.is_error) {
+        const errText = typeof ev.result === "string" && ev.result.trim() ?
+          ev.result.trim() : this.plugin.t("Unknown error");
+        cb.onError(errText);
+        return;
+      }
+      if (typeof ev.result === "string" && ev.result.trim()) {
+        state.accumulatedText = ev.result;
+        cb.onText(state.accumulatedText, "final");
+      }
+      const u = ev.usage ?? {};
+      const input = Number(u.input_tokens ?? 0);
+      const output = Number(u.output_tokens ?? 0);
+      const cacheRead = Number(u.cache_read_input_tokens ?? 0);
+      const cacheWrite = Number(u.cache_creation_input_tokens ?? 0);
+      const cost = typeof ev.total_cost_usd === "number" ? ev.total_cost_usd :
+        typeof ev.cost_usd === "number" ? ev.cost_usd : void 0;
+      cb.onFinish({
+        tokens: {
+          total: input + output,
+          input,
+          output,
+          cache: cacheRead > 0 || cacheWrite > 0 ?
+            { read: cacheRead, write: cacheWrite } : void 0
+        },
+        cost
+      });
+      return;
+    }
+    if (ev.type === "error" || ev.error) {
+      const msg = typeof ev.error === "string" ? ev.error :
+        ev.error?.message || JSON.stringify(ev.error || ev);
+      cb.onError(String(msg));
+    }
+  }
+};
+
+// src/providers/codex/runner.ts
+var import_fs4 = require("fs");
+var import_os4 = require("os");
+var import_path5 = require("path");
+var CODEX_DESCRIPTOR = {
+  id: "codex",
+  displayName: "OpenAI Codex CLI",
+  shortName: "Codex",
+  icon: "code-2",
+  defaultBinary: "codex",
+  defaultModel: "",
+  binaryDesc:
+    "Command or full path to the codex executable. Usually 'codex' is " +
+    "enough if it is on your PATH.",
+  modelDesc:
+    "Leave on default to use your ~/.codex/config.toml model, or enter an " +
+    "OpenAI model ID.",
+  included: false,
+  supportsSessions: "local-db",
+  supportsUsageStats: true,
+  supportsDbCleanup: false,
+  options: [
+    {
+      key: "sandbox",
+      label: "Sandbox mode",
+      desc: "Filesystem sandbox policy when auto-approve is disabled.",
+      type: "select",
+      default: "workspace-write",
+      choices: [
+        { value: "read-only", label: "Read-only" },
+        { value: "workspace-write", label: "Workspace write" },
+        { value: "danger-full-access", label: "Full access" }
+      ]
+    }
+  ]
+};
+var CodexRunner = class extends BaseCliRunner {
+  descriptor = CODEX_DESCRIPTOR;
+  id = "codex";
+  displayName = "OpenAI Codex CLI";
+  engine = "codex";
+  included = false;
+  cachedModels = null;
+  constructor(plugin) {
+    super(plugin);
+  }
+  getConfig() {
+    return this.plugin.getEngineConfig("codex");
+  }
+  getBin() {
+    return this.resolveBinaryPath(this.getConfig().binary || "codex");
+  }
+  async getVersion() {
+    const out = await this.execCli(this.getBin(), ["--version"]);
+    const first = out.trim().split("\n")[0];
+    if (!first) throw new Error("Empty output from codex --version");
+    return first;
+  }
+  async listModels(forceRefresh = false) {
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+      return this.cachedModels;
+    }
+    const models = [];
+    try {
+      const cfgPath =
+        (0, import_path5.join)((0, import_os4.homedir)(), ".codex",
+          "config.toml");
+      if ((0, import_fs4.existsSync)(cfgPath)) {
+        const raw = (0, import_fs4.readFileSync)(cfgPath, "utf-8");
+        const m = raw.match(/^\s*model\s*=\s*["']([^"']+)["']/m);
+        if (m && m[1].trim()) {
+          models.push(m[1].trim());
+        }
+      }
+    } catch {
+    }
+    for (const def of ["o3", "o4-mini"]) {
+      if (!models.includes(def)) models.push(def);
+    }
+    this.cachedModels = models;
+    return models;
+  }
+  async listSessions() {
+    return this.listHistorySessions("codex");
+  }
+  async renameSession(_sessionId, _title) {
+  }
+  async deleteSession(_sessionId) {
+  }
+  async getModelContextLimit(model) {
+    return this.estimateModelContextLimit(model, 2e5);
+  }
+  async getSessionTokens(sessionId) {
+    return this.getHistorySessionTokens(sessionId);
+  }
+  async getUsageStats() {
+    return this.computeHistoryUsageStats("codex");
+  }
+  buildArgs(req) {
+    const s = this.plugin.settings;
+    const cfg = this.getConfig();
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const finalPrompt = this.inlinePromptAttachments(
+      req.prompt,
+      req.fileAttachments,
+      cwd
+    );
+    const args = ["exec", "--json", "--skip-git-repo-check"];
+    const model = cfg.model.trim();
+    if (model) {
+      args.push("--model", model);
+    }
+    if (s.autoApprove) {
+      args.push("--full-auto");
+    } else {
+      const sandbox = cfg.options.sandbox || "workspace-write";
+      args.push("--sandbox", sandbox);
+    }
+    const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
+    if (sid) {
+      args.push("resume", sid, finalPrompt);
+    } else {
+      args.push(finalPrompt);
+    }
+    return args;
+  }
+  runStream(reqOrPrompt, fileAttachmentsOrCb, maybeCb) {
+    const { req, cb } = this.normalizeRunArgs(
+      reqOrPrompt,
+      fileAttachmentsOrCb,
+      maybeCb
+    );
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const args = this.buildArgs({ ...req, cwd });
+    const bin = this.getBin();
+    const state = { accumulatedText: "" };
+    return this.spawnJsonlStream(
+      bin,
+      args,
+      cwd,
+      (line) => this.handleLine(line, cb, state),
+      cb
+    );
+  }
+  handleLine(line, cb, state = { accumulatedText: "" }) {
+    if (line.length > MAX_STREAM_LINE_BYTES) {
+      cb.onRaw?.(`[omitted event of ${line.length} bytes]
+`);
+      return;
+    }
+    let ev;
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      cb.onRaw?.(line + "\n");
+      return;
+    }
+    if (ev.type === "thread.started") {
+      if (typeof ev.thread_id === "string" && ev.thread_id) {
+        cb.onSession(ev.thread_id);
+      }
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if (ev.type === "turn.started") {
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if ((ev.type === "item.started" || ev.type === "item.updated" ||
+      ev.type === "item.completed" || ev.type === "item.failed") && ev.item) {
+      this.handleItemEvent(ev.type, ev.item, cb, state);
+      return;
+    }
+    if (ev.type === "turn.completed") {
+      const u = ev.usage ?? {};
+      const input = Number(u.input_tokens ?? 0);
+      const cached = Number(u.cached_input_tokens ?? 0);
+      const output = Number(u.output_tokens ?? 0);
+      const reasoning = Number(u.reasoning_tokens ?? 0);
+      cb.onFinish({
+        tokens: {
+          total: input + output + reasoning,
+          input,
+          output,
+          reasoning,
+          cache: cached > 0 ? { read: cached, write: 0 } : void 0
+        }
+      });
+      return;
+    }
+    if (ev.type === "turn.failed" || ev.type === "error" || ev.error) {
+      const msg = typeof ev.error === "string" ? ev.error :
+        ev.error?.message || ev.message || JSON.stringify(ev.error || ev);
+      cb.onError(String(msg));
+    }
+  }
+  handleItemEvent(eventType, item, cb, state) {
+    const itemId = String(item.id || `item-${Date.now()}`);
+    const isCompleted = eventType === "item.completed";
+    const isFailed = eventType === "item.failed" || item.status === "failed" ||
+      typeof item.exit_code === "number" && item.exit_code !== 0;
+    if (item.type === "reasoning") {
+      if (typeof item.text === "string" && item.text) {
+        cb.onActivity?.(this.plugin.t("Thinking..."));
+        cb.onReasoning(item.text, itemId);
+      }
+      return;
+    }
+    if (item.type === "agent_message") {
+      if (typeof item.text === "string" && item.text) {
+        state.accumulatedText = item.text;
+        cb.onActivity?.(this.plugin.t("Writing response..."));
+        cb.onText(state.accumulatedText, itemId);
+      }
+      return;
+    }
+    if (item.type === "command_execution") {
+      const title = item.command?.trim() || "bash";
+      if (!isCompleted && !isFailed) {
+        cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
+      } else {
+        cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      }
+      cb.onStep({
+        id: itemId,
+        tool: "bash",
+        title,
+        state: isFailed ? "error" : isCompleted ? "completed" : "running",
+        input: item.command ? { command: item.command } : void 0,
+        output: item.aggregated_output
+      });
+      return;
+    }
+    if (item.type === "file_change") {
+      const firstPath = item.changes?.[0]?.path || "";
+      const title = firstPath ? (0, import_path5.basename)(firstPath) : "file";
+      cb.onStep({
+        id: itemId,
+        tool: "edit_file",
+        title,
+        state: isFailed ? "error" : isCompleted ? "completed" : "running",
+        input: item.changes
+      });
+      return;
+    }
+    if (item.type === "web_search") {
+      const title = item.query || "search_web";
+      cb.onStep({
+        id: itemId,
+        tool: "search_web",
+        title,
+        state: isFailed ? "error" : isCompleted ? "completed" : "running",
+        input: item.query ? { query: item.query } : void 0
+      });
+      return;
+    }
+    if (item.type === "mcp_tool_call") {
+      const toolName = item.tool || "tool";
+      const title = this.extractCommonToolTitle(toolName, item.arguments);
+      cb.onStep({
+        id: itemId,
+        tool: toolName,
+        title,
+        state: isFailed ? "error" : isCompleted ? "completed" : "running",
+        input: item.arguments,
+        output: item.result
+      });
+    }
+  }
+};
+
+// src/providers/hermes/runner.ts
+var import_fs5 = require("fs");
+var import_os5 = require("os");
+var import_path6 = require("path");
+var HERMES_DESCRIPTOR = {
+  id: "hermes",
+  displayName: "Hermes Agent CLI (Nous Research)",
+  shortName: "Hermes",
+  icon: "zap",
+  defaultBinary: "hermes",
+  defaultModel: "",
+  binaryDesc:
+    "Command or full path to the hermes executable. Default is 'hermes' or " +
+    "'~/.hermes/bin/hermes'.",
+  modelDesc:
+    "Leave on default to use your ~/.hermes/config.yaml model, or enter a " +
+    "provider/model ID.",
+  included: false,
+  supportsSessions: "local-db",
+  supportsUsageStats: true,
+  supportsDbCleanup: false,
+  options: [
+    {
+      key: "provider",
+      label: "Provider",
+      desc:
+        "Optional Hermes backend provider (e.g. openrouter, nous, " +
+        "anthropic).",
+      type: "text",
+      placeholder: "e.g. openrouter",
+      default: ""
+    },
+    {
+      key: "reasoning",
+      label: "Reasoning effort",
+      desc: "Optional reasoning effort level for Hermes.",
+      type: "select",
+      choices: [
+        { value: "", label: "Default (from config.yaml)" },
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium" },
+        { value: "high", label: "High" }
+      ],
+      default: ""
+    }
+  ]
+};
+var HermesRunner = class extends BaseCliRunner {
+  descriptor = HERMES_DESCRIPTOR;
+  id = "hermes";
+  displayName = "Hermes Agent CLI";
+  engine = "hermes";
+  included = false;
+  cachedModels = null;
+  cachedModelsBin = null;
+  contextLimits = /* @__PURE__ */ new Map();
+  constructor(plugin) {
+    super(plugin);
+  }
+  getConfig() {
+    return this.plugin.getEngineConfig("hermes");
+  }
+  getBin() {
+    return this.resolveBinaryPath(this.getConfig().binary || "hermes");
+  }
+  getHermesHome() {
+    return process.env.HERMES_HOME ||
+      (0, import_path6.join)((0, import_os5.homedir)(), ".hermes");
+  }
+  /**
+   * Resolve the Python interpreter and checkout root of the user's Hermes
+   * installation so we can query Hermes' native model & context APIs directly
+   * for ANY provider the user has configured (OpenRouter, Nous, Anthropic,
+   * OpenAI, Copilot, OpenCode Go/Zen, Ollama, LM Studio, Bedrock, etc.).
+   */
+  resolveHermesPython() {
+    const hermesHome = this.getHermesHome();
+    const repoRoot = (0, import_path6.join)(hermesHome, "hermes-agent");
+    if (!(0, import_fs5.existsSync)(repoRoot)) return null;
+    const launcherCandidates = [
+      this.getBin(),
+      (0, import_path6.join)(repoRoot, ".hermes", "bin", "hermes")
+    ];
+    for (const candidate of launcherCandidates) {
+      try {
+        if (!(0, import_fs5.existsSync)(candidate)) continue;
+        const text = (0, import_fs5.readFileSync)(candidate, "utf-8");
+        const execMatch = text.match(/exec\s+([^\s"']+\/python3?(?:\.\d+)?)\b/);
+        if (execMatch && execMatch[1] &&
+          (0, import_fs5.existsSync)(execMatch[1])) {
+          return { pythonBin: execMatch[1], repoRoot };
+        }
+      } catch {
+      }
+    }
+    try {
+      const toolsDir = (0, import_path6.join)(hermesHome, "tools");
+      if ((0, import_fs5.existsSync)(toolsDir)) {
+        for (const entry of (0, import_fs5.readdirSync)(toolsDir)) {
+          if (entry.startsWith("python")) {
+            const py = (0, import_path6.join)(
+              toolsDir,
+              entry,
+              process.platform === "win32" ? "python.exe" : "bin/python3"
+            );
+            if ((0, import_fs5.existsSync)(py)) {
+              return { pythonBin: py, repoRoot };
+            }
+          }
+        }
+      }
+    } catch {
+    }
+    const venvPy = (0, import_path6.join)(
+      repoRoot,
+      ".venv",
+      process.platform === "win32" ? "Scripts/python.exe" : "bin/python"
+    );
+    if ((0, import_fs5.existsSync)(venvPy)) {
+      return { pythonBin: venvPy, repoRoot };
+    }
+    return null;
+  }
+  /**
+   * Run a short Python introspection snippet inside the Hermes runtime.
+   */
+  async execHermesPython(script, extraArgs = []) {
+    const runtime = this.resolveHermesPython();
+    if (!runtime) return null;
+    try {
+      const bootstrap = [
+        "import os, sys",
+        "os.environ.pop('PYTHONHOME', None)",
+        "os.environ.pop('PYTHONPATH', None)",
+        `sys.path.insert(0, ${JSON.stringify(runtime.repoRoot)})`,
+        "import hermes_bootstrap",
+        script
+      ].join("\n");
+      return await this.execCli(runtime.pythonBin, [
+        "-I",
+        "-c",
+        bootstrap,
+        ...extraArgs
+      ]);
+    } catch {
+      return null;
+    }
+  }
+  async getVersion() {
+    const out = await this.execCli(this.getBin(), ["--version"]);
+    const first = out.trim().split("\n")[0];
+    if (!first) throw new Error("Empty output from hermes --version");
+    return first;
+  }
+  async listModels(forceRefresh = false) {
+    const bin = this.getBin();
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0 &&
+      this.cachedModelsBin === bin) {
+      return this.cachedModels;
+    }
+    const seen = /* @__PURE__ */ new Set();
+    const addModel = (m) => {
+      const clean = m.trim();
+      if (clean && !seen.has(clean)) {
+        seen.add(clean);
+      }
+    };
+    const requestedProvider = this.getConfig().options.provider?.trim() || "";
+    const pyScript = `
+import json, sys
+from hermes_cli.config import load_config
+from hermes_cli.models import list_available_providers,
+  cached_provider_model_ids, provider_model_ids
+
+req_prov = sys.argv[1] if len(sys.argv) > 1 else ""
+force = sys.argv[2] == "1" if len(sys.argv) > 2 else False
+cfg = load_config()
+m = cfg.get("model") if isinstance(cfg, dict) else {}
+default_model =
+  (m.get("default") or m.get("model") or "") if isinstance(m,
+    dict) else (m if isinstance(m, str) else "")
+cfg_provider =
+  req_prov or ((m.get("provider") or "") if isinstance(m, dict) else "")
+
+providers = []
+if cfg_provider and cfg_provider != "auto":
+    providers.append(cfg_provider)
+for p in list_available_providers():
+    pid = p.get("id")
+    if p.get("authenticated") and pid and pid not in providers:
+        providers.append(pid)
+
+models = []
+if default_model:
+    models.append(str(default_model).strip())
+
+for pid in providers:
+    try:
+        rows =
+          provider_model_ids(pid,
+            force_refresh=force) if force else (cached_provider_model_ids(
+              pid) or provider_model_ids(pid))
+        for mid in (rows or []):
+            models.append(str(mid).strip())
+    except Exception:
+        pass
+
+print(json.dumps({"models": models}))
+`;
+    const pyOut = await this.execHermesPython(pyScript, [
+      requestedProvider,
+      forceRefresh ? "1" : "0"
+    ]);
+    if (pyOut) {
+      try {
+        const parsed = JSON.parse(pyOut.trim());
+        for (const m of parsed.models || []) {
+          addModel(m);
+        }
+      } catch {
+      }
+    }
+    const hermesHome = this.getHermesHome();
+    try {
+      const cfgPath = (0, import_path6.join)(hermesHome, "config.yaml");
+      if ((0, import_fs5.existsSync)(cfgPath)) {
+        const raw = (0, import_fs5.readFileSync)(cfgPath, "utf-8");
+        const modelSection = raw.match(
+          /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
+        );
+        if (modelSection) {
+          const defMatch = modelSection[0].match(
+            /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
+          );
+          if (defMatch && defMatch[1]) {
+            addModel(defMatch[1]);
+          }
+        }
+        const topMatch = raw.match(
+          /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
+        );
+        if (topMatch && topMatch[1]) {
+          addModel(topMatch[1]);
+        }
+      }
+    } catch {
+    }
+    try {
+      const provCachePath =
+        (0, import_path6.join)(hermesHome, "provider_models_cache.json");
+      if ((0, import_fs5.existsSync)(provCachePath)) {
+        const parsed =
+          JSON.parse((0, import_fs5.readFileSync)(provCachePath, "utf-8"));
+        const entries = Object.entries(parsed);
+        entries.sort(
+          ([, a], [, b]) => (a.fallback ? 1 : 0) - (b.fallback ? 1 : 0)
+        );
+        for (const [, entry] of entries) {
+          for (const m of entry.models || []) {
+            if (typeof m === "string") {
+              addModel(m);
+            }
+          }
+        }
+      }
+    } catch {
+    }
+    if (seen.size <= 1) {
+      try {
+        const catalogPath =
+          (0, import_path6.join)(hermesHome, "cache", "model_catalog.json");
+        if ((0, import_fs5.existsSync)(catalogPath)) {
+          const parsed =
+            JSON.parse((0, import_fs5.readFileSync)(catalogPath, "utf-8"));
+          const providers = parsed.providers || {};
+          for (const prov of Object.values(providers)) {
+            for (const item of prov.models || []) {
+              if (typeof item.id === "string") {
+                addModel(item.id);
+              }
+            }
+          }
+        }
+      } catch {
+      }
+    }
+    if (seen.size === 0) {
+      try {
+        const out = await this.execCli(bin, ["models"]);
+        for (const line of out.split("\n")) {
+          addModel(line);
+        }
+      } catch {
+      }
+    }
+    this.cachedModels = Array.from(seen);
+    this.cachedModelsBin = bin;
+    return this.cachedModels;
+  }
+  async listSessions() {
+    return this.listHistorySessions("hermes");
+  }
+  async renameSession(sessionId, title) {
+    if (!sessionId || !title.trim()) return;
+    try {
+      await this.execCli(this.getBin(), [
+        "sessions",
+        "rename",
+        sessionId,
+        title.trim()
+      ]);
+    } catch {
+    }
+  }
+  async deleteSession(sessionId) {
+    if (!sessionId) return;
+    try {
+      await this.execCli(this.getBin(), [
+        "sessions",
+        "delete",
+        sessionId,
+        "--yes"
+      ]);
+    } catch {
+    }
+  }
+  readConfiguredDefaultModel() {
+    try {
+      const cfgPath =
+        (0, import_path6.join)((0, import_os5.homedir)(), ".hermes",
+          "config.yaml");
+      if ((0, import_fs5.existsSync)(cfgPath)) {
+        const raw = (0, import_fs5.readFileSync)(cfgPath, "utf-8");
+        const modelSection = raw.match(
+          /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
+        );
+        if (modelSection) {
+          const defMatch = modelSection[0].match(
+            /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
+          );
+          if (defMatch && defMatch[1]) {
+            return defMatch[1].trim();
+          }
+        }
+        const topMatch = raw.match(
+          /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
+        );
+        if (topMatch && topMatch[1]) {
+          return topMatch[1].trim();
+        }
+      }
+    } catch {
+    }
+    return "";
+  }
+  async getModelContextLimit(model) {
+    const effective = model.trim() || this.getConfig().model.trim() ||
+      this.readConfiguredDefaultModel();
+    const configuredProvider = (this.getConfig().options.provider ?? "").trim();
+    const cacheKey = `${configuredProvider}:${effective}`;
+    const cached = this.contextLimits.get(cacheKey) ??
+      this.contextLimits.get(effective);
+    if (cached && cached > 0) return cached;
+    try {
+      const script = [
+        "import json, sys",
+        "from agent.model_metadata import get_model_context_length",
+        "from hermes_cli.runtime_provider import resolve_runtime_provider",
+        "from hermes_cli.models import PROVIDER_REGISTRY",
+        "mod = sys.argv[1] if len(sys.argv) > 1 else ''",
+        "req_prov = sys.argv[2] if len(sys.argv) > 2 else ''",
+        "if '/' in mod and not req_prov:",
+        "    prefix, rest = mod.split('/', 1)",
+        "    if prefix in PROVIDER_REGISTRY and prefix != 'openrouter':",
+        "        req_prov = prefix",
+        "        mod = rest",
+          "rt = resolve_runtime_provider(requested=req_prov or None, " +
+          "target_model=mod or None)",
+        "eff_mod = mod or rt.get('model') or ''",
+        "ctx = get_model_context_length(",
+        "    eff_mod,",
+        "    base_url=rt.get('base_url', '') or '',",
+        "    api_key=rt.get('api_key', '') or '',",
+        "    provider=rt.get('provider', '') or req_prov,",
+        ")",
+        "print(json.dumps({'context_length': ctx, 'model': eff_mod}))"
+      ].join("\n");
+      const out = await this.execHermesPython(script, [
+        effective,
+        configuredProvider
+      ]);
+      if (out) {
+        const parsed = JSON.parse(out);
+        if (typeof parsed.context_length === "number" &&
+          parsed.context_length > 0) {
+          this.contextLimits.set(cacheKey, parsed.context_length);
+          if (effective) this.contextLimits.set(effective,
+            parsed.context_length);
+          if (parsed.model) {
+            this.contextLimits.set(parsed.model, parsed.context_length);
+          }
+          return parsed.context_length;
+        }
+      }
+    } catch {
+    }
+    return this.estimateModelContextLimit(effective, 256e3);
+  }
+  async getSessionTokens(sessionId) {
+    return this.getHistorySessionTokens(sessionId);
+  }
+  async getUsageStats() {
+    return this.computeHistoryUsageStats("hermes");
+  }
+  buildArgs(req) {
+    const s = this.plugin.settings;
+    const cfg = this.getConfig();
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const finalPrompt = this.inlinePromptAttachments(
+      req.prompt,
+      req.fileAttachments,
+      cwd
+    );
+    const args = ["chat", "-q", finalPrompt, "--format", "stream-json"];
+    const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
+    if (sid) {
+      args.push("--resume", sid);
+      return args;
+    }
+    if (s.autoApprove) {
+      args.push("--yolo");
+    }
+    const model = cfg.model.trim();
+    if (model) {
+      args.push("--model", model);
+    }
+    const provider = cfg.options.provider?.trim();
+    if (provider) {
+      args.push("--provider", provider);
+    }
+    const reasoning = cfg.options.reasoning?.trim();
+    if (reasoning) {
+      args.push("--reasoning", reasoning);
+    }
+    return args;
+  }
+  createStreamState() {
+    return {
+      accumulatedText: "",
+      activeToolSteps: /* @__PURE__ */ new Map()
+    };
+  }
+  runStream(reqOrPrompt, fileAttachmentsOrCb, maybeCb) {
+    const { req, cb } = this.normalizeRunArgs(
+      reqOrPrompt,
+      fileAttachmentsOrCb,
+      maybeCb
+    );
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const args = this.buildArgs({ ...req, cwd });
+    const bin = this.getBin();
+    const state = this.createStreamState();
+    return this.spawnJsonlStream(
+      bin,
+      args,
+      cwd,
+      (line) => this.handleLine(line, cb, state),
+      cb
+    );
+  }
+  handleLine(line, cb, state = this.createStreamState()) {
+    if (line.length > MAX_STREAM_LINE_BYTES) {
+      cb.onRaw?.(`[omitted event of ${line.length} bytes]
+`);
+      return;
+    }
+    let ev;
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      cb.onRaw?.(line + "\n");
+      return;
+    }
+    if (typeof ev.session_id === "string" && ev.session_id) {
+      cb.onSession(ev.session_id);
+    }
+    if (ev.type === "system") {
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if (ev.type === "text" && typeof (ev.text ?? ev.content) === "string") {
+      state.accumulatedText += String(ev.text ?? ev.content);
+      cb.onActivity?.(this.plugin.t("Writing response..."));
+      cb.onText(state.accumulatedText, "text");
+      return;
+    }
+    if ((ev.type === "reasoning" || ev.type === "thought") &&
+      typeof (ev.text ?? ev.reasoning) === "string") {
+      const thought = String(ev.text ?? ev.reasoning);
+      cb.onActivity?.(this.plugin.t("Thinking..."));
+      cb.onReasoning(thought, "reasoning");
+      return;
+    }
+    if (ev.type === "tool_use") {
+      const toolName = String(ev.name || ev.tool || "tool");
+      const key = String(ev.tool_call_id || ev.call_id || ev.id || toolName);
+      const stepId = `step-${ev.timestamp ?? Date.now()}-${key}`;
+      const input = ev.input ?? ev.arguments;
+      if (toolName === "ask_question" || toolName === "question" ||
+        toolName === "clarify") {
+        const questions = this.parseCommonQuestions(input);
+        const qTitle = questions[0]?.question ||
+          this.plugin.t("Agent question");
+        if (questions.length > 0) {
+          cb.onQuestion?.(questions);
+        }
+        cb.onActivity?.(this.plugin.t("Waiting for your answer..."));
+        cb.onStep({
+          id: stepId,
+          tool: toolName,
+          title: qTitle,
+          state: "completed",
+          input
+        });
+        return;
+      }
+      const title = this.extractCommonToolTitle(toolName, input);
+      state.activeToolSteps.set(key, { id: stepId, tool: toolName, title,
+        input });
+      cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
+      cb.onStep({
+        id: stepId,
+        tool: toolName,
+        title,
+        state: "running",
+        input
+      });
+      return;
+    }
+    if (ev.type === "tool_result") {
+      const toolName = String(ev.name || ev.tool || "tool");
+      const key = String(ev.tool_call_id || ev.call_id || ev.id || toolName);
+      const prev = state.activeToolSteps.get(key);
+      if (prev) {
+        state.activeToolSteps.delete(key);
+      }
+      const stepId = prev?.id || `step-${ev.timestamp ?? Date.now()}-${key}`;
+      const title = prev?.title || toolName;
+      const isErr = Boolean(ev.is_error);
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      cb.onStep({
+        id: stepId,
+        tool: prev?.tool || toolName,
+        title,
+        state: isErr ? "error" : "completed",
+        input: prev?.input,
+        output: ev.output,
+        durationMs: ev.duration_ms
+      });
+      return;
+    }
+    if (ev.type === "result") {
+      if (ev.error) {
+        const msg = typeof ev.error === "string" ? ev.error :
+          ev.error?.message || JSON.stringify(ev.error);
+        cb.onError(String(msg));
+        return;
+      }
+      if (typeof ev.text === "string" && ev.text.trim()) {
+        state.accumulatedText = ev.text;
+        cb.onText(state.accumulatedText, "final");
+      }
+      const tk = ev.tokens ?? {};
+      const input = Number(tk.input ?? 0);
+      const output = Number(tk.output ?? 0);
+      const reasoning = Number(tk.reasoning ?? 0);
+      const rawTotal = Number(tk.total ?? 0);
+      const total = rawTotal > 0 ? rawTotal : input + output + reasoning;
+      const cacheRead = Number(tk.cache_read ?? 0);
+      const cacheWrite = Number(tk.cache_write ?? 0);
+      cb.onFinish({
+        tokens: {
+          total,
+          input,
+          output,
+          reasoning,
+          cache: cacheRead > 0 || cacheWrite > 0 ?
+            { read: cacheRead, write: cacheWrite } : void 0
+        },
+        cost: typeof ev.cost === "number" ? ev.cost : void 0
+      });
+      return;
+    }
+    if (ev.type === "error" || ev.error) {
+      const msg = typeof ev.error === "string" ? ev.error :
+        ev.error?.message || JSON.stringify(ev.error || ev);
+      cb.onError(String(msg));
+    }
+  }
+};
+
+// src/providers/pi/runner.ts
+var import_path7 = require("path");
+var PI_DESCRIPTOR = {
+  id: "pi",
+  displayName: "Pi Coding Agent CLI",
+  shortName: "Pi",
+  icon: "compass",
+  defaultBinary: "pi",
+  defaultModel: "",
+  binaryDesc:
+    "Command or full path to the pi executable. Usually 'pi' is enough if " +
+    "it is on your PATH.",
+  modelDesc:
+    "Leave on default to use your Pi config, or pick a model from 'pi --" +
+    "list-models'.",
+  included: false,
+  supportsSessions: "local-db",
+  supportsUsageStats: true,
+  supportsDbCleanup: false,
+  options: [
+    {
+      key: "provider",
+      label: "Provider",
+      desc: "Optional model provider for Pi (e.g. anthropic, openai, google).",
+      type: "text",
+      placeholder: "e.g. anthropic",
+      default: ""
+    },
+    {
+      key: "thinking",
+      label: "Reasoning effort",
+      desc: "Thinking level passed to Pi (--thinking).",
+      type: "select",
+      default: "",
+      choices: [
+        { value: "", label: "(default)" },
+        { value: "off", label: "Off" },
+        { value: "minimal", label: "Minimal" },
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium" },
+        { value: "high", label: "High" },
+        { value: "xhigh", label: "Extra high" }
+      ]
+    }
+  ]
+};
+var PiRunner = class extends BaseCliRunner {
+  descriptor = PI_DESCRIPTOR;
+  id = "pi";
+  displayName = "Pi Coding Agent CLI";
+  engine = "pi";
+  included = false;
+  cachedModels = null;
+  cachedModelsBin = "";
+  contextLimits = /* @__PURE__ */ new Map();
+  constructor(plugin) {
+    super(plugin);
+  }
+  getConfig() {
+    return this.plugin.getEngineConfig("pi");
+  }
+  getBin() {
+    return this.resolveBinaryPath(this.getConfig().binary || "pi");
+  }
+  parseContextWindowToken(raw) {
+    const m = raw.trim().match(/^(\d+(?:\.\d+)?)\s*([kKmM])$/);
+    if (!m) return 0;
+    const val = parseFloat(m[1]);
+    const unit = m[2].toUpperCase();
+    return Math.round(val * (unit === "M" ? 1e6 : 1e3));
+  }
+  async getVersion() {
+    const out = await this.execCli(this.getBin(), ["--version"]);
+    const first = out.trim().split("\n")[0];
+    if (!first) throw new Error("Empty output from pi --version");
+    return first;
+  }
+  async listModels(forceRefresh = false) {
+    const bin = this.getBin();
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0 &&
+      this.cachedModelsBin === bin) {
+      return this.cachedModels;
+    }
+    try {
+      const out = await this.execCli(bin, ["--list-models"]);
+      const models = [];
+      for (const line of out.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("No models") ||
+          trimmed.startsWith("Warning:") || trimmed.startsWith("/")) {
+          continue;
+        }
+        const cols = trimmed.split(/\s{2,}|\s+/);
+        if (cols.length >= 2) {
+          const prov = cols[0];
+          const mod = cols[1];
+          if (prov.toLowerCase() === "provider" &&
+            mod.toLowerCase() === "model") {
+            continue;
+          }
+          if (/^[a-zA-Z0-9_.-]+$/.test(prov) &&
+            /^[a-zA-Z0-9_.:/+-]+$/.test(mod)) {
+            const full = mod.includes("/") ? mod : `${prov}/${mod}`;
+            if (!models.includes(full)) models.push(full);
+            if (cols[2]) {
+              const ctx = this.parseContextWindowToken(cols[2]);
+              if (ctx > 0) {
+                this.contextLimits.set(full, ctx);
+                this.contextLimits.set(mod, ctx);
+              }
+            }
+            continue;
+          }
+        }
+        const firstToken = cols[0];
+        if (firstToken && /^[a-zA-Z0-9_.:/+-]+$/.test(firstToken) &&
+          firstToken.toLowerCase() !== "provider" &&
+            firstToken.toLowerCase() !== "model" &&
+              !models.includes(firstToken)) {
+          models.push(firstToken);
+        }
+      }
+      if (models.length > 0) {
+        this.cachedModels = models;
+        this.cachedModelsBin = bin;
+        return models;
+      }
+    } catch {
+    }
+    return [];
+  }
+  async listSessions() {
+    return this.listHistorySessions("pi");
+  }
+  async renameSession(_sessionId, _title) {
+  }
+  async deleteSession(_sessionId) {
+  }
+  async getModelContextLimit(model) {
+    const target = model.trim() || this.getConfig().model.trim();
+    if (target) {
+      if (this.contextLimits.size === 0) {
+        await this.listModels().catch(() => {
+        });
+      }
+      const exact = this.contextLimits.get(target);
+      if (exact && exact > 0) return exact;
+      const bare = target.includes("/") ? target.slice(target.indexOf("/") +
+        1) : target;
+      const byBare = this.contextLimits.get(bare);
+      if (byBare && byBare > 0) return byBare;
+    }
+    return this.estimateModelContextLimit(target, 2e5);
+  }
+  async getSessionTokens(sessionId) {
+    return this.getHistorySessionTokens(sessionId);
+  }
+  async getUsageStats() {
+    return this.computeHistoryUsageStats("pi");
+  }
+  buildArgs(req) {
+    const s = this.plugin.settings;
+    const cfg = this.getConfig();
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const args = ["--print", "--mode", "json"];
+    const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
+    if (sid) {
+      args.push("--session", sid);
+    }
+    const model = cfg.model.trim();
+    if (model) {
+      args.push("--model", model);
+    }
+    const provider = cfg.options.provider?.trim();
+    if (provider && !model.includes("/")) {
+      args.push("--provider", provider);
+    }
+    const thinking = cfg.options.thinking?.trim();
+    if (thinking && !model.includes(":")) {
+      args.push("--thinking", thinking);
+    }
+    for (const f of req.fileAttachments) {
+      const fullPath = !(0, import_path7.isAbsolute)(f) && cwd ?
+        (0, import_path7.join)(cwd, f) : f;
+      args.push(`@${fullPath}`);
+    }
+    args.push(req.prompt);
+    return args;
+  }
+  createStreamState() {
+    return {
+      accumulatedText: "",
+      accumulatedReasoning: "",
+      toolTitles: /* @__PURE__ */ new Map()
+    };
+  }
+  runStream(reqOrPrompt, fileAttachmentsOrCb, maybeCb) {
+    const { req, cb } = this.normalizeRunArgs(
+      reqOrPrompt,
+      fileAttachmentsOrCb,
+      maybeCb
+    );
+    const cwd = req.cwd ?? this.getVaultPath() ?? void 0;
+    const args = this.buildArgs({ ...req, cwd });
+    const bin = this.getBin();
+    const state = this.createStreamState();
+    return this.spawnJsonlStream(
+      bin,
+      args,
+      cwd,
+      (line) => this.handleLine(line, cb, state),
+      cb
+    );
+  }
+  handleLine(line, cb, state = this.createStreamState()) {
+    if (line.length > MAX_STREAM_LINE_BYTES) {
+      cb.onRaw?.(`[omitted event of ${line.length} bytes]
+`);
+      return;
+    }
+    let ev;
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      cb.onRaw?.(line + "\n");
+      return;
+    }
+    if (ev.type === "session") {
+      const sid = ev.id || ev.sessionId;
+      if (typeof sid === "string" && sid) {
+        cb.onSession(sid);
+      }
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if (ev.type === "agent_start" || ev.type === "turn_start") {
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      return;
+    }
+    if (ev.type === "message_update" && ev.assistantMessageEvent) {
+      const ame = ev.assistantMessageEvent;
+      if (ame.type === "text_delta" && typeof ame.delta === "string") {
+        state.accumulatedText += ame.delta;
+        cb.onActivity?.(this.plugin.t("Writing response..."));
+        cb.onText(state.accumulatedText, String(ame.contentIndex ?? 0));
+      } else if (ame.type === "thinking_delta" &&
+        typeof ame.delta === "string") {
+        state.accumulatedReasoning += ame.delta;
+        cb.onActivity?.(this.plugin.t("Thinking..."));
+        cb.onReasoning(
+          state.accumulatedReasoning,
+          String(ame.contentIndex ?? 0)
+        );
+      }
+      return;
+    }
+    if (ev.type === "tool_execution_start") {
+      const stepId = String(ev.toolCallId || `step-${Date.now()}`);
+      const toolName = String(ev.toolName || "tool");
+      const input = ev.args;
+      const title = this.extractCommonToolTitle(toolName, input);
+      state.toolTitles.set(stepId, { tool: toolName, title, input });
+      cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
+      cb.onStep({
+        id: stepId,
+        tool: toolName,
+        title,
+        state: "running",
+        input
+      });
+      return;
+    }
+    if (ev.type === "tool_execution_end") {
+      const stepId = String(ev.toolCallId || `step-${Date.now()}`);
+      const prev = state.toolTitles.get(stepId);
+      const toolName = prev?.tool || String(ev.toolName || "tool");
+      const title = prev?.title ||
+        this.extractCommonToolTitle(toolName, ev.args);
+      const isErr = Boolean(ev.isError);
+      cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
+      cb.onStep({
+        id: stepId,
+        tool: toolName,
+        title,
+        state: isErr ? "error" : "completed",
+        input: prev?.input ?? ev.args,
+        output: ev.result
+      });
+      return;
+    }
+    if (ev.type === "message_end" && ev.message) {
+      if (ev.message.role === "assistant") {
+        this.extractPiMessageUsage(ev.message, cb, state);
+      }
+      return;
+    }
+    if (ev.type === "agent_end" && Array.isArray(ev.messages)) {
+      const assistantMsgs = ev.messages.filter((m) => m?.role === "assistant");
+      const lastAssistant = assistantMsgs[assistantMsgs.length - 1];
+      if (lastAssistant) {
+        this.extractPiMessageUsage(lastAssistant, cb, state);
+      }
+      return;
+    }
+    if (ev.type === "error" || ev.error) {
+      const msg = typeof ev.error === "string" ? ev.error :
+        ev.error?.message || JSON.stringify(ev.error || ev);
+      cb.onError(String(msg));
+    }
+  }
+  extractPiMessageUsage(msg, cb, state) {
+    if (msg.stopReason === "error" && msg.errorMessage) {
+      cb.onError(msg.errorMessage);
+    }
+    if (Array.isArray(msg.content)) {
+      for (const block of msg.content) {
+        if (block?.type === "text" && typeof block.text === "string" &&
+          block.text.trim()) {
+          state.accumulatedText = block.text;
+          cb.onText(state.accumulatedText, "final");
+        } else if (block?.type === "thinking" &&
+          typeof block.thinking === "string" && block.thinking.trim()) {
+          state.accumulatedReasoning = block.thinking;
+          cb.onReasoning(state.accumulatedReasoning, "final");
+        }
+      }
+    }
+    if (msg.usage) {
+      const u = msg.usage;
+      const input = Number(u.input ?? 0);
+      const output = Number(u.output ?? 0);
+      const cacheRead = Number(u.cacheRead ?? 0);
+      const cacheWrite = Number(u.cacheWrite ?? 0);
+      const total = Number(u.totalTokens ?? 0) || input + output;
+      if (total > 0) {
+        cb.onFinish({
+          tokens: {
+            total,
+            input,
+            output,
+            cache: cacheRead > 0 || cacheWrite > 0 ?
+              { read: cacheRead, write: cacheWrite } : void 0
+          },
+          cost: typeof u.cost?.total === "number" ? u.cost.total : void 0
+        });
+      }
+    }
   }
 };
 
@@ -4678,8 +6733,8 @@ var ProviderRegistry = class {
 };
 
 // src/features/settings/settingsTab.ts
-var import_obsidian7 = require("obsidian");
-var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
+var import_obsidian9 = require("obsidian");
+var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
   plugin;
   constructor(app, plugin) {
     super(app, plugin);
@@ -4690,7 +6745,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
     const t = (s) => this.plugin.t(s);
     containerEl.empty();
     containerEl.createEl("h2", { text: "Vault Agents" });
-    new import_obsidian7.Setting(containerEl).setName(t("Language")).setDesc(
+    new import_obsidian9.Setting(containerEl).setName(t("Language")).setDesc(
       t(
           "Interface language. English is the default. Some command names " +
           "update after reloading Obsidian."
@@ -4702,7 +6757,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
             async (value) => {
         this.plugin.settings.language = value;
         await this.plugin.saveSettings();
-        new import_obsidian7.Notice(
+        new import_obsidian9.Notice(
           t("Language changed. Reload Obsidian to apply it everywhere.")
         );
         this.display();
@@ -4714,14 +6769,17 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
     );
     const activeDesc = activeProvider.descriptor;
     const activeCfg = this.plugin.getEngineConfig(activeDesc.id);
-    new import_obsidian7.Setting(containerEl).setName(t("AI Engine")).setDesc(
+    new import_obsidian9.Setting(containerEl).setName(t("AI Engine")).setDesc(
       t(
           "Select which AI backend to use. Antigravity connects directly to " +
           "your Google AI Pro subscription with no API key needed."
       )
     ).addDropdown((dd) => {
       for (const desc of descriptors) {
-        dd.addOption(desc.id, t(desc.displayName));
+        const prov = this.plugin.registry.get(desc.id);
+        const avail = prov?.isAvailable ? prov.isAvailable() : true;
+        const prefix = avail ? "● " : "○ ";
+        dd.addOption(desc.id, prefix + t(desc.displayName));
       }
       dd.setValue(activeDesc.id);
       dd.onChange(async (value) => {
@@ -4730,15 +6788,14 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
         this.display();
       });
     });
-    const sectionTitle = activeDesc.id === "antigravity" ?
-      t("Antigravity settings (Google AI Pro)") :
-        activeDesc.id === "opencode" ? t("OpenCode settings") :
-          activeDesc.displayName;
+    const sectionTitle = substitute(
+      t("$1 settings"),
+      t(activeDesc.displayName)
+    );
     containerEl.createEl("h3", { text: sectionTitle });
-    const binaryNameLabel = activeDesc.id === "antigravity" ?
-      t("Antigravity binary path") : t("Binary path");
-    new import_obsidian7.Setting(containerEl).setName(binaryNameLabel).setDesc(
-      t(activeDesc.binaryDesc)).addText(
+    const binSetting =
+      new import_obsidian9.Setting(containerEl).setName(t("Binary path"))
+        .setDesc(t(activeDesc.binaryDesc)).addText(
       (text) =>
         text.setPlaceholder(activeDesc.defaultBinary).setValue(activeCfg.binary)
           .onChange(async (value) => {
@@ -4746,13 +6803,49 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName(t("Model")).setDesc(t(
-      activeDesc.modelDesc)).addDropdown((dd) => {
-      void this.populateProviderModelDropdown(dd, activeProvider);
+    if (activeCfg.binary && activeCfg.binary !== activeDesc.defaultBinary) {
+      binSetting.addExtraButton(
+        (btn) =>
+          btn.setIcon("rotate-ccw").setTooltip(t("Reset to default")).onClick(
+            async () => {
+          activeCfg.binary = activeDesc.defaultBinary;
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+    }
+    const curModel = activeCfg.model || activeDesc.defaultModel;
+    const defaultLabel = substitute(
+      t("(default from $1)"),
+      activeDesc.shortName
+    );
+    const modelSetting =
+      new import_obsidian9.Setting(containerEl).setName(t("Model")).setDesc(t(
+        activeDesc.modelDesc));
+    const badgeEl = modelSetting.controlEl.createSpan({
+      cls: "opencode-settings-model-badge" + (curModel ? "" : " is-default"),
+      text: curModel || defaultLabel
     });
+    badgeEl.setAttribute("title", curModel || defaultLabel);
+    modelSetting.addButton(
+      (btn) => btn.setButtonText(t("Select model...")).setCta().onClick(() => {
+        void this.openProviderModelModal(activeProvider);
+      })
+    );
+    if (activeCfg.model && activeCfg.model !== activeDesc.defaultModel) {
+      modelSetting.addExtraButton(
+        (btn) =>
+          btn.setIcon("rotate-ccw").setTooltip(t("Reset to default")).onClick(
+            async () => {
+          activeCfg.model = activeDesc.defaultModel;
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+    }
     for (const opt of activeDesc.options) {
       const setting =
-        new import_obsidian7.Setting(containerEl).setName(t(opt.label)).setDesc(
+        new import_obsidian9.Setting(containerEl).setName(t(opt.label)).setDesc(
           t(opt.desc));
       if (opt.type === "select" && opt.choices) {
         setting.addDropdown((dd) => {
@@ -4777,24 +6870,24 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
       }
     }
     const binCmd = activeDesc.defaultBinary;
-    const testDesc = activeDesc.id === "antigravity" ? t(
-      "Run 'agy --version' to verify the binary is reachable.") :
-        activeDesc.id === "opencode" ? t(
-      "Run 'opencode --version' to verify the binary is reachable.") :
-        `Run '${binCmd} --version' to verify the binary is reachable.`;
-    const foundPrefix = activeDesc.id === "antigravity" ?
-      t("Antigravity found:") : activeDesc.id === "opencode" ?
-        t("Opencode found:") : `${activeDesc.shortName}:`;
-    new import_obsidian7.Setting(containerEl).setName(t("Test connection"))
+    const testDesc = substitute(
+      t("Run '$1 --version' to verify the binary is reachable."),
+      binCmd
+    );
+    const foundPrefix = substitute(
+      t("$1 found:"),
+      t(activeDesc.shortName)
+    );
+    new import_obsidian9.Setting(containerEl).setName(t("Test connection"))
       .setDesc(testDesc).addButton(
       (btn) => btn.setButtonText(t("Test")).onClick(async () => {
         btn.setDisabled(true);
         btn.setButtonText(t("Testing..."));
         try {
           const version = await activeProvider.getVersion();
-          new import_obsidian7.Notice(`${foundPrefix} ${version}`);
+          new import_obsidian9.Notice(`${foundPrefix} ${version}`);
         } catch (e) {
-          new import_obsidian7.Notice(`${t("Error:")} ${e.message}`);
+          new import_obsidian9.Notice(`${t("Error:")} ${e.message}`);
         } finally {
           btn.setDisabled(false);
           btn.setButtonText(t("Test"));
@@ -4802,7 +6895,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: t("General settings") });
-    new import_obsidian7.Setting(containerEl).setName(t(
+    new import_obsidian9.Setting(containerEl).setName(t(
       "Auto-approve permissions")).setDesc(
       t(
           "Automatically allow tool permissions (bash, file edits, etc.). " +
@@ -4816,7 +6909,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName(t("Show reasoning"))
+    new import_obsidian9.Setting(containerEl).setName(t("Show reasoning"))
       .setDesc(t("Show the model's reasoning blocks.")).addToggle(
       (toggle) =>
         toggle.setValue(this.plugin.settings.showThinking).onChange(
@@ -4825,7 +6918,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName(t("Show tool details"))
+    new import_obsidian9.Setting(containerEl).setName(t("Show tool details"))
       .setDesc(
       t(
           "Show the input and output of every tool executed during the " +
@@ -4839,7 +6932,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName(t("Session ID")).setDesc(
+    new import_obsidian9.Setting(containerEl).setName(t("Session ID")).setDesc(
       t(
           "The persistent session id used for the chat. Managed " +
           "automatically. Empty = new session on next message."
@@ -4852,7 +6945,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName(t("Reset session"))
+    new import_obsidian9.Setting(containerEl).setName(t("Reset session"))
       .setDesc(
       t(
         "Clear the saved session and start from scratch on the next message."
@@ -4861,13 +6954,13 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
       (btn) => btn.setButtonText(t("Reset")).onClick(async () => {
         this.plugin.settings.sessionId = "";
         await this.plugin.saveSettings();
-        new import_obsidian7.Notice(
+        new import_obsidian9.Notice(
           t("Session reset: the next message will start from a new session.")
         );
       })
     );
     containerEl.createEl("h3", { text: t("Document conversion") });
-    new import_obsidian7.Setting(containerEl).setName(t(
+    new import_obsidian9.Setting(containerEl).setName(t(
       "Convert documents with anydoc")).setDesc(
       t(
           "Run anydoc on attached documents (PDF, Word, Excel, etc.) and " +
@@ -4881,7 +6974,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian7.Setting(containerEl).setName(t("Anydoc binary path"))
+    new import_obsidian9.Setting(containerEl).setName(t("Anydoc binary path"))
       .setDesc(
       t(
           "Command or full path to the anydoc executable (npm install -g " +
@@ -4897,7 +6990,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
     );
     if (activeDesc.supportsDbCleanup && activeProvider.pruneOversizedParts) {
       containerEl.createEl("h3", { text: t("Database self-cleanup") });
-      new import_obsidian7.Setting(containerEl).setName(t(
+      new import_obsidian9.Setting(containerEl).setName(t(
         "Enable automatic cleanup")).setDesc(
         t(
             "Periodically remove large file attachments from the opencode " +
@@ -4913,7 +7006,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian7.Setting(containerEl).setName(t("Max part size (MB)"))
+      new import_obsidian9.Setting(containerEl).setName(t("Max part size (MB)"))
         .setDesc(
         t("File attachments larger than this (in the database) are removed.")
       ).addText(
@@ -4926,7 +7019,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian7.Setting(containerEl).setName(t("Minimum age (days)"))
+      new import_obsidian9.Setting(containerEl).setName(t("Minimum age (days)"))
         .setDesc(
         t(
             "Only attachments older than this are removed, so recent files " +
@@ -4942,7 +7035,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian7.Setting(containerEl).setName(t(
+      new import_obsidian9.Setting(containerEl).setName(t(
         "Max attachment size (MB)")).setDesc(
         t(
             "When anydoc fails to convert a document, files larger than " +
@@ -4959,7 +7052,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian7.Setting(containerEl).setName(t("Run cleanup now"))
+      new import_obsidian9.Setting(containerEl).setName(t("Run cleanup now"))
         .setDesc(
         t("Remove oversized file attachments immediately, regardless of age.")
       ).addButton(
@@ -4968,9 +7061,9 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
           btn.setButtonText(t("Cleaning..."));
           try {
             await activeProvider.pruneOversizedParts?.(true, true);
-            new import_obsidian7.Notice(t("Cleanup done."));
+            new import_obsidian9.Notice(t("Cleanup done."));
           } catch (e) {
-            new import_obsidian7.Notice(`${t("Error:")} ${e.message}`);
+            new import_obsidian9.Notice(`${t("Error:")} ${e.message}`);
           } finally {
             btn.setDisabled(false);
             btn.setButtonText(t("Cleanup"));
@@ -4990,7 +7083,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
     for (let i = 0; i < prompts.length; i++) {
       const p = prompts[i];
       const desc = p.text.length > 90 ? p.text.slice(0, 87) + "…" : p.text;
-      const s = new import_obsidian7.Setting(containerEl).setName(p.name ||
+      const s = new import_obsidian9.Setting(containerEl).setName(p.name ||
         t("(untitled)")).setDesc(desc);
       s.addButton(
         (b) => b.setButtonText(t("Edit")).onClick(() => this.editPrompt(i))
@@ -5004,7 +7097,7 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
         })
       );
     }
-    new import_obsidian7.Setting(containerEl).addButton(
+    new import_obsidian9.Setting(containerEl).addButton(
       (b) => b.setButtonText(t("Add prompt")).setCta().onClick(() =>
         this.editPrompt(-1))
     );
@@ -5029,50 +7122,67 @@ var VaultAgentsSettingTab = class extends import_obsidian7.PluginSettingTab {
       }
     ).open();
   }
-  async populateProviderModelDropdown(dd, provider) {
+  async openProviderModelModal(provider) {
     const t = (s) => this.plugin.t(s);
     const desc = provider.descriptor;
     const cfg = this.plugin.getEngineConfig(desc.id);
     const cur = cfg.model || desc.defaultModel;
+    const providerLabel = provider.costNote || t(desc.shortName);
+    const items = [];
     const seen = /* @__PURE__ */ new Set();
-    const addOption = (val, display) => {
-      if (seen.has(val)) return;
-      seen.add(val);
-      dd.addOption(val, display);
-    };
-    if (!desc.included) {
-      addOption("", t("(default from opencode)"));
-      if (cur) {
-        const suffix = cur.includes("/") ? "" : ` ${t("(custom)")}`;
-        addOption(cur, cur + suffix);
-      }
+    if (!desc.defaultModel) {
+      items.push({
+        id: "",
+        label: substitute(t("(default from $1)"), desc.shortName),
+        engine: desc.id,
+        provider: providerLabel,
+        isActive: cur === "",
+        isDefault: true
+      });
+      seen.add("");
+    }
+    if (cur && !seen.has(cur)) {
+      items.push({
+        id: cur,
+        engine: desc.id,
+        provider: providerLabel,
+        isActive: true
+      });
+      seen.add(cur);
     }
     try {
       const models = await provider.listModels();
-      for (const m of models) addOption(m, m);
-      dd.setValue(cur || "");
-    } catch (e) {
-      if (desc.id === "antigravity") {
-        addOption("gemini-3.8-flash-high", "Gemini 3.8 Flash (High)");
-        addOption("claude-opus-5-5-high", "Claude Opus 5.5 (High)");
-        addOption("claude-sonnet-5-5-high", "Claude Sonnet 5.5 (High)");
-      } else {
-        const opt = dd.selectEl.createEl("option");
-        opt.value = "__error__";
-        opt.textContent = `${t("Error:")} ${e.message}`;
-        opt.disabled = true;
+      for (const m of models) {
+        if (seen.has(m)) continue;
+        seen.add(m);
+        items.push({
+          id: m,
+          engine: desc.id,
+          provider: providerLabel,
+          isActive: m === cur
+        });
       }
-      dd.setValue(cur || "");
+    } catch {
     }
-    dd.onChange(async (val) => {
-      cfg.model = val;
-      await this.plugin.saveSettings();
-    });
+    new ModelSuggestModal(
+      this.app,
+      this.plugin,
+      items,
+      desc.id,
+      async (item) => {
+        cfg.model = item.id;
+        await this.plugin.saveSettings();
+        this.display();
+        const shownModel = item.label || item.id;
+        new import_obsidian9.Notice(
+          `${t("Model set:")} ${shownModel} (${item.provider})`);
+      }
+    ).open();
   }
 };
 
 // src/main.ts
-var OpencodePlugin = class extends import_obsidian8.Plugin {
+var OpencodePlugin = class extends import_obsidian10.Plugin {
   settings;
   histories = {};
   registry;
@@ -5091,7 +7201,7 @@ var OpencodePlugin = class extends import_obsidian8.Plugin {
   }
   getVaultPath() {
     const adapter = this.app.vault.adapter;
-    if (adapter instanceof import_obsidian8.FileSystemAdapter) {
+    if (adapter instanceof import_obsidian10.FileSystemAdapter) {
       return adapter.getBasePath();
     }
     return null;
@@ -5106,7 +7216,13 @@ var OpencodePlugin = class extends import_obsidian8.Plugin {
     this.registry = new ProviderRegistry();
     this.registry.register(this.opencodeRunner);
     this.registry.register(this.antigravityRunner);
-    void this.opencodeRunner.pruneOversizedParts();
+    this.registry.register(new ClaudeRunner(this));
+    this.registry.register(new CodexRunner(this));
+    this.registry.register(new HermesRunner(this));
+    this.registry.register(new PiRunner(this));
+    for (const provider of this.registry.getAll()) {
+      void provider.pruneOversizedParts?.();
+    }
     const t = this.t.bind(this);
     this.registerView(CHAT_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
     this.addRibbonIcon("bot", t("New Vault Agents chat"), () => {
@@ -5136,7 +7252,7 @@ var OpencodePlugin = class extends import_obsidian8.Plugin {
       editorCallback: (editor, view) => {
         const selection = editor.getSelection();
         if (!selection.trim()) {
-          new import_obsidian8.Notice(t("No text selected"));
+          new import_obsidian10.Notice(t("No text selected"));
           return;
         }
         const label = view.file ? view.file.path : "selection";
@@ -5152,7 +7268,7 @@ var OpencodePlugin = class extends import_obsidian8.Plugin {
       callback: async () => {
         const file = this.app.workspace.getActiveFile();
         if (!file) {
-          new import_obsidian8.Notice(t("No active note"));
+          new import_obsidian10.Notice(t("No active note"));
           return;
         }
         const content = await this.app.vault.cachedRead(file);
@@ -5167,7 +7283,7 @@ var OpencodePlugin = class extends import_obsidian8.Plugin {
       callback: async () => {
         const file = this.app.workspace.getActiveFile();
         if (!file) {
-          new import_obsidian8.Notice(t("No active note"));
+          new import_obsidian10.Notice(t("No active note"));
           return;
         }
         const content = await this.app.vault.cachedRead(file);
@@ -5188,7 +7304,7 @@ var OpencodePlugin = class extends import_obsidian8.Plugin {
       callback: async () => {
         this.settings.sessionId = "";
         await this.saveSettings();
-        new import_obsidian8.Notice(t("Session reset."));
+        new import_obsidian10.Notice(t("Session reset."));
       }
     });
     this.addSettingTab(new VaultAgentsSettingTab(this.app, this));

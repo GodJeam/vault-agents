@@ -8,10 +8,13 @@ export function metaWithCopy(
   label: string,
   getText: () => string,
   onCopy: (text: string) => void,
-  copyTitle: string
+  copyTitle: string,
+  iconName = "bot"
 ): void {
   const meta = row.createDiv({ cls: "opencode-meta" });
-  meta.createSpan({ text: label });
+  const iconEl = meta.createSpan({ cls: "opencode-meta-icon" });
+  setIcon(iconEl, iconName);
+  meta.createSpan({ text: label, cls: "opencode-meta-label" });
   meta.createSpan({ cls: "opencode-meta-spacer" });
   const btn = meta.createEl("button", {
     cls: "opencode-icon-btn",
@@ -31,12 +34,12 @@ export function renderUserBubble(
   const row = container.createDiv({
     cls: "opencode-message opencode-message--user",
   });
-  metaWithCopy(row, t("You"), () => text, onCopy, t("Copy text"));
+  metaWithCopy(row, t("You"), () => text, onCopy, t("Copy text"), "user");
   if (ctxLabel) {
-    row.createDiv({
-      cls: "opencode-context-hint",
-      text: `${t("with context:")} ${ctxLabel}`,
-    });
+    const ctxHint = row.createDiv({ cls: "opencode-context-hint" });
+    const ctxIcon = ctxHint.createSpan({ cls: "opencode-context-hint-icon" });
+    setIcon(ctxIcon, "file-text");
+    ctxHint.createSpan({ text: `${t("with context:")} ${ctxLabel}` });
   }
   row.createDiv({ cls: "opencode-bubble", text });
 }
@@ -50,7 +53,14 @@ export function renderErrorBubble(
   const row = container.createDiv({
     cls: "opencode-message opencode-message--error",
   });
-  metaWithCopy(row, t("Error"), () => msg, onCopy, t("Copy text"));
+  metaWithCopy(
+    row,
+    t("Error"),
+    () => msg,
+    onCopy,
+    t("Copy text"),
+    "alert-triangle"
+  );
   row.createDiv({ cls: "opencode-bubble", text: msg });
 }
 
@@ -97,20 +107,24 @@ export class AssistantBubble {
       output: number,
       cost?: number
     ) => string,
-    private onAnswerQuestion?: (formattedAnswer: string) => void
+    private onAnswerQuestion?: (formattedAnswer: string) => void,
+    private assistantIcon = "bot"
   ) {
     metaWithCopy(
       this.row,
       this.assistantLabel,
       () => this.rawText,
       this.onCopy,
-      this.t("Copy text")
+      this.t("Copy text"),
+      this.assistantIcon
     );
     this.reasoningEl = this.row.createEl("details", {
       cls: "opencode-reasoning hidden",
     });
     const summary = this.reasoningEl.createEl("summary");
-    summary.setText(this.t("Reasoning"));
+    const brainIcon = summary.createSpan({ cls: "opencode-reasoning-icon" });
+    setIcon(brainIcon, "brain");
+    summary.createSpan({ text: this.t("Reasoning") });
     this.reasoningContent = this.reasoningEl.createDiv({
       cls: "opencode-reasoning-content",
     });

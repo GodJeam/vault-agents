@@ -1,8 +1,15 @@
-import { App, Modal, Notice, Setting, SuggestModal } from "obsidian";
-import type { TFile } from "obsidian";
+import { App, Modal, Notice, Setting } from "obsidian";
 import type OpencodePlugin from "../main";
 import type { UsageWindow, EngineType } from "../core/types";
 import { substitute } from "../i18n";
+
+export {
+  FileSuggestModal,
+  AgentSuggestModal,
+  ModelSuggestModal,
+  type AgentItem,
+  type ModelItem,
+} from "./suggestModals";
 
 export class RenameModal extends Modal {
   constructor(
@@ -212,116 +219,5 @@ export class PromptModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
-  }
-}
-
-export class FileSuggestModal extends SuggestModal<TFile> {
-  private items: TFile[] | null = null;
-
-  constructor(
-    app: App,
-    private plugin: OpencodePlugin,
-    private onPick: (file: TFile) => void
-  ) {
-    super(app);
-    const t = (s: string) => this.plugin.t(s);
-    this.setPlaceholder(t("Search a vault file to attach..."));
-    this.setInstructions([
-      { command: "↑↓", purpose: t("navigate") },
-      { command: "↵", purpose: t("attach") },
-      { command: "esc", purpose: t("close") },
-    ]);
-  }
-
-  getItems(): TFile[] {
-    if (!this.items) {
-      this.items = this.app.vault
-        .getFiles()
-        .sort((a, b) => a.path.localeCompare(b.path));
-    }
-    return this.items;
-  }
-
-  getSuggestions(query: string): TFile[] {
-    const q = query.trim().toLowerCase();
-    const items = this.getItems();
-    if (!q) return items.slice(0, 50);
-    return items.filter((f) => f.path.toLowerCase().includes(q)).slice(0, 50);
-  }
-
-  renderSuggestion(file: TFile, el: HTMLElement): void {
-    el.createEl("div", { text: file.path });
-  }
-
-  onChooseSuggestion(file: TFile): void {
-    this.onPick(file);
-  }
-}
-
-export interface ModelItem {
-  id: string;
-  engine: EngineType;
-  provider: string;
-  isActive: boolean;
-}
-
-export class ModelSuggestModal extends SuggestModal<ModelItem> {
-  constructor(
-    app: App,
-    private plugin: OpencodePlugin,
-    private items: ModelItem[],
-    private onPick: (item: ModelItem) => void
-  ) {
-    super(app);
-    const t = (s: string) => this.plugin.t(s);
-    this.setPlaceholder(
-      t("Search models... (e.g. gemini, claude, flash, deepseek)")
-    );
-    this.setInstructions([
-      { command: "↑↓", purpose: t("navigate") },
-      { command: "↵", purpose: t("select") },
-      { command: "esc", purpose: t("close") },
-    ]);
-  }
-
-  getItems(): ModelItem[] {
-    return this.items;
-  }
-
-  getSuggestions(query: string): ModelItem[] {
-    const q = query.trim().toLowerCase();
-    if (!q) {
-      return this.items.slice(0, 30);
-    }
-    const filtered = this.items.filter(
-      (item) =>
-        item.id.toLowerCase().includes(q) ||
-        item.provider.toLowerCase().includes(q) ||
-        item.engine.toLowerCase().includes(q)
-    );
-    return filtered.slice(0, 30);
-  }
-
-  renderSuggestion(item: ModelItem, el: HTMLElement): void {
-    el.addClass("opencode-model-suggest-item");
-    const titleEl = el.createDiv({ cls: "opencode-model-suggest-title" });
-    titleEl.createSpan({ text: item.id, cls: "opencode-model-suggest-name" });
-    if (item.isActive) {
-      titleEl.createSpan({ text: "  ✓", cls: "opencode-model-suggest-check" });
-    }
-    const activeSuffix = item.isActive
-      ? ` · ${this.plugin.t("active model")}`
-      : "";
-    const descCls =
-      "opencode-model-suggest-desc " +
-      `opencode-model-suggest-desc--${item.engine}`;
-    el.createDiv({
-      cls: descCls,
-      text: item.provider + activeSuffix,
-    });
-  }
-
-  onChooseSuggestion(item: ModelItem): void {
-    this.onPick(item);
   }
 }

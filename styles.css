@@ -88,6 +88,9 @@
 }
 
 .opencode-add-note-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: var(--font-smaller);
   padding: 3px 10px;
   cursor: pointer;
@@ -96,6 +99,20 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
   transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.opencode-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.opencode-btn-icon svg {
+  width: 13px;
+  height: 13px;
 }
 
 .opencode-add-note-btn:hover {
@@ -229,11 +246,34 @@
 .opencode-meta {
   font-size: var(--font-smaller);
   color: var(--text-muted);
-  opacity: 0.85;
+  opacity: 0.9;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   width: 100%;
+}
+
+.opencode-meta-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--interactive-accent);
+  flex-shrink: 0;
+}
+
+.opencode-meta-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.opencode-meta-label {
+  font-weight: 600;
+}
+
+.opencode-message--error .opencode-meta-icon {
+  color: var(--text-error);
 }
 
 .opencode-meta-spacer {
@@ -253,18 +293,6 @@
 
 .opencode-message--user .opencode-meta {
   flex-direction: row-reverse;
-}
-
-.opencode-meta::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-muted);
-}
-
-.opencode-message--user .opencode-meta::before {
-  background: var(--interactive-accent);
 }
 
 /* ====== Bubbles ====== */
@@ -333,10 +361,25 @@
 }
 
 .opencode-context-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: var(--font-smaller);
   color: var(--text-muted);
-  opacity: 0.75;
+  opacity: 0.85;
   max-width: 88%;
+}
+
+.opencode-context-hint-icon {
+  display: inline-flex;
+  align-items: center;
+  width: 13px;
+  height: 13px;
+}
+
+.opencode-context-hint-icon svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* ====== Reasoning ====== */
@@ -357,10 +400,26 @@
 }
 
 .opencode-reasoning summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
   user-select: none;
   font-weight: 600;
   opacity: 0.9;
+}
+
+.opencode-reasoning-icon {
+  display: inline-flex;
+  align-items: center;
+  width: 14px;
+  height: 14px;
+  color: var(--interactive-accent);
+}
+
+.opencode-reasoning-icon svg {
+  width: 13px;
+  height: 13px;
 }
 
 .opencode-reasoning-content {
@@ -772,11 +831,19 @@
 }
 
 .opencode-question-opt-check {
-  font-family: var(--font-monospace);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
   color: var(--interactive-accent);
-  font-weight: 700;
   flex-shrink: 0;
-  margin-top: 1px;
+  margin-top: 2px;
+}
+
+.opencode-question-opt-check svg {
+  width: 15px;
+  height: 15px;
 }
 
 .opencode-question-opt-content {
@@ -946,32 +1013,114 @@
 .opencode-buttons {
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .opencode-buttons-spacer {
   flex: 1;
 }
 
+.opencode-selector-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.opencode-agent-btn,
 .opencode-model-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--font-smaller);
-  max-width: 240px;
+  height: 28px;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
   background: var(--background-secondary);
   color: var(--text-normal);
   border: 1px solid var(--background-modifier-border);
   border-radius: 999px;
-  padding: 5px 14px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  padding: 0 11px;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
+.opencode-agent-btn {
+  font-weight: 600;
+  background: color-mix(
+    in srgb,
+    var(--interactive-accent) 10%,
+    var(--background-secondary)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--interactive-accent) 32%,
+    var(--background-modifier-border)
+  );
+}
+
+.opencode-model-btn {
+  max-width: 260px;
+}
+
+.opencode-agent-btn:hover,
 .opencode-model-btn:hover {
   background: var(--background-modifier-hover);
   border-color: var(--interactive-accent);
+}
+
+.opencode-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--interactive-accent);
+  flex-shrink: 0;
+}
+
+.opencode-chip-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.opencode-chip-vendor {
+  font-size: 0.88em;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.opencode-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencode-chip-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  color: var(--text-muted);
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+.opencode-chip-chevron svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* ====== Autocomplete (/, @, !) ====== */
@@ -1004,11 +1153,33 @@
 
 .opencode-suggest-item {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: center;
+  gap: 10px;
   padding: 6px 10px;
   border-radius: var(--radius-s);
   cursor: pointer;
+}
+
+.opencode-suggest-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--interactive-accent);
+  flex-shrink: 0;
+}
+
+.opencode-suggest-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.opencode-suggest-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
 .opencode-suggest-item:hover,
@@ -1034,8 +1205,11 @@
 
 .opencode-send-btn,
 .opencode-stop-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
-  padding: 6px 18px;
+  padding: 6px 16px;
   border-radius: var(--radius-m);
   border: none;
   font-size: var(--font-ui-small);
@@ -1074,7 +1248,7 @@
   display: none;
 }
 
-/* ====== Modals ====== */
+/* ====== Modals & Suggest Pickers ====== */
 
 .opencode-confirm-message {
   color: var(--text-normal);
@@ -1087,31 +1261,165 @@
   color: var(--text-muted);
 }
 
+.opencode-agent-suggest-item,
 .opencode-model-suggest-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 6px 10px;
+  gap: 4px;
+  padding: 6px 8px;
 }
 
+.opencode-agent-suggest-item.is-selected,
+.opencode-model-suggest-item.is-selected {
+  border-left: 3px solid var(--interactive-accent);
+  padding-left: 8px;
+}
+
+.opencode-agent-suggest-top,
 .opencode-model-suggest-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-weight: 500;
+  gap: 10px;
+}
+
+.opencode-agent-suggest-left,
+.opencode-model-suggest-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.opencode-agent-suggest-right,
+.opencode-model-suggest-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.opencode-agent-suggest-icon,
+.opencode-model-suggest-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--interactive-accent);
+  flex-shrink: 0;
+}
+
+.opencode-agent-suggest-icon svg,
+.opencode-model-suggest-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.opencode-agent-suggest-name,
+.opencode-model-suggest-name {
+  font-weight: 600;
   font-size: var(--font-ui-medium);
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencode-agent-suggest-fullname {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencode-agent-suggest-bottom {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  padding-left: 24px;
+}
+
+.opencode-agent-suggest-meta-val {
+  font-family: var(--font-monospace);
+  color: var(--text-normal);
+}
+
+.opencode-suggest-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.opencode-suggest-badge--vendor {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+}
+
+.opencode-suggest-badge--accent {
+  background: color-mix(
+    in srgb,
+    var(--interactive-accent) 16%,
+    var(--background-primary)
+  );
+  color: var(--interactive-accent);
+}
+
+.opencode-suggest-badge--ok {
+  background: color-mix(
+    in srgb,
+    var(--text-success) 15%,
+    var(--background-primary)
+  );
+  color: var(--text-success);
+}
+
+.opencode-suggest-badge--muted {
+  background: var(--background-secondary);
+  color: var(--text-faint);
 }
 
 .opencode-model-suggest-check {
   color: var(--interactive-accent);
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .opencode-model-suggest-desc {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
+  padding-left: 24px;
+  font-family: var(--font-monospace);
 }
 
 .opencode-model-suggest-desc--antigravity {
   color: var(--color-blue, var(--text-accent));
+}
+
+.opencode-settings-model-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  margin-right: 6px;
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencode-settings-model-badge.is-default {
+  font-family: var(--font-interface);
+  color: var(--text-muted);
+  font-style: italic;
 }

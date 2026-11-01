@@ -1,6 +1,13 @@
 import { FileSystemAdapter, Notice, Plugin, WorkspaceLeaf } from "obsidian";
 import { CHAT_VIEW_TYPE, ChatView } from "./features/chat";
-import { OpencodeRunner, AntigravityRunner } from "./providers";
+import {
+  OpencodeRunner,
+  AntigravityRunner,
+  ClaudeRunner,
+  CodexRunner,
+  HermesRunner,
+  PiRunner,
+} from "./providers";
 import { ProviderRegistry } from "./core/registry";
 import type { AgentProvider, RunnerHost } from "./core/provider";
 import {
@@ -61,10 +68,15 @@ export default class OpencodePlugin extends Plugin implements RunnerHost {
     this.registry = new ProviderRegistry();
     this.registry.register(this.opencodeRunner);
     this.registry.register(this.antigravityRunner);
+    this.registry.register(new ClaudeRunner(this));
+    this.registry.register(new CodexRunner(this));
+    this.registry.register(new HermesRunner(this));
+    this.registry.register(new PiRunner(this));
 
-    // Best-effort opencode database cleanup on load (no-op if opencode is
-    // absent).
-    void this.opencodeRunner.pruneOversizedParts();
+    // Best-effort database cleanup on load for any provider that supports it
+    for (const provider of this.registry.getAll()) {
+      void provider.pruneOversizedParts?.();
+    }
     const t = this.t.bind(this);
 
     this.registerView(CHAT_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
