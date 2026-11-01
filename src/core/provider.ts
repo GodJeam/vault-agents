@@ -85,6 +85,9 @@ export interface AgentProvider {
   /** Check CLI version */
   getVersion(): Promise<string>;
 
+  /** Quick synchronous check whether the CLI binary appears installed */
+  isAvailable?(): boolean;
+
   /** List available models */
   listModels(forceRefresh?: boolean): Promise<string[]>;
 

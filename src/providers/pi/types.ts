@@ -13,6 +13,8 @@ export interface PiMessageContent {
 export interface PiMessage {
   role?: string;
   content?: PiMessageContent[];
+  stopReason?: "stop" | "error" | "aborted" | "toolUse" | string;
+  errorMessage?: string;
   usage?: {
     input?: number;
     output?: number;

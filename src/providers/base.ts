@@ -4,7 +4,7 @@ import { existsSync, readFileSync, statSync } from "fs";
 import { copyFile, mkdir, readdir, stat, unlink } from "fs/promises";
 import { basename, dirname, extname, isAbsolute, join } from "path";
 import { homedir, tmpdir } from "os";
-import type { RunnerHost } from "../core/provider";
+import type { ProviderDescriptor, RunnerHost } from "../core/provider";
 import type {
   AgentQuestion,
   AgentQuestionOption,
@@ -32,6 +32,7 @@ export const BINARY_EXT_REGEX = new RegExp(
 );
 
 export abstract class BaseCliRunner {
+  abstract readonly descriptor: ProviderDescriptor;
   protected plugin: RunnerHost;
   protected resolvedBinaries = new Map<string, string | null>();
   protected activeProcs = new Set<ChildProcess>();
@@ -113,15 +114,30 @@ export abstract class BaseCliRunner {
     extraEnv?: NodeJS.ProcessEnv
   ): ChildProcess {
     const isWin = process.platform === "win32";
-    const env: NodeJS.ProcessEnv =
-      cwd || extraEnv
-        ? Object.assign(
-            {},
-            process.env,
-            cwd ? { PWD: cwd } : undefined,
-            extraEnv
-          )
-        : process.env;
+    const env: NodeJS.ProcessEnv = Object.assign(
+      {},
+      process.env,
+      cwd ? { PWD: cwd } : undefined,
+      extraEnv
+    );
+    if (!isWin) {
+      const home = homedir();
+      const extraDirs = [
+        join(home, ".local", "bin"),
+        join(home, ".opencode", "bin"),
+        join(home, ".gemini", "antigravity-cli", "bin"),
+        join(home, ".hermes", "bin"),
+        join(home, ".claude", "local"),
+        "/usr/local/bin",
+        "/usr/bin",
+      ];
+      const curPath = env.PATH || "";
+      const parts = curPath.split(":").filter(Boolean);
+      for (const d of extraDirs) {
+        if (!parts.includes(d)) parts.push(d);
+      }
+      env.PATH = parts.join(":");
+    }
     const options: SpawnOptions = {
       cwd,
       shell: isWin && (bin.endsWith(".cmd") || bin.endsWith(".bat")),
@@ -239,6 +255,16 @@ export abstract class BaseCliRunner {
   }
 
   /**
+   * Check whether the CLI executable is installed and reachable on the system
+   */
+  public isAvailable(): boolean {
+    const cfg = this.plugin.getEngineConfig(this.descriptor.id);
+    const binName = cfg.binary || this.descriptor.defaultBinary;
+    const bin = this.resolveBinaryPath(binName);
+    return existsSync(bin);
+  }
+
+  /**
    * Resolve full path to a CLI executable, checking PATH and candidate folders
    */
   protected resolveBinaryPath(
@@ -271,7 +297,12 @@ export abstract class BaseCliRunner {
       `/usr/bin/${bin}`,
     ];
 
-    const allCandidates = [...candidatePaths, ...defaultCandidates];
+    const pathDirs = (process.env.PATH ?? "")
+      .split(process.platform === "win32" ? ";" : ":")
+      .filter(Boolean)
+      .map((dir) => join(dir, bin));
+
+    const allCandidates = [...candidatePaths, ...defaultCandidates, ...pathDirs];
     for (const p of allCandidates) {
       if (existsSync(p)) {
         this.resolvedBinaries.set(bin, p);

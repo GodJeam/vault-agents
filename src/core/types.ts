@@ -194,6 +194,7 @@ export const DEFAULT_ENGINE_CONFIGS: Record<string, EngineConfig> = {
     model: "",
     options: {
       provider: "",
+      thinking: "",
     },
   },
 };

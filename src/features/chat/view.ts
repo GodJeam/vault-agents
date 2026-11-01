@@ -15,10 +15,12 @@ import type {
 } from "../../core/types";
 import { substitute } from "../../i18n";
 import {
+  AgentSuggestModal,
   ConfirmModal,
   ModelSuggestModal,
   RenameModal,
   StatsModal,
+  type AgentItem,
   type ModelItem,
 } from "../../shared/modals";
 import type { TurnContext, SessionStats } from "./types";
@@ -44,6 +46,7 @@ export class ChatView extends ItemView {
   private pinBtn!: HTMLButtonElement;
   private renameBtn!: HTMLButtonElement;
   private deleteBtn!: HTMLButtonElement;
+  private agentBtn!: HTMLButtonElement;
   private modelBtn!: HTMLButtonElement;
   private sendBtn!: HTMLButtonElement;
   private stopBtn!: HTMLButtonElement;
@@ -588,6 +591,7 @@ export class ChatView extends ItemView {
       this.app,
       this.plugin,
       {
+        onOpenAgentList: () => this.openAgentList(),
         onOpenModelList: () => void this.openModelList(),
         onStartNewSession: () => this.startNewSession(),
         onAttachCurrentNote: () => void this.attachCurrentNote(),
@@ -613,9 +617,21 @@ export class ChatView extends ItemView {
 
     const buttons = inputArea.createDiv({ cls: "opencode-buttons" });
 
-    this.modelBtn = buttons.createEl("button", { cls: "opencode-model-btn" });
-    this.updateModelBtn();
+    const selectorGroup = buttons.createDiv({
+      cls: "opencode-selector-group",
+    });
+
+    this.agentBtn = selectorGroup.createEl("button", {
+      cls: "opencode-agent-btn",
+    });
+    this.agentBtn.addEventListener("click", () => this.openAgentList());
+
+    this.modelBtn = selectorGroup.createEl("button", {
+      cls: "opencode-model-btn",
+    });
     this.modelBtn.addEventListener("click", () => void this.openModelList());
+
+    this.updateModelBtn();
 
     buttons.createSpan({ cls: "opencode-buttons-spacer" });
 
@@ -644,64 +660,145 @@ export class ChatView extends ItemView {
   }
 
   private updateModelBtn(): void {
-    if (!this.modelBtn) return;
     const engine = this.sessionEngine();
     const provider = this.plugin.registry.get(engine);
     const shortName = provider?.descriptor.shortName || engine;
     const m = this.activeModelFor(engine);
-    const display = m || `${shortName} (${this.plugin.t("default")})`;
-    this.modelBtn.setText(
-      display.length > 30 ? display.slice(0, 27) + "…" : display
-    );
-    this.modelBtn.setAttribute(
-      "title",
-      `${display} (${this.engineLabel(engine)})`
-    );
+
+    if (this.agentBtn) {
+      this.agentBtn.empty();
+      const iconEl = this.agentBtn.createSpan({ cls: "opencode-chip-icon" });
+      setIcon(iconEl, "bot");
+      this.agentBtn.createSpan({
+        text: this.plugin.t(shortName),
+        cls: "opencode-chip-text",
+      });
+      const chevEl = this.agentBtn.createSpan({ cls: "opencode-chip-chevron" });
+      setIcon(chevEl, "chevron-down");
+      this.agentBtn.setAttribute(
+        "title",
+        `${this.plugin.t("AI Engine")}: ${this.engineLabel(engine)}`
+      );
+    }
+
+    if (this.modelBtn) {
+      this.modelBtn.empty();
+      const iconEl = this.modelBtn.createSpan({ cls: "opencode-chip-icon" });
+      setIcon(iconEl, "cpu");
+
+      const slashIdx = m.indexOf("/");
+      const shortModel =
+        m && slashIdx > 0 ? m.slice(slashIdx + 1) : m || this.plugin.t("Default");
+      const vendor = m && slashIdx > 0 ? m.slice(0, slashIdx) : "";
+
+      if (vendor) {
+        this.modelBtn.createSpan({
+          text: vendor,
+          cls: "opencode-chip-vendor",
+        });
+      }
+
+      const display =
+        shortModel.length > 26 ? shortModel.slice(0, 24) + "…" : shortModel;
+      this.modelBtn.createSpan({
+        text: display,
+        cls: "opencode-chip-text",
+      });
+
+      const chevEl = this.modelBtn.createSpan({ cls: "opencode-chip-chevron" });
+      setIcon(chevEl, "chevron-down");
+      this.modelBtn.setAttribute(
+        "title",
+        `${this.plugin.t("Model")}: ${m || this.plugin.t("(CLI default)")}`
+      );
+    }
+  }
+
+  private openAgentList(): void {
+    const activeEngine = this.sessionEngine();
+    const providers = this.plugin.registry.getAll();
+    const items: AgentItem[] = providers.map((p) => {
+      const cfg = this.plugin.getEngineConfig(p.id);
+      const installed = p.isAvailable ? p.isAvailable() : true;
+      return {
+        id: p.id,
+        shortName: this.plugin.t(p.descriptor.shortName),
+        displayName: this.plugin.t(p.descriptor.displayName),
+        binary: cfg.binary || p.descriptor.defaultBinary,
+        activeModel: cfg.model || p.descriptor.defaultModel || "",
+        installed,
+        isActive: p.id === activeEngine,
+      };
+    });
+
+    new AgentSuggestModal(this.app, this.plugin, items, (item) => {
+      const engineChanged = item.id !== activeEngine;
+      this.plugin.settings.engine = item.id;
+      if (this.viewSession && engineChanged) {
+        this.viewSession = "";
+        this.plugin.settings.sessionId = "";
+        void this.plugin.saveSettings();
+        this.loadHistoryForSession("");
+      } else {
+        void this.plugin.saveSettings();
+        this.updateModelBtn();
+        this.updateStatsBar();
+        this.contextLimit = 0;
+        void this.refreshContext();
+      }
+      new Notice(
+        `${this.plugin.t("AI Engine")}: ${item.shortName} (${item.activeModel || this.plugin.t("default")})`
+      );
+    }).open();
   }
 
   private async openModelList(): Promise<void> {
     const activeEngine = this.sessionEngine();
     const cur = this.activeModelFor(activeEngine);
+    const provider = this.plugin.registry.resolveProvider(activeEngine);
 
     try {
-      const providers = this.plugin.registry.getAll();
-      // Place the currently active engine first
-      const orderedProviders = [
-        ...providers.filter((p) => p.id === activeEngine),
-        ...providers.filter((p) => p.id !== activeEngine),
-      ];
-
-      const results = await Promise.allSettled(
-        orderedProviders.map((p) => p.listModels())
-      );
+      const models = await provider.listModels();
+      const providerLabel =
+        provider.costNote || this.plugin.t(provider.descriptor.shortName);
       const items: ModelItem[] = [];
+      const seen = new Set<string>();
 
-      orderedProviders.forEach((provider, idx) => {
-        const res = results[idx];
-        const models = res.status === "fulfilled" ? res.value : [];
-        const providerLabel =
-          provider.costNote || provider.descriptor.shortName;
-        if (!provider.descriptor.defaultModel) {
-          items.push({
-            id: "",
-            label: substitute(
-              this.plugin.t("(default from $1)"),
-              provider.descriptor.shortName
-            ),
-            engine: provider.id,
-            provider: providerLabel,
-            isActive: provider.id === activeEngine && cur === "",
-          });
-        }
-        for (const m of models) {
-          items.push({
-            id: m,
-            engine: provider.id,
-            provider: providerLabel,
-            isActive: provider.id === activeEngine && m === cur,
-          });
-        }
-      });
+      if (!provider.descriptor.defaultModel) {
+        items.push({
+          id: "",
+          label: substitute(
+            this.plugin.t("(default from $1)"),
+            provider.descriptor.shortName
+          ),
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: cur === "",
+          isDefault: true,
+        });
+        seen.add("");
+      }
+
+      if (cur && !seen.has(cur)) {
+        items.push({
+          id: cur,
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: true,
+        });
+        seen.add(cur);
+      }
+
+      for (const m of models) {
+        if (seen.has(m)) continue;
+        seen.add(m);
+        items.push({
+          id: m,
+          engine: provider.id,
+          provider: providerLabel,
+          isActive: m === cur,
+        });
+      }
 
       new ModelSuggestModal(
         this.app,
@@ -709,33 +806,21 @@ export class ChatView extends ItemView {
         items,
         activeEngine,
         (item) => {
-          const engineChanged = item.engine !== activeEngine;
-          this.plugin.settings.engine = item.engine;
-          const cfg = this.plugin.getEngineConfig(item.engine);
+          const cfg = this.plugin.getEngineConfig(activeEngine);
           cfg.model = item.id;
-
-          const shownModel = item.label || item.id;
-          const setPrefix = this.plugin.t("Model set:");
-          if (this.viewSession && engineChanged) {
-            // The open session belongs to another engine: start a fresh session
-            this.viewSession = "";
-            this.plugin.settings.sessionId = "";
-            void this.plugin.saveSettings();
-            this.loadHistoryForSession("");
-            new Notice(`${setPrefix} ${shownModel} (${item.provider})`);
-            return;
-          }
           if (this.viewSession) {
             if (!this.plugin.settings.sessionEngines) {
               this.plugin.settings.sessionEngines = {};
             }
-            this.plugin.settings.sessionEngines[this.viewSession] = item.engine;
+            this.plugin.settings.sessionEngines[this.viewSession] = activeEngine;
           }
           void this.plugin.saveSettings();
           this.updateModelBtn();
           this.updateStatsBar();
           this.contextLimit = 0;
           void this.refreshContext();
+          const shownModel = item.label || item.id;
+          const setPrefix = this.plugin.t("Model set:");
           new Notice(`${setPrefix} ${shownModel} (${item.provider})`);
         }
       ).open();
