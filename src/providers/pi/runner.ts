@@ -76,6 +76,7 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
 
   private cachedModels: string[] | null = null;
   private cachedModelsBin = "";
+  private contextLimits = new Map<string, number>();
 
   constructor(plugin: RunnerHost) {
     super(plugin);
@@ -87,6 +88,14 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
 
   private getBin(): string {
     return this.resolveBinaryPath(this.getConfig().binary || "pi");
+  }
+
+  private parseContextWindowToken(raw: string): number {
+    const m = raw.trim().match(/^(\d+(?:\.\d+)?)\s*([kKmM])$/);
+    if (!m) return 0;
+    const val = parseFloat(m[1]);
+    const unit = m[2].toUpperCase();
+    return Math.round(val * (unit === "M" ? 1_000_000 : 1_000));
   }
 
   async getVersion(): Promise<string> {
@@ -135,6 +144,13 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
           ) {
             const full = mod.includes("/") ? mod : `${prov}/${mod}`;
             if (!models.includes(full)) models.push(full);
+            if (cols[2]) {
+              const ctx = this.parseContextWindowToken(cols[2]);
+              if (ctx > 0) {
+                this.contextLimits.set(full, ctx);
+                this.contextLimits.set(mod, ctx);
+              }
+            }
             continue;
           }
         }
@@ -169,7 +185,20 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
   async deleteSession(_sessionId: string): Promise<void> {}
 
   async getModelContextLimit(model: string): Promise<number> {
-    return this.estimateModelContextLimit(model, 200_000);
+    const target = model.trim() || this.getConfig().model.trim();
+    if (target) {
+      if (this.contextLimits.size === 0) {
+        await this.listModels().catch(() => {});
+      }
+      const exact = this.contextLimits.get(target);
+      if (exact && exact > 0) return exact;
+      const bare = target.includes("/")
+        ? target.slice(target.indexOf("/") + 1)
+        : target;
+      const byBare = this.contextLimits.get(bare);
+      if (byBare && byBare > 0) return byBare;
+    }
+    return this.estimateModelContextLimit(target, 200_000);
   }
 
   async getSessionTokens(

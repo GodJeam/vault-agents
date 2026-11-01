@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import type {
@@ -77,6 +77,7 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
 
   private cachedModels: string[] | null = null;
   private cachedModelsBin: string | null = null;
+  private contextLimits = new Map<string, number>();
 
   constructor(plugin: RunnerHost) {
     super(plugin);
@@ -88,6 +89,102 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
 
   private getBin(): string {
     return this.resolveBinaryPath(this.getConfig().binary || "hermes");
+  }
+
+  private getHermesHome(): string {
+    return process.env.HERMES_HOME || join(homedir(), ".hermes");
+  }
+
+  /**
+   * Resolve the Python interpreter and checkout root of the user's Hermes
+   * installation so we can query Hermes' native model & context APIs directly
+   * for ANY provider the user has configured (OpenRouter, Nous, Anthropic,
+   * OpenAI, Copilot, OpenCode Go/Zen, Ollama, LM Studio, Bedrock, etc.).
+   */
+  private resolveHermesPython(): { pythonBin: string; repoRoot: string } | null {
+    const hermesHome = this.getHermesHome();
+    const repoRoot = join(hermesHome, "hermes-agent");
+    if (!existsSync(repoRoot)) return null;
+
+    // 1. Inspect the launcher script (`~/.local/bin/hermes` or `~/.hermes/hermes-agent/.hermes/bin/hermes`)
+    const launcherCandidates = [
+      this.getBin(),
+      join(repoRoot, ".hermes", "bin", "hermes"),
+    ];
+    for (const candidate of launcherCandidates) {
+      try {
+        if (!existsSync(candidate)) continue;
+        const text = readFileSync(candidate, "utf-8");
+        const execMatch = text.match(/exec\s+([^\s"']+\/python3?(?:\.\d+)?)\b/);
+        if (execMatch && execMatch[1] && existsSync(execMatch[1])) {
+          return { pythonBin: execMatch[1], repoRoot };
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. Check `~/.hermes/tools/python-*/bin/python3`
+    try {
+      const toolsDir = join(hermesHome, "tools");
+      if (existsSync(toolsDir)) {
+        for (const entry of readdirSync(toolsDir)) {
+          if (entry.startsWith("python")) {
+            const py = join(
+              toolsDir,
+              entry,
+              process.platform === "win32" ? "python.exe" : "bin/python3"
+            );
+            if (existsSync(py)) {
+              return { pythonBin: py, repoRoot };
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. Check standard venv inside hermes-agent
+    const venvPy = join(
+      repoRoot,
+      ".venv",
+      process.platform === "win32" ? "Scripts/python.exe" : "bin/python"
+    );
+    if (existsSync(venvPy)) {
+      return { pythonBin: venvPy, repoRoot };
+    }
+
+    return null;
+  }
+
+  /**
+   * Run a short Python introspection snippet inside the Hermes runtime.
+   */
+  private async execHermesPython(
+    script: string,
+    extraArgs: string[] = []
+  ): Promise<string | null> {
+    const runtime = this.resolveHermesPython();
+    if (!runtime) return null;
+    try {
+      const bootstrap = [
+        "import os, sys",
+        "os.environ.pop('PYTHONHOME', None)",
+        "os.environ.pop('PYTHONPATH', None)",
+        `sys.path.insert(0, ${JSON.stringify(runtime.repoRoot)})`,
+        "import hermes_bootstrap",
+        script,
+      ].join("\n");
+      return await this.execCli(runtime.pythonBin, [
+        "-I",
+        "-c",
+        bootstrap,
+        ...extraArgs,
+      ]);
+    } catch {
+      return null;
+    }
   }
 
   async getVersion(): Promise<string> {
@@ -115,8 +212,62 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
       }
     };
 
+    // 1. Query Hermes' native Python model discovery (`hermes_cli.models`)
+    // This works universally for ANY provider the user authenticated in Hermes.
+    const requestedProvider = this.getConfig().options.provider?.trim() || "";
+    const pyScript = `
+import json, sys
+from hermes_cli.config import load_config
+from hermes_cli.models import list_available_providers, cached_provider_model_ids, provider_model_ids
+
+req_prov = sys.argv[1] if len(sys.argv) > 1 else ""
+force = sys.argv[2] == "1" if len(sys.argv) > 2 else False
+cfg = load_config()
+m = cfg.get("model") if isinstance(cfg, dict) else {}
+default_model = (m.get("default") or m.get("model") or "") if isinstance(m, dict) else (m if isinstance(m, str) else "")
+cfg_provider = req_prov or ((m.get("provider") or "") if isinstance(m, dict) else "")
+
+providers = []
+if cfg_provider and cfg_provider != "auto":
+    providers.append(cfg_provider)
+for p in list_available_providers():
+    pid = p.get("id")
+    if p.get("authenticated") and pid and pid not in providers:
+        providers.append(pid)
+
+models = []
+if default_model:
+    models.append(str(default_model).strip())
+
+for pid in providers:
+    try:
+        rows = provider_model_ids(pid, force_refresh=force) if force else (cached_provider_model_ids(pid) or provider_model_ids(pid))
+        for mid in (rows or []):
+            models.append(str(mid).strip())
+    except Exception:
+        pass
+
+print(json.dumps({"models": models}))
+`;
+    const pyOut = await this.execHermesPython(pyScript, [
+      requestedProvider,
+      forceRefresh ? "1" : "0",
+    ]);
+    if (pyOut) {
+      try {
+        const parsed = JSON.parse(pyOut.trim()) as { models?: string[] };
+        for (const m of parsed.models || []) {
+          addModel(m);
+        }
+      } catch {
+        // ignore and continue to file/CLI fallbacks
+      }
+    }
+
+    // 2. Fallback: read ~/.hermes/config.yaml and ~/.hermes/provider_models_cache.json
+    const hermesHome = this.getHermesHome();
     try {
-      const cfgPath = join(homedir(), ".hermes", "config.yaml");
+      const cfgPath = join(hermesHome, "config.yaml");
       if (existsSync(cfgPath)) {
         const raw = readFileSync(cfgPath, "utf-8");
         const modelSection = raw.match(
@@ -141,20 +292,13 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
       // ignore
     }
 
-    // 2. Read live probed models from ~/.hermes/provider_models_cache.json
-    // (e.g. custom OpenAI-compatible endpoints like OpenCode Go)
     try {
-      const provCachePath = join(
-        homedir(),
-        ".hermes",
-        "provider_models_cache.json"
-      );
+      const provCachePath = join(hermesHome, "provider_models_cache.json");
       if (existsSync(provCachePath)) {
         const parsed = JSON.parse(readFileSync(provCachePath, "utf-8")) as Record<
           string,
           { models?: string[]; fallback?: boolean }
         >;
-        // Prioritize non-fallback (live probed custom/endpoint) models first
         const entries = Object.entries(parsed);
         entries.sort(([, a], [, b]) =>
           (a.fallback ? 1 : 0) - (b.fallback ? 1 : 0)
@@ -171,34 +315,32 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
       // ignore
     }
 
-    // 3. Read Hermes static/curated catalog from ~/.hermes/cache/model_catalog.json
-    try {
-      const catalogPath = join(
-        homedir(),
-        ".hermes",
-        "cache",
-        "model_catalog.json"
-      );
-      if (existsSync(catalogPath)) {
-        const parsed = JSON.parse(readFileSync(catalogPath, "utf-8")) as {
-          providers?: Record<
-            string,
-            { models?: Array<{ id?: string }> }
-          >;
-        };
-        const providers = parsed.providers || {};
-        for (const prov of Object.values(providers)) {
-          for (const item of prov.models || []) {
-            if (typeof item.id === "string") {
-              addModel(item.id);
+    // 3. Fallback: read Hermes static/curated catalog if no authenticated provider models were found
+    if (seen.size <= 1) {
+      try {
+        const catalogPath = join(hermesHome, "cache", "model_catalog.json");
+        if (existsSync(catalogPath)) {
+          const parsed = JSON.parse(readFileSync(catalogPath, "utf-8")) as {
+            providers?: Record<
+              string,
+              { models?: Array<{ id?: string }> }
+            >;
+          };
+          const providers = parsed.providers || {};
+          for (const prov of Object.values(providers)) {
+            for (const item of prov.models || []) {
+              if (typeof item.id === "string") {
+                addModel(item.id);
+              }
             }
           }
         }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
 
+    // 4. Final fallback: `hermes models` CLI (e.g. mock CLI simulator)
     if (seen.size === 0) {
       try {
         const out = await this.execCli(bin, ["models"]);
@@ -281,6 +423,61 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
       model.trim() ||
       this.getConfig().model.trim() ||
       this.readConfiguredDefaultModel();
+    const configuredProvider =
+      (this.getConfig().options.provider ?? "").trim();
+    const cacheKey = `${configuredProvider}:${effective}`;
+    const cached = this.contextLimits.get(cacheKey) ?? this.contextLimits.get(effective);
+    if (cached && cached > 0) return cached;
+
+    try {
+      const script = [
+        "import json, sys",
+        "from agent.model_metadata import get_model_context_length",
+        "from hermes_cli.runtime_provider import resolve_runtime_provider",
+        "from hermes_cli.models import PROVIDER_REGISTRY",
+        "mod = sys.argv[1] if len(sys.argv) > 1 else ''",
+        "req_prov = sys.argv[2] if len(sys.argv) > 2 else ''",
+        "if '/' in mod and not req_prov:",
+        "    prefix, rest = mod.split('/', 1)",
+        "    if prefix in PROVIDER_REGISTRY and prefix != 'openrouter':",
+        "        req_prov = prefix",
+        "        mod = rest",
+        "rt = resolve_runtime_provider(requested=req_prov or None, target_model=mod or None)",
+        "eff_mod = mod or rt.get('model') or ''",
+        "ctx = get_model_context_length(",
+        "    eff_mod,",
+        "    base_url=rt.get('base_url', '') or '',",
+        "    api_key=rt.get('api_key', '') or '',",
+        "    provider=rt.get('provider', '') or req_prov,",
+        ")",
+        "print(json.dumps({'context_length': ctx, 'model': eff_mod}))",
+      ].join("\n");
+
+      const out = await this.execHermesPython(script, [
+        effective,
+        configuredProvider,
+      ]);
+      if (out) {
+        const parsed = JSON.parse(out) as {
+          context_length?: number;
+          model?: string;
+        };
+        if (
+          typeof parsed.context_length === "number" &&
+          parsed.context_length > 0
+        ) {
+          this.contextLimits.set(cacheKey, parsed.context_length);
+          if (effective) this.contextLimits.set(effective, parsed.context_length);
+          if (parsed.model) {
+            this.contextLimits.set(parsed.model, parsed.context_length);
+          }
+          return parsed.context_length;
+        }
+      }
+    } catch {
+      // Fallback to heuristic estimation below
+    }
+
     return this.estimateModelContextLimit(effective, 256_000);
   }
 
