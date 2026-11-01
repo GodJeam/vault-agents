@@ -130,6 +130,11 @@ test/
 - `build/` — build and test tooling (`esbuild.config.mjs`, `run-tests.mjs`, `tsconfig.json`)
 - `main.js` / `manifest.json` / `styles.css` — built plugin files (copy into the vault)
 
+## Contributing
+
+Contributions, bug fixes, and new agent CLI integrations are welcome!
+All development takes place on the **`dev`** branch using an iterative, test-driven workflow. Before opening a Pull Request, please read [**CONTRIBUTIONS.md**](CONTRIBUTIONS.md) for full details on our branching strategy (`dev` → `main`), code organization, commit conventions, and testing requirements.
+
 ## License
 
 GPL-3.0 — see [LICENSE](LICENSE).
