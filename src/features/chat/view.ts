@@ -108,6 +108,10 @@ export class ChatView extends ItemView {
     return this.plugin.t(desc.shortName);
   }
 
+  assistantIcon(): string {
+    return this.getRunner().descriptor.icon || "bot";
+  }
+
   getViewType(): string {
     return CHAT_VIEW_TYPE;
   }
@@ -258,7 +262,9 @@ export class ChatView extends ItemView {
     const attachBtn = this.contextBar.createEl("button", {
       cls: "opencode-add-note-btn",
     });
-    attachBtn.setText("＋ " + this.plugin.t("Attach file"));
+    const attachIcon = attachBtn.createSpan({ cls: "opencode-btn-icon" });
+    setIcon(attachIcon, "paperclip");
+    attachBtn.createSpan({ text: this.plugin.t("Attach file") });
     attachBtn.addEventListener("click", () =>
       this.attachmentManager.openFilePicker()
     );
@@ -266,7 +272,9 @@ export class ChatView extends ItemView {
     const add = this.contextBar.createEl("button", {
       cls: "opencode-add-note-btn",
     });
-    add.setText("+ " + this.plugin.t("Current note"));
+    const addIcon = add.createSpan({ cls: "opencode-btn-icon" });
+    setIcon(addIcon, "file-plus");
+    add.createSpan({ text: this.plugin.t("Current note") });
     add.addEventListener("click", () => this.attachCurrentNote());
 
     this.updateContextBar();
@@ -636,11 +644,15 @@ export class ChatView extends ItemView {
     buttons.createSpan({ cls: "opencode-buttons-spacer" });
 
     this.sendBtn = buttons.createEl("button", { cls: "opencode-send-btn" });
-    this.sendBtn.setText(this.plugin.t("Send"));
+    const sendIcon = this.sendBtn.createSpan({ cls: "opencode-btn-icon" });
+    setIcon(sendIcon, "send");
+    this.sendBtn.createSpan({ text: this.plugin.t("Send") });
     this.sendBtn.addEventListener("click", () => void this.send());
 
     this.stopBtn = buttons.createEl("button", { cls: "opencode-stop-btn" });
-    this.stopBtn.setText(this.plugin.t("Stop"));
+    const stopIcon = this.stopBtn.createSpan({ cls: "opencode-btn-icon" });
+    setIcon(stopIcon, "square");
+    this.stopBtn.createSpan({ text: this.plugin.t("Stop") });
     this.stopBtn.addClass("hidden");
     this.stopBtn.addEventListener("click", () => {
       this.stoppedByUser = true;
@@ -668,7 +680,7 @@ export class ChatView extends ItemView {
     if (this.agentBtn) {
       this.agentBtn.empty();
       const iconEl = this.agentBtn.createSpan({ cls: "opencode-chip-icon" });
-      setIcon(iconEl, "bot");
+      setIcon(iconEl, provider?.descriptor.icon || "bot");
       this.agentBtn.createSpan({
         text: this.plugin.t(shortName),
         cls: "opencode-chip-text",
@@ -724,6 +736,7 @@ export class ChatView extends ItemView {
         id: p.id,
         shortName: this.plugin.t(p.descriptor.shortName),
         displayName: this.plugin.t(p.descriptor.displayName),
+        icon: p.descriptor.icon || "bot",
         binary: cfg.binary || p.descriptor.defaultBinary,
         activeModel: cfg.model || p.descriptor.defaultModel || "",
         installed,
@@ -985,7 +998,8 @@ export class ChatView extends ItemView {
       this.assistantLabel(),
       () => text,
       (t) => this.copyText(t),
-      this.plugin.t("Copy text")
+      this.plugin.t("Copy text"),
+      this.assistantIcon()
     );
     row.createDiv({ text, cls: "opencode-bubble" });
   }
@@ -1218,7 +1232,8 @@ export class ChatView extends ItemView {
       (t) => this.copyText(t),
       (total, input, output, cost) =>
         this.fmtTokens(total, input, output, cost, this.sessionEngine()),
-      (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer)
+      (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer),
+      this.assistantIcon()
     );
     this.activeBubble = bubble;
     this.scrollToBottom();
@@ -1335,11 +1350,15 @@ export class ChatView extends ItemView {
           this.assistantLabel(),
           () => rec.text,
           (t) => this.copyText(t),
-          this.plugin.t("Copy text")
+          this.plugin.t("Copy text"),
+          this.assistantIcon()
         );
         if (rec.reasoning) {
           const det = row.createEl("details", { cls: "opencode-reasoning" });
-          det.createEl("summary", { text: this.plugin.t("Reasoning") });
+          const summary = det.createEl("summary");
+          const brainIcon = summary.createSpan({ cls: "opencode-reasoning-icon" });
+          setIcon(brainIcon, "brain");
+          summary.createSpan({ text: this.plugin.t("Reasoning") });
           det.createDiv({
             cls: "opencode-reasoning-content",
             text: rec.reasoning,

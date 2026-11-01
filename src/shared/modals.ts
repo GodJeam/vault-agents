@@ -262,6 +262,7 @@ export interface AgentItem {
   id: EngineType;
   shortName: string;
   displayName: string;
+  icon: string;
   binary: string;
   activeModel: string;
   installed: boolean;
@@ -310,7 +311,7 @@ export class AgentSuggestModal extends SuggestModal<AgentItem> {
     const leftGroup = topRow.createDiv({ cls: "opencode-agent-suggest-left" });
 
     const iconEl = leftGroup.createSpan({ cls: "opencode-agent-suggest-icon" });
-    setIcon(iconEl, "bot");
+    setIcon(iconEl, item.icon || "bot");
 
     leftGroup.createSpan({
       text: item.shortName,

@@ -22,6 +22,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
   id: "codex",
   displayName: "OpenAI Codex CLI",
   shortName: "Codex",
+  icon: "code-2",
   defaultBinary: "codex",
   defaultModel: "",
   binaryDesc:

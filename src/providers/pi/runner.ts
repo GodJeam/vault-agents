@@ -20,6 +20,7 @@ export const PI_DESCRIPTOR: ProviderDescriptor = {
   id: "pi",
   displayName: "Pi Coding Agent CLI",
   shortName: "Pi",
+  icon: "compass",
   defaultBinary: "pi",
   defaultModel: "",
   binaryDesc:

@@ -22,6 +22,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   id: "claude",
   displayName: "Claude Code CLI",
   shortName: "Claude",
+  icon: "brain-circuit",
   defaultBinary: "claude",
   defaultModel: "",
   binaryDesc:

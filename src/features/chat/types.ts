@@ -13,6 +13,7 @@ export interface SessionStats {
 export interface SuggestItem {
   label: string;
   desc?: string;
+  icon?: string;
   action: () => void;
 }
 

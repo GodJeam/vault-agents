@@ -30,6 +30,7 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
   id: "opencode",
   displayName: "OpenCode CLI",
   shortName: "Opencode",
+  icon: "terminal-square",
   defaultBinary: "opencode",
   defaultModel: "opencode-go/deepseek-v4.1-flash",
   binaryDesc:

@@ -22,6 +22,7 @@ export const HERMES_DESCRIPTOR: ProviderDescriptor = {
   id: "hermes",
   displayName: "Hermes Agent CLI (Nous Research)",
   shortName: "Hermes",
+  icon: "zap",
   defaultBinary: "hermes",
   defaultModel: "",
   binaryDesc:

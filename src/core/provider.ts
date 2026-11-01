@@ -28,6 +28,8 @@ export interface ProviderDescriptor {
   displayName: string;
   /** Short name displayed in chat message headers */
   shortName: string;
+  /** Lucide icon name representing this agent in UI selectors and headers */
+  icon?: string;
   /** Default CLI executable name */
   defaultBinary: string;
   /** Default model identifier */

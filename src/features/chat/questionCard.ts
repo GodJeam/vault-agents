@@ -82,7 +82,7 @@ export function renderQuestionCard(
         attr: { type: "button" },
       });
       const checkSpan = btn.createSpan({ cls: "opencode-question-opt-check" });
-      checkSpan.setText(q.multiple ? "☐" : "○");
+      setIcon(checkSpan, q.multiple ? "square" : "circle");
 
       const textCol = btn.createDiv({ cls: "opencode-question-opt-content" });
       textCol.createDiv({
@@ -102,22 +102,28 @@ export function renderQuestionCard(
           if (selected.has(opt.label)) {
             selected.delete(opt.label);
             btn.removeClass("is-selected");
-            checkSpan.setText("☐");
+            checkSpan.empty();
+            setIcon(checkSpan, "square");
           } else {
             selected.add(opt.label);
             btn.addClass("is-selected");
-            checkSpan.setText("☑");
+            checkSpan.empty();
+            setIcon(checkSpan, "check-square");
           }
         } else {
           selected.clear();
           for (const b of blockBtns) {
             b.removeClass("is-selected");
             const c = b.querySelector(".opencode-question-opt-check");
-            if (c) c.setText("○");
+            if (c) {
+              c.empty();
+              setIcon(c as HTMLElement, "circle");
+            }
           }
           selected.add(opt.label);
           btn.addClass("is-selected");
-          checkSpan.setText("●");
+          checkSpan.empty();
+          setIcon(checkSpan, "check-circle-2");
         }
       });
 

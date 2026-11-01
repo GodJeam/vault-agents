@@ -27,6 +27,7 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   id: "antigravity",
   displayName: "Antigravity CLI (Google AI Pro)",
   shortName: "Antigravity",
+  icon: "sparkles",
   defaultBinary: "agy",
   defaultModel: "gemini-3.8-flash-high",
   binaryDesc:
