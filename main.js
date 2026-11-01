@@ -3831,11 +3831,42 @@ ${content}
    */
   estimateModelContextLimit(model, defaultLimit = 128e3) {
     const m = (model || "").toLowerCase();
+    if (m.includes("deepseek-v4") || m.includes("deepseek-flash") ||
+      m.includes("deepseek-chat") || m.includes("deepseek-reasoner")) {
+      return 1e6;
+    }
     if (m.includes("gemini")) return 1048576;
+    if (m.includes("claude-fable") || m.includes("claude-opus-5") ||
+      m.includes("claude-sonnet-5") || m.includes("claude-opus-4-8") ||
+        m.includes("claude-opus-4.8") || m.includes("claude-opus-4-6") ||
+          m.includes("claude-opus-4.6") || m.includes("claude-sonnet-4-6") ||
+            m.includes("claude-sonnet-4.6") || m.includes("claude-haiku-5")) {
+      return 1e6;
+    }
     if (m.includes("claude")) return 2e5;
+    if (m.includes("gpt-6") || m.includes("gpt-5.6") ||
+      m.includes("gpt-5.5") || m.includes("gpt-5.4") && !m.includes("mini") &&
+        !m.includes("nano")) {
+      return 105e4;
+    }
     if (m.includes("gpt-5") || m.includes("codex")) return 256e3;
+    if (m.includes("gpt-4.1")) return 1047576;
     if (m.includes("o3") || m.includes("o4") || m.includes("gpt-4")) {
       return 2e5;
+    }
+    if (m.includes("glm-5.3") || m.includes("glm-5.2") &&
+      !m.includes(":free") || m.includes("kimi-k3") ||
+        m.includes("mimo-v2.5") || m.includes("mimo-v2.6") ||
+          m.includes("minimax-m3") || m.includes("qwen3.6") ||
+            m.includes("qwen3.7") || m.includes("qwen3.8") ||
+              m.includes("muse-spark") || m.includes("hy4") ||
+                m.includes("beam") || m.includes("longcat") ||
+                  m.includes("step-5")) {
+      return 1e6;
+    }
+    if (m.includes("grok-4.7") || m.includes("grok-4.6") ||
+      m.includes("grok-4.5")) {
+      return 5e5;
     }
     if (m.includes("hermes") || m.includes("deepseek")) return 128e3;
     return defaultLimit;
@@ -5820,6 +5851,29 @@ var HermesRunner = class extends BaseCliRunner {
     } catch {
     }
     try {
+      const provCachePath = (0, import_path6.join)(
+        (0, import_os5.homedir)(),
+        ".hermes",
+        "provider_models_cache.json"
+      );
+      if ((0, import_fs5.existsSync)(provCachePath)) {
+        const parsed =
+          JSON.parse((0, import_fs5.readFileSync)(provCachePath, "utf-8"));
+        const entries = Object.entries(parsed);
+        entries.sort(
+          ([, a], [, b]) => (a.fallback ? 1 : 0) - (b.fallback ? 1 : 0)
+        );
+        for (const [, entry] of entries) {
+          for (const m of entry.models || []) {
+            if (typeof m === "string") {
+              addModel(m);
+            }
+          }
+        }
+      }
+    } catch {
+    }
+    try {
       const catalogPath = (0, import_path6.join)(
         (0, import_os5.homedir)(),
         ".hermes",
@@ -5880,8 +5934,39 @@ var HermesRunner = class extends BaseCliRunner {
     } catch {
     }
   }
+  readConfiguredDefaultModel() {
+    try {
+      const cfgPath =
+        (0, import_path6.join)((0, import_os5.homedir)(), ".hermes",
+          "config.yaml");
+      if ((0, import_fs5.existsSync)(cfgPath)) {
+        const raw = (0, import_fs5.readFileSync)(cfgPath, "utf-8");
+        const modelSection = raw.match(
+          /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
+        );
+        if (modelSection) {
+          const defMatch = modelSection[0].match(
+            /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
+          );
+          if (defMatch && defMatch[1]) {
+            return defMatch[1].trim();
+          }
+        }
+        const topMatch = raw.match(
+          /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
+        );
+        if (topMatch && topMatch[1]) {
+          return topMatch[1].trim();
+        }
+      }
+    } catch {
+    }
+    return "";
+  }
   async getModelContextLimit(model) {
-    return this.estimateModelContextLimit(model, 128e3);
+    const effective = model.trim() || this.getConfig().model.trim() ||
+      this.readConfiguredDefaultModel();
+    return this.estimateModelContextLimit(effective, 256e3);
   }
   async getSessionTokens(sessionId) {
     return this.getHistorySessionTokens(sessionId);
