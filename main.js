@@ -24,10 +24,10 @@ __export(main_exports, {
   default: () => OpencodePlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian9 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 
 // src/features/chat/view.ts
-var import_obsidian7 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 
 // src/i18n/index.ts
 var IT = {
@@ -509,168 +509,10 @@ function substitute(template, ...args) {
 }
 
 // src/shared/modals.ts
+var import_obsidian2 = require("obsidian");
+
+// src/shared/suggestModals.ts
 var import_obsidian = require("obsidian");
-var RenameModal = class extends import_obsidian.Modal {
-  constructor(app, plugin, current, onSubmit) {
-    super(app);
-    this.plugin = plugin;
-    this.current = current;
-    this.onSubmit = onSubmit;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    const t = (s) => this.plugin.t(s);
-    contentEl.empty();
-    contentEl.createEl("h3", { text: t("Rename session") });
-    let input;
-    new import_obsidian.Setting(contentEl).setName(t("New title")).addText(
-      (txt) => {
-      input = txt.inputEl;
-      txt.setValue(this.current);
-      txt.inputEl.select();
-    });
-    new import_obsidian.Setting(contentEl).addButton(
-      (b) => b.setButtonText(t("Save")).setCta().onClick(() => {
-        if (!input) return;
-        const v = input.value.trim();
-        if (!v) {
-          new import_obsidian.Notice(t("The title cannot be empty."));
-          return;
-        }
-        this.onSubmit(v);
-        this.close();
-      })
-    ).addButton(
-      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
-    );
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-var StatsModal = class extends import_obsidian.Modal {
-  constructor(app, plugin, engine) {
-    super(app);
-    this.plugin = plugin;
-    this.engine = engine;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    const t = (s) => this.plugin.t(s);
-    contentEl.empty();
-    contentEl.createEl("h3", { text: t("Token usage and costs") });
-    const status = contentEl.createDiv({
-      cls: "opencode-stats-loading",
-      text: t("Loading...")
-    });
-    this.plugin.registry.resolveProvider(this.engine).getUsageStats().then(
-      (s) => {
-      status.remove();
-      this.renderWindow(contentEl, t("Last 5 hours"), s.h5);
-      this.renderWindow(contentEl, t("Last week"), s.week);
-      this.renderWindow(contentEl, t("Last month"), s.month);
-    }).catch((e) => {
-      status.setText(`${t("Error:")} ${e.message}`);
-    });
-  }
-  renderWindow(container, label, w) {
-    const locale = this.plugin.settings.language === "it" ? "it-IT" : "en-US";
-    const t = (s) => this.plugin.t(s);
-    container.createEl("h4", { text: label });
-    new import_obsidian.Setting(container).setName(t("Input tokens")).setDesc(
-      w.input.toLocaleString(locale));
-    new import_obsidian.Setting(container).setName(t("Output tokens")).setDesc(
-      w.output.toLocaleString(locale));
-    new import_obsidian.Setting(container).setName(t("Total tokens")).setDesc((
-      w.input + w.output).toLocaleString(locale));
-    const provider = this.plugin.registry.resolveProvider(this.engine);
-    const incKey = provider.costNote ? t("Included with $1 ($0.00)") :
-      t("Included ($0.00)");
-    const costDesc = provider.included ?
-      substitute(incKey, provider.costNote ?? "") : `${w.cost.toFixed(4)} $`;
-    new import_obsidian.Setting(container).setName(t("Cost")).setDesc(costDesc);
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-var ConfirmModal = class extends import_obsidian.Modal {
-  constructor(app, plugin, title, message, confirmLabel, onConfirm) {
-    super(app);
-    this.plugin = plugin;
-    this.title = title;
-    this.message = message;
-    this.confirmLabel = confirmLabel;
-    this.onConfirm = onConfirm;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    const t = (s) => this.plugin.t(s);
-    contentEl.empty();
-    contentEl.createEl("h3", { text: this.title });
-    contentEl.createDiv({
-      cls: "opencode-confirm-message",
-      text: this.message
-    });
-    new import_obsidian.Setting(contentEl).addButton(
-      (b) => b.setButtonText(this.confirmLabel).setWarning().onClick(() => {
-        this.onConfirm();
-        this.close();
-      })
-    ).addButton(
-      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
-    );
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-var PromptModal = class extends import_obsidian.Modal {
-  constructor(app, plugin, initialName, initialText, onSave) {
-    super(app);
-    this.plugin = plugin;
-    this.initialName = initialName;
-    this.initialText = initialText;
-    this.onSave = onSave;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    const t = (s) => this.plugin.t(s);
-    contentEl.empty();
-    contentEl.createEl("h3", { text: t("Prompt") });
-    let nameInput;
-    let textArea;
-    new import_obsidian.Setting(contentEl).setName(t("Prompt name")).addText(
-      (x) => {
-      nameInput = x.inputEl;
-      x.setValue(this.initialName);
-    });
-    new import_obsidian.Setting(contentEl).setName(t("Prompt text"))
-      .addTextArea((x) => {
-      textArea = x.inputEl;
-      x.setValue(this.initialText);
-      x.inputEl.rows = 10;
-    });
-    new import_obsidian.Setting(contentEl).addButton(
-      (b) => b.setButtonText(t("Save")).setCta().onClick(() => {
-        if (!nameInput || !textArea) return;
-        const name = nameInput.value.trim();
-        const text = textArea.value;
-        if (!name || !text) {
-          new import_obsidian.Notice(t("The prompt cannot be empty."));
-          return;
-        }
-        this.onSave(name, text);
-        this.close();
-      })
-    ).addButton(
-      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
-    );
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
 var FileSuggestModal = class extends import_obsidian.SuggestModal {
   constructor(app, plugin, onPick) {
     super(app);
@@ -843,8 +685,10 @@ var ModelSuggestModal = class extends import_obsidian.SuggestModal {
     const titleEl = el.createDiv({ cls: "opencode-model-suggest-title" });
     const leftEl = titleEl.createDiv({ cls: "opencode-model-suggest-left" });
     const iconEl = leftEl.createSpan({ cls: "opencode-model-suggest-icon" });
-    (0, import_obsidian.setIcon)(iconEl, item.isDefault ? "sparkles" :
-      item.isCustom ? "edit-3" : "cpu");
+    (0, import_obsidian.setIcon)(
+      iconEl,
+      item.isDefault ? "sparkles" : item.isCustom ? "edit-3" : "cpu"
+    );
     leftEl.createSpan({
       text: shortModelName,
       cls: "opencode-model-suggest-name"
@@ -889,11 +733,175 @@ var ModelSuggestModal = class extends import_obsidian.SuggestModal {
   }
 };
 
+// src/shared/modals.ts
+var RenameModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin, current, onSubmit) {
+    super(app);
+    this.plugin = plugin;
+    this.current = current;
+    this.onSubmit = onSubmit;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    const t = (s) => this.plugin.t(s);
+    contentEl.empty();
+    contentEl.createEl("h3", { text: t("Rename session") });
+    let input;
+    new import_obsidian2.Setting(contentEl).setName(t("New title")).addText(
+      (txt) => {
+      input = txt.inputEl;
+      txt.setValue(this.current);
+      txt.inputEl.select();
+    });
+    new import_obsidian2.Setting(contentEl).addButton(
+      (b) => b.setButtonText(t("Save")).setCta().onClick(() => {
+        if (!input) return;
+        const v = input.value.trim();
+        if (!v) {
+          new import_obsidian2.Notice(t("The title cannot be empty."));
+          return;
+        }
+        this.onSubmit(v);
+        this.close();
+      })
+    ).addButton(
+      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var StatsModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin, engine) {
+    super(app);
+    this.plugin = plugin;
+    this.engine = engine;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    const t = (s) => this.plugin.t(s);
+    contentEl.empty();
+    contentEl.createEl("h3", { text: t("Token usage and costs") });
+    const status = contentEl.createDiv({
+      cls: "opencode-stats-loading",
+      text: t("Loading...")
+    });
+    this.plugin.registry.resolveProvider(this.engine).getUsageStats().then(
+      (s) => {
+      status.remove();
+      this.renderWindow(contentEl, t("Last 5 hours"), s.h5);
+      this.renderWindow(contentEl, t("Last week"), s.week);
+      this.renderWindow(contentEl, t("Last month"), s.month);
+    }).catch((e) => {
+      status.setText(`${t("Error:")} ${e.message}`);
+    });
+  }
+  renderWindow(container, label, w) {
+    const locale = this.plugin.settings.language === "it" ? "it-IT" : "en-US";
+    const t = (s) => this.plugin.t(s);
+    container.createEl("h4", { text: label });
+    new import_obsidian2.Setting(container).setName(t("Input tokens")).setDesc(
+      w.input.toLocaleString(locale));
+    new import_obsidian2.Setting(container).setName(t("Output tokens")).setDesc(
+      w.output.toLocaleString(locale));
+    new import_obsidian2.Setting(container).setName(t("Total tokens")).setDesc((
+      w.input + w.output).toLocaleString(locale));
+    const provider = this.plugin.registry.resolveProvider(this.engine);
+    const incKey = provider.costNote ? t("Included with $1 ($0.00)") :
+      t("Included ($0.00)");
+    const costDesc = provider.included ?
+      substitute(incKey, provider.costNote ?? "") : `${w.cost.toFixed(4)} $`;
+    new import_obsidian2.Setting(container).setName(t("Cost")).setDesc(
+      costDesc);
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var ConfirmModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin, title, message, confirmLabel, onConfirm) {
+    super(app);
+    this.plugin = plugin;
+    this.title = title;
+    this.message = message;
+    this.confirmLabel = confirmLabel;
+    this.onConfirm = onConfirm;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    const t = (s) => this.plugin.t(s);
+    contentEl.empty();
+    contentEl.createEl("h3", { text: this.title });
+    contentEl.createDiv({
+      cls: "opencode-confirm-message",
+      text: this.message
+    });
+    new import_obsidian2.Setting(contentEl).addButton(
+      (b) => b.setButtonText(this.confirmLabel).setWarning().onClick(() => {
+        this.onConfirm();
+        this.close();
+      })
+    ).addButton(
+      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var PromptModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin, initialName, initialText, onSave) {
+    super(app);
+    this.plugin = plugin;
+    this.initialName = initialName;
+    this.initialText = initialText;
+    this.onSave = onSave;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    const t = (s) => this.plugin.t(s);
+    contentEl.empty();
+    contentEl.createEl("h3", { text: t("Prompt") });
+    let nameInput;
+    let textArea;
+    new import_obsidian2.Setting(contentEl).setName(t("Prompt name")).addText(
+      (x) => {
+      nameInput = x.inputEl;
+      x.setValue(this.initialName);
+    });
+    new import_obsidian2.Setting(contentEl).setName(t("Prompt text"))
+      .addTextArea((x) => {
+      textArea = x.inputEl;
+      x.setValue(this.initialText);
+      x.inputEl.rows = 10;
+    });
+    new import_obsidian2.Setting(contentEl).addButton(
+      (b) => b.setButtonText(t("Save")).setCta().onClick(() => {
+        if (!nameInput || !textArea) return;
+        const name = nameInput.value.trim();
+        const text = textArea.value;
+        if (!name || !text) {
+          new import_obsidian2.Notice(t("The prompt cannot be empty."));
+          return;
+        }
+        this.onSave(name, text);
+        this.close();
+      })
+    ).addButton(
+      (b) => b.setButtonText(t("Cancel")).onClick(() => this.close())
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+
 // src/features/chat/messageBubble.ts
-var import_obsidian4 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 
 // src/features/chat/stepWidget.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 var TOOL_PRESENTATION_MAP = {
   read: { labelKey: "Read file", icon: "file-text" },
   view_file: { labelKey: "Read file", icon: "file-text" },
@@ -989,7 +997,7 @@ var StepManager = class {
       rec.row.removeClass("opencode-step--running");
       rec.row.addClass(doneCls);
       rec.icon.empty();
-      (0, import_obsidian2.setIcon)(rec.icon, isErr ? "x" : toolIcon);
+      (0, import_obsidian3.setIcon)(rec.icon, isErr ? "x" : toolIcon);
       this.renderStepTitle(rec.titleEl, step);
       this.updateDuration(rec.durationEl, step.durationMs);
       if (this.showIO) {
@@ -1004,7 +1012,7 @@ var StepManager = class {
         cls: `opencode-step ${doneCls}`
       });
       const icon = row.createSpan({ cls: "opencode-step-icon" });
-      (0, import_obsidian2.setIcon)(icon, isErr ? "x" : toolIcon);
+      (0, import_obsidian3.setIcon)(icon, isErr ? "x" : toolIcon);
       const main = row.createDiv({ cls: "opencode-step-main" });
       const header = main.createDiv({ cls: "opencode-step-header" });
       const titleEl = header.createDiv({ cls: "opencode-step-title" });
@@ -1033,7 +1041,7 @@ var StepManager = class {
         rec.row.removeClass("opencode-step--running");
         rec.row.addClass("opencode-step--done");
         rec.icon.empty();
-        (0, import_obsidian2.setIcon)(rec.icon, "check");
+        (0, import_obsidian3.setIcon)(rec.icon, "check");
       }
     }
   }
@@ -1099,7 +1107,7 @@ var StepManager = class {
 };
 
 // src/features/chat/questionCard.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 function formatQuestionAnswers(questions, selectedByIdx, customByIdx, t) {
   const lines = [];
   if (questions.length > 1) {
@@ -1128,7 +1136,7 @@ function renderQuestionCard(container, questions, t, onSubmit,
   const card = container.createDiv({ cls: "opencode-question-card" });
   const headerRow = card.createDiv({ cls: "opencode-question-card-header" });
   const iconSpan = headerRow.createSpan({ cls: "opencode-question-card-icon" });
-  (0, import_obsidian3.setIcon)(iconSpan, "help-circle");
+  (0, import_obsidian4.setIcon)(iconSpan, "help-circle");
   headerRow.createSpan({
     cls: "opencode-question-card-title",
     text: t("Agent question")
@@ -1159,7 +1167,7 @@ function renderQuestionCard(container, questions, t, onSubmit,
         attr: { type: "button" }
       });
       const checkSpan = btn.createSpan({ cls: "opencode-question-opt-check" });
-      (0, import_obsidian3.setIcon)(checkSpan, q.multiple ? "square" :
+      (0, import_obsidian4.setIcon)(checkSpan, q.multiple ? "square" :
         "circle");
       const textCol = btn.createDiv({ cls: "opencode-question-opt-content" });
       textCol.createDiv({
@@ -1179,12 +1187,12 @@ function renderQuestionCard(container, questions, t, onSubmit,
             selected.delete(opt.label);
             btn.removeClass("is-selected");
             checkSpan.empty();
-            (0, import_obsidian3.setIcon)(checkSpan, "square");
+            (0, import_obsidian4.setIcon)(checkSpan, "square");
           } else {
             selected.add(opt.label);
             btn.addClass("is-selected");
             checkSpan.empty();
-            (0, import_obsidian3.setIcon)(checkSpan, "check-square");
+            (0, import_obsidian4.setIcon)(checkSpan, "check-square");
           }
         } else {
           selected.clear();
@@ -1193,13 +1201,13 @@ function renderQuestionCard(container, questions, t, onSubmit,
             const c = b.querySelector(".opencode-question-opt-check");
             if (c) {
               c.empty();
-              (0, import_obsidian3.setIcon)(c, "circle");
+              (0, import_obsidian4.setIcon)(c, "circle");
             }
           }
           selected.add(opt.label);
           btn.addClass("is-selected");
           checkSpan.empty();
-          (0, import_obsidian3.setIcon)(checkSpan, "check-circle-2");
+          (0, import_obsidian4.setIcon)(checkSpan, "check-circle-2");
         }
       });
       blockBtns.push(btn);
@@ -1239,7 +1247,7 @@ function renderQuestionCard(container, questions, t, onSubmit,
       t
     );
     if (!formatted) {
-      new import_obsidian3.Notice(t(
+      new import_obsidian4.Notice(t(
         "Please select or type an answer before sending."));
       return;
     }
@@ -1258,14 +1266,14 @@ function metaWithCopy(row, label, getText, onCopy, copyTitle, iconName =
   "bot") {
   const meta = row.createDiv({ cls: "opencode-meta" });
   const iconEl = meta.createSpan({ cls: "opencode-meta-icon" });
-  (0, import_obsidian4.setIcon)(iconEl, iconName);
+  (0, import_obsidian5.setIcon)(iconEl, iconName);
   meta.createSpan({ text: label, cls: "opencode-meta-label" });
   meta.createSpan({ cls: "opencode-meta-spacer" });
   const btn = meta.createEl("button", {
     cls: "opencode-icon-btn",
     attr: { title: copyTitle }
   });
-  (0, import_obsidian4.setIcon)(btn, "copy");
+  (0, import_obsidian5.setIcon)(btn, "copy");
   btn.addEventListener("click", () => onCopy(getText()));
 }
 function renderUserBubble(container, text, ctxLabel, t, onCopy) {
@@ -1276,7 +1284,7 @@ function renderUserBubble(container, text, ctxLabel, t, onCopy) {
   if (ctxLabel) {
     const ctxHint = row.createDiv({ cls: "opencode-context-hint" });
     const ctxIcon = ctxHint.createSpan({ cls: "opencode-context-hint-icon" });
-    (0, import_obsidian4.setIcon)(ctxIcon, "file-text");
+    (0, import_obsidian5.setIcon)(ctxIcon, "file-text");
     ctxHint.createSpan({ text: `${t("with context:")} ${ctxLabel}` });
   }
   row.createDiv({ cls: "opencode-bubble", text });
@@ -1322,7 +1330,7 @@ var AssistantBubble = class {
     });
     const summary = this.reasoningEl.createEl("summary");
     const brainIcon = summary.createSpan({ cls: "opencode-reasoning-icon" });
-    (0, import_obsidian4.setIcon)(brainIcon, "brain");
+    (0, import_obsidian5.setIcon)(brainIcon, "brain");
     summary.createSpan({ text: this.t("Reasoning") });
     this.reasoningContent = this.reasoningEl.createDiv({
       cls: "opencode-reasoning-content"
@@ -1449,7 +1457,7 @@ var AssistantBubble = class {
     }
     this.contentEl.empty();
     if (this.rawText.trim()) {
-      import_obsidian4.MarkdownRenderer.render(
+      import_obsidian5.MarkdownRenderer.render(
         this.app,
         this.rawText,
         this.contentEl,
@@ -1540,7 +1548,7 @@ var AssistantBubble = class {
     if (this.rawText.trim()) {
       this.contentEl.removeClass("hidden");
       if (this.rawText.length <= 3e4) {
-        import_obsidian4.MarkdownRenderer.render(
+        import_obsidian5.MarkdownRenderer.render(
           this.app,
           this.rawText,
           this.contentEl,
@@ -1569,7 +1577,7 @@ var AssistantBubble = class {
 };
 
 // src/features/chat/suggestPopup.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 var MAX_SUGGEST = 50;
 var SuggestPopup = class {
   constructor(container, inputEl, app, plugin, cb) {
@@ -1942,7 +1950,7 @@ var SuggestPopup = class {
       const row = this.suggestEl.createDiv({ cls: "opencode-suggest-item" });
       if (it.icon) {
         const iconEl = row.createSpan({ cls: "opencode-suggest-icon" });
-        (0, import_obsidian5.setIcon)(iconEl, it.icon);
+        (0, import_obsidian6.setIcon)(iconEl, it.icon);
       }
       const textCol = row.createDiv({ cls: "opencode-suggest-content" });
       textCol.createDiv({ text: it.label, cls: "opencode-suggest-label" });
@@ -1982,7 +1990,7 @@ var SuggestPopup = class {
 };
 
 // src/features/chat/attachmentManager.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 var import_promises = require("fs/promises");
 var DOC_RE = /\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|epub|html?)$/i;
 var AttachmentManager = class {
@@ -2009,7 +2017,7 @@ var AttachmentManager = class {
     this.attachments.push({ path, label: path, image: isImage });
     this.updateBar();
     if (isImage) {
-      new import_obsidian6.Notice(
+      new import_obsidian7.Notice(
         this.plugin.t(
             "Image attached: check that the selected model supports images " +
             "(vision)."
@@ -2032,7 +2040,7 @@ var AttachmentManager = class {
       } catch (e) {
         const errMsg = e.message;
         const failLabel = this.plugin.t("anydoc conversion failed");
-        new import_obsidian6.Notice(`${failLabel}: ${a.label} (${errMsg})`);
+        new import_obsidian7.Notice(`${failLabel}: ${a.label} (${errMsg})`);
         const maxMB = this.plugin.settings.maxAttachMB || 20;
         try {
           if (abs) {
@@ -2041,7 +2049,7 @@ var AttachmentManager = class {
               const skipKey = 
                 "Attachment skipped: the file is larger than $1 MB and " +
                 "could not be converted, so it was not attached.";
-              new import_obsidian6.Notice(substitute(this.plugin.t(skipKey),
+              new import_obsidian7.Notice(substitute(this.plugin.t(skipKey),
                 maxMB));
               return null;
             }
@@ -2056,7 +2064,7 @@ var AttachmentManager = class {
   }
   resolveVaultFile(relPath) {
     const adapter = this.app.vault.adapter;
-    if (adapter instanceof import_obsidian6.FileSystemAdapter) {
+    if (adapter instanceof import_obsidian7.FileSystemAdapter) {
       return adapter.getFullPath(relPath);
     }
     return null;
@@ -2073,10 +2081,10 @@ var AttachmentManager = class {
         cls: "opencode-attachment-chip"
       });
       const icon = chip.createSpan({ cls: "opencode-attachment-icon" });
-      (0, import_obsidian6.setIcon)(icon, a.image ? "image" : "file-text");
+      (0, import_obsidian7.setIcon)(icon, a.image ? "image" : "file-text");
       chip.createSpan({ text: a.label, cls: "opencode-attachment-label" });
       const rm = chip.createEl("button", { cls: "opencode-icon-btn" });
-      (0, import_obsidian6.setIcon)(rm, "x");
+      (0, import_obsidian7.setIcon)(rm, "x");
       rm.addEventListener("click", () => {
         this.attachments = this.attachments.filter((x) => x.path !== a.path);
         this.updateBar();
@@ -2085,9 +2093,83 @@ var AttachmentManager = class {
   }
 };
 
+// src/features/chat/sessionControls.ts
+async function fetchDisplayedSessions(plugin, viewSession, fallbackEngine) {
+  const providers = plugin.registry.getAll();
+  const results = await Promise.allSettled(
+    providers.map((p) => p.listSessions())
+  );
+  const all = [];
+  const seen = /* @__PURE__ */ new Set();
+  results.forEach((res, i) => {
+    if (res.status === "fulfilled") {
+      const providerId = providers[i].id;
+      for (const s of res.value) {
+        if (!seen.has(s.id)) {
+          seen.add(s.id);
+          const engine = s.engine || providerId;
+          all.push({ ...s, engine });
+          if (!plugin.settings.sessionEngines) {
+            plugin.settings.sessionEngines = {};
+          }
+          if (!plugin.settings.sessionEngines[s.id]) {
+            plugin.settings.sessionEngines[s.id] = engine;
+          }
+        }
+      }
+    }
+  });
+  all.sort((a, b) => (b.updated ?? 0) - (a.updated ?? 0));
+  const pinnedSet = new Set(plugin.settings.pinned ?? []);
+  const pinned = all.filter((s) => pinnedSet.has(s.id));
+  const recent = all.filter((s) => !pinnedSet.has(s.id)).slice(0, 20);
+  const displayed = [...pinned, ...recent];
+  const hasActive = displayed.some((s) => s.id === viewSession);
+  if (viewSession && !hasActive) {
+    const found = all.find((s) => s.id === viewSession);
+    if (found) {
+      displayed.push(found);
+    } else {
+      const hist = plugin.getHistory(viewSession);
+      const firstUser = hist.find(
+        (m) => m.role === "user" && m.text.trim()
+      );
+      const fallbackTitle = firstUser ?
+        firstUser.text.trim().replace(/\s+/g, " ").slice(0, 40) : viewSession;
+      displayed.push({
+        id: viewSession,
+        title: fallbackTitle,
+        updated: Date.now(),
+        engine: fallbackEngine
+      });
+    }
+  }
+  return displayed;
+}
+function buildLocalContinuationPrompt(plugin, sessionId, assistantLabel) {
+  const history = plugin.getHistory(sessionId);
+  const recent = history.slice(-24);
+  if (recent.length === 0) {
+    return plugin.t(
+      "The previous session has no saved history. Continue the work from here."
+    );
+  }
+  const lines = [];
+  for (const rec of recent) {
+    const who = rec.role === "user" ? plugin.t("User") : assistantLabel;
+    const text = rec.text.length > 800 ? rec.text.slice(0, 800) + "…" :
+      rec.text;
+    lines.push(`${who}: ${text}`);
+  }
+  return plugin.t("[RECENT HISTORY OF THE PREVIOUS SESSION]") + "\n" +
+    lines.join("\n\n") + "\n\n---\n\n" + plugin.t(
+    "Continue the work from here, keeping the context above in mind."
+  );
+}
+
 // src/features/chat/view.ts
 var CHAT_VIEW_TYPE = "opencode-chat-view";
-var ChatView = class extends import_obsidian7.ItemView {
+var ChatView = class extends import_obsidian8.ItemView {
   plugin;
   messagesEl;
   inputEl;
@@ -2219,7 +2301,7 @@ var ChatView = class extends import_obsidian7.ItemView {
     void this.populateSessionSelect();
     this.loadHistoryForSession("");
     if (!silent) {
-      new import_obsidian7.Notice(
+      new import_obsidian8.Notice(
         this.plugin.t("New session: the next message will start from scratch.")
       );
     }
@@ -2233,7 +2315,7 @@ var ChatView = class extends import_obsidian7.ItemView {
       cls: "opencode-icon-btn hidden",
       attr: { title: this.plugin.t("Remove the attached context") }
     });
-    (0, import_obsidian7.setIcon)(this.contextClearBtn, "x");
+    (0, import_obsidian8.setIcon)(this.contextClearBtn, "x");
     this.contextClearBtn.addEventListener("click", () => {
       this.context = null;
       this.updateContextBar();
@@ -2256,13 +2338,13 @@ var ChatView = class extends import_obsidian7.ItemView {
       cls: "opencode-icon-btn",
       attr: { title: this.plugin.t("Pin/Unpin session") }
     });
-    (0, import_obsidian7.setIcon)(this.pinBtn, "pin");
+    (0, import_obsidian8.setIcon)(this.pinBtn, "pin");
     this.pinBtn.addEventListener("click", () => this.togglePin());
     this.renameBtn = this.contextBar.createEl("button", {
       cls: "opencode-icon-btn",
       attr: { title: this.plugin.t("Rename session") }
     });
-    (0, import_obsidian7.setIcon)(this.renameBtn, "pencil");
+    (0, import_obsidian8.setIcon)(this.renameBtn, "pencil");
     this.renameBtn.addEventListener(
       "click",
       () => this.renameCurrentSession()
@@ -2271,7 +2353,7 @@ var ChatView = class extends import_obsidian7.ItemView {
       cls: "opencode-icon-btn",
       attr: { title: this.plugin.t("Delete session") }
     });
-    (0, import_obsidian7.setIcon)(this.deleteBtn, "trash");
+    (0, import_obsidian8.setIcon)(this.deleteBtn, "trash");
     this.deleteBtn.addEventListener(
       "click",
       () => this.deleteCurrentSession()
@@ -2280,7 +2362,7 @@ var ChatView = class extends import_obsidian7.ItemView {
       cls: "opencode-icon-btn",
       attr: { title: this.plugin.t("Token and cost statistics") }
     });
-    (0, import_obsidian7.setIcon)(statsBtn, "bar-chart-3");
+    (0, import_obsidian8.setIcon)(statsBtn, "bar-chart-3");
     statsBtn.addEventListener(
       "click",
       () => new StatsModal(this.app, this.plugin, this.sessionEngine()).open()
@@ -2289,7 +2371,7 @@ var ChatView = class extends import_obsidian7.ItemView {
       cls: "opencode-add-note-btn"
     });
     const attachIcon = attachBtn.createSpan({ cls: "opencode-btn-icon" });
-    (0, import_obsidian7.setIcon)(attachIcon, "paperclip");
+    (0, import_obsidian8.setIcon)(attachIcon, "paperclip");
     attachBtn.createSpan({ text: this.plugin.t("Attach file") });
     attachBtn.addEventListener(
       "click",
@@ -2299,7 +2381,7 @@ var ChatView = class extends import_obsidian7.ItemView {
       cls: "opencode-add-note-btn"
     });
     const addIcon = add.createSpan({ cls: "opencode-btn-icon" });
-    (0, import_obsidian7.setIcon)(addIcon, "file-plus");
+    (0, import_obsidian8.setIcon)(addIcon, "file-plus");
     add.createSpan({ text: this.plugin.t("Current note") });
     add.addEventListener("click", () => this.attachCurrentNote());
     this.updateContextBar();
@@ -2307,7 +2389,7 @@ var ChatView = class extends import_obsidian7.ItemView {
   togglePin() {
     const id = this.viewSession;
     if (!id) {
-      new import_obsidian7.Notice(this.plugin.t("Select a session to pin."));
+      new import_obsidian8.Notice(this.plugin.t("Select a session to pin."));
       return;
     }
     const pinned = this.plugin.settings.pinned ?? [];
@@ -2319,29 +2401,29 @@ var ChatView = class extends import_obsidian7.ItemView {
     void this.populateSessionSelect();
     const msg = idx >= 0 ? this.plugin.t("Session unpinned.") :
       this.plugin.t("Session pinned.");
-    new import_obsidian7.Notice(msg);
+    new import_obsidian8.Notice(msg);
   }
   renameCurrentSession() {
     const id = this.viewSession;
     if (!id) {
-      new import_obsidian7.Notice(this.plugin.t("Select a session to rename."));
+      new import_obsidian8.Notice(this.plugin.t("Select a session to rename."));
       return;
     }
     const current = this.sessionSelect.selectedOptions[0]?.textContent ?? id;
     new RenameModal(this.app, this.plugin, current, (newTitle) => {
       this.getRunner().renameSession(id, newTitle).then(() => {
         void this.populateSessionSelect();
-        new import_obsidian7.Notice(this.plugin.t("Session renamed."));
+        new import_obsidian8.Notice(this.plugin.t("Session renamed."));
       }).catch(
         (e) =>
-          new import_obsidian7.Notice(`${this.plugin.t("Error:")} ${e.message}`)
+          new import_obsidian8.Notice(`${this.plugin.t("Error:")} ${e.message}`)
       );
     }).open();
   }
   deleteCurrentSession() {
     const id = this.viewSession;
     if (!id) {
-      new import_obsidian7.Notice(this.plugin.t("Select a session to delete."));
+      new import_obsidian8.Notice(this.plugin.t("Select a session to delete."));
       return;
     }
     const title = this.sessionSelect.selectedOptions[0]?.textContent ?? id;
@@ -2372,10 +2454,10 @@ var ChatView = class extends import_obsidian7.ItemView {
           await this.plugin.saveSettings();
           await this.populateSessionSelect();
           this.loadHistoryForSession(this.viewSession);
-          new import_obsidian7.Notice(this.plugin.t("Session deleted."));
+          new import_obsidian8.Notice(this.plugin.t("Session deleted."));
         }).catch(
           (e) =>
-            new import_obsidian7.Notice(
+            new import_obsidian8.Notice(
               `${this.plugin.t("Error:")} ${e.message}`)
         );
       }
@@ -2402,56 +2484,12 @@ var ChatView = class extends import_obsidian7.ItemView {
     newOpt.value = "";
     newOpt.textContent = "＋ " + this.plugin.t("New session");
     try {
-      const providers = this.plugin.registry.getAll();
-      const results = await Promise.allSettled(
-        providers.map((p) => p.listSessions())
+      const displayed = await fetchDisplayedSessions(
+        this.plugin,
+        this.viewSession,
+        this.sessionEngine()
       );
-      const all = [];
-      const seen = /* @__PURE__ */ new Set();
-      results.forEach((res, i) => {
-        if (res.status === "fulfilled") {
-          const providerId = providers[i].id;
-          for (const s of res.value) {
-            if (!seen.has(s.id)) {
-              seen.add(s.id);
-              const engine = s.engine || providerId;
-              all.push({ ...s, engine });
-              if (!this.plugin.settings.sessionEngines) {
-                this.plugin.settings.sessionEngines = {};
-              }
-              if (!this.plugin.settings.sessionEngines[s.id]) {
-                this.plugin.settings.sessionEngines[s.id] = engine;
-              }
-            }
-          }
-        }
-      });
-      all.sort((a, b) => (b.updated ?? 0) - (a.updated ?? 0));
       const pinnedSet = new Set(this.plugin.settings.pinned ?? []);
-      const pinned = all.filter((s) => pinnedSet.has(s.id));
-      const recent = all.filter((s) => !pinnedSet.has(s.id)).slice(0, 20);
-      const displayed = [...pinned, ...recent];
-      const hasActive = displayed.some((s) => s.id === this.viewSession);
-      if (this.viewSession && !hasActive) {
-        const found = all.find((s) => s.id === this.viewSession);
-        if (found) {
-          displayed.push(found);
-        } else {
-          const hist = this.plugin.getHistory(this.viewSession);
-          const firstUser = hist.find(
-            (m) => m.role === "user" && m.text.trim()
-          );
-          const fallbackTitle = firstUser ?
-            firstUser.text.trim().replace(/\s+/g, " ").slice(0, 40) :
-              this.viewSession;
-          displayed.push({
-            id: this.viewSession,
-            title: fallbackTitle,
-            updated: Date.now(),
-            engine: this.sessionEngine()
-          });
-        }
-      }
       for (const s of displayed) {
         const o = sel.createEl("option");
         o.value = s.id;
@@ -2570,13 +2608,13 @@ var ChatView = class extends import_obsidian7.ItemView {
   async attachCurrentNote() {
     const file = this.app.workspace.getActiveFile();
     if (!file) {
-      new import_obsidian7.Notice(this.plugin.t("No active note"));
+      new import_obsidian8.Notice(this.plugin.t("No active note"));
       return;
     }
     const content = await this.app.vault.cachedRead(file);
     this.context = { label: file.path, content };
     this.updateContextBar();
-    new import_obsidian7.Notice(this.plugin.t("Note added to context."));
+    new import_obsidian8.Notice(this.plugin.t("Note added to context."));
   }
   buildInputArea(container) {
     const inputArea = container.createDiv({ cls: "opencode-input-area" });
@@ -2634,12 +2672,12 @@ var ChatView = class extends import_obsidian7.ItemView {
     buttons.createSpan({ cls: "opencode-buttons-spacer" });
     this.sendBtn = buttons.createEl("button", { cls: "opencode-send-btn" });
     const sendIcon = this.sendBtn.createSpan({ cls: "opencode-btn-icon" });
-    (0, import_obsidian7.setIcon)(sendIcon, "send");
+    (0, import_obsidian8.setIcon)(sendIcon, "send");
     this.sendBtn.createSpan({ text: this.plugin.t("Send") });
     this.sendBtn.addEventListener("click", () => void this.send());
     this.stopBtn = buttons.createEl("button", { cls: "opencode-stop-btn" });
     const stopIcon = this.stopBtn.createSpan({ cls: "opencode-btn-icon" });
-    (0, import_obsidian7.setIcon)(stopIcon, "square");
+    (0, import_obsidian8.setIcon)(stopIcon, "square");
     this.stopBtn.createSpan({ text: this.plugin.t("Stop") });
     this.stopBtn.addClass("hidden");
     this.stopBtn.addEventListener("click", () => {
@@ -2666,13 +2704,13 @@ var ChatView = class extends import_obsidian7.ItemView {
     if (this.agentBtn) {
       this.agentBtn.empty();
       const iconEl = this.agentBtn.createSpan({ cls: "opencode-chip-icon" });
-      (0, import_obsidian7.setIcon)(iconEl, provider?.descriptor.icon || "bot");
+      (0, import_obsidian8.setIcon)(iconEl, provider?.descriptor.icon || "bot");
       this.agentBtn.createSpan({
         text: this.plugin.t(shortName),
         cls: "opencode-chip-text"
       });
       const chevEl = this.agentBtn.createSpan({ cls: "opencode-chip-chevron" });
-      (0, import_obsidian7.setIcon)(chevEl, "chevron-down");
+      (0, import_obsidian8.setIcon)(chevEl, "chevron-down");
       this.agentBtn.setAttribute(
         "title",
         `${this.plugin.t("AI Engine")}: ${this.engineLabel(engine)}`
@@ -2681,7 +2719,7 @@ var ChatView = class extends import_obsidian7.ItemView {
     if (this.modelBtn) {
       this.modelBtn.empty();
       const iconEl = this.modelBtn.createSpan({ cls: "opencode-chip-icon" });
-      (0, import_obsidian7.setIcon)(iconEl, "cpu");
+      (0, import_obsidian8.setIcon)(iconEl, "cpu");
       const slashIdx = m.indexOf("/");
       const shortModel = m && slashIdx > 0 ? m.slice(slashIdx + 1) : m ||
         this.plugin.t("Default");
@@ -2699,7 +2737,7 @@ var ChatView = class extends import_obsidian7.ItemView {
         cls: "opencode-chip-text"
       });
       const chevEl = this.modelBtn.createSpan({ cls: "opencode-chip-chevron" });
-      (0, import_obsidian7.setIcon)(chevEl, "chevron-down");
+      (0, import_obsidian8.setIcon)(chevEl, "chevron-down");
       this.modelBtn.setAttribute(
         "title",
         `${this.plugin.t("Model")}: ${m || this.plugin.t("(CLI default)")}`
@@ -2738,7 +2776,7 @@ var ChatView = class extends import_obsidian7.ItemView {
         this.contextLimit = 0;
         void this.refreshContext();
       }
-      new import_obsidian7.Notice(
+      new import_obsidian8.Notice(
         `${this.plugin.t("AI Engine")}: ${item.shortName} (${item.activeModel || this.plugin.t("default")})`
       );
     }).open();
@@ -2808,23 +2846,23 @@ var ChatView = class extends import_obsidian7.ItemView {
           void this.refreshContext();
           const shownModel = item.label || item.id;
           const setPrefix = this.plugin.t("Model set:");
-          new import_obsidian7.Notice(
+          new import_obsidian8.Notice(
             `${setPrefix} ${shownModel} (${item.provider})`);
         }
       ).open();
     } catch (e) {
-      new import_obsidian7.Notice(`${this.plugin.t("Error:")} ${e.message}`);
+      new import_obsidian8.Notice(`${this.plugin.t("Error:")} ${e.message}`);
     }
   }
   continueInNewSession() {
     if (this.running) {
-      new import_obsidian7.Notice(this.plugin.t(
+      new import_obsidian8.Notice(this.plugin.t(
         "There is already a request in progress."));
       return;
     }
     const oldSession = this.viewSession;
     if (!oldSession) {
-      new import_obsidian7.Notice(this.plugin.t(
+      new import_obsidian8.Notice(this.plugin.t(
         "Select first the session to summarize."));
       return;
     }
@@ -2922,28 +2960,13 @@ var ChatView = class extends import_obsidian7.ItemView {
     this.loadHistoryForSession("");
     this.inputEl.value = prompt;
     this.inputEl.focus();
-    new import_obsidian7.Notice(notice);
+    new import_obsidian8.Notice(notice);
   }
   buildLocalContinuation(sessionId) {
-    const history = this.plugin.getHistory(sessionId);
-    const recent = history.slice(-24);
-    if (recent.length === 0) {
-      return this.plugin.t(
-          "The previous session has no saved history. Continue the work " +
-          "from here."
-      );
-    }
-    const assistantWho = this.assistantLabel();
-    const lines = [];
-    for (const rec of recent) {
-      const who = rec.role === "user" ? this.plugin.t("User") : assistantWho;
-      const text = rec.text.length > 800 ? rec.text.slice(0, 800) + "…" :
-        rec.text;
-      lines.push(`${who}: ${text}`);
-    }
-    return this.plugin.t("[RECENT HISTORY OF THE PREVIOUS SESSION]") + "\n" +
-      lines.join("\n\n") + "\n\n---\n\n" + this.plugin.t(
-      "Continue the work from here, keeping the context above in mind."
+    return buildLocalContinuationPrompt(
+      this.plugin,
+      sessionId,
+      this.assistantLabel()
     );
   }
   addWelcome() {
@@ -3002,7 +3025,7 @@ ${this.context.content}
       this.doRun(prompt, filePaths);
     } catch (e) {
       this.dispatching = false;
-      new import_obsidian7.Notice(`${this.plugin.t("Error:")} ${e.message}`);
+      new import_obsidian8.Notice(`${this.plugin.t("Error:")} ${e.message}`);
     }
   }
   doRun(prompt, fileAttachments) {
@@ -3212,7 +3235,7 @@ ${this.context.content}
   }
   copyText(text) {
     void navigator.clipboard.writeText(text);
-    new import_obsidian7.Notice(this.plugin.t("Text copied."));
+    new import_obsidian8.Notice(this.plugin.t("Text copied."));
   }
   handleStreamError(err) {
     const isImageError = /does not support image/i.test(err) ||
@@ -3295,7 +3318,7 @@ ${this.context.content}
           const summary = det.createEl("summary");
           const brainIcon =
             summary.createSpan({ cls: "opencode-reasoning-icon" });
-          (0, import_obsidian7.setIcon)(brainIcon, "brain");
+          (0, import_obsidian8.setIcon)(brainIcon, "brain");
           summary.createSpan({ text: this.plugin.t("Reasoning") });
           det.createDiv({
             cls: "opencode-reasoning-content",
@@ -3306,7 +3329,7 @@ ${this.context.content}
           cls: "opencode-bubble opencode-bubble--assistant"
         });
         if (rec.text.length <= 3e4) {
-          import_obsidian7.MarkdownRenderer.render(this.app, rec.text, bubble,
+          import_obsidian8.MarkdownRenderer.render(this.app, rec.text, bubble,
             "", this);
         } else {
           bubble.textContent = rec.text;
@@ -6309,8 +6332,8 @@ var ProviderRegistry = class {
 };
 
 // src/features/settings/settingsTab.ts
-var import_obsidian8 = require("obsidian");
-var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
+var import_obsidian9 = require("obsidian");
+var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
   plugin;
   constructor(app, plugin) {
     super(app, plugin);
@@ -6321,7 +6344,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
     const t = (s) => this.plugin.t(s);
     containerEl.empty();
     containerEl.createEl("h2", { text: "Vault Agents" });
-    new import_obsidian8.Setting(containerEl).setName(t("Language")).setDesc(
+    new import_obsidian9.Setting(containerEl).setName(t("Language")).setDesc(
       t(
           "Interface language. English is the default. Some command names " +
           "update after reloading Obsidian."
@@ -6333,7 +6356,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
             async (value) => {
         this.plugin.settings.language = value;
         await this.plugin.saveSettings();
-        new import_obsidian8.Notice(
+        new import_obsidian9.Notice(
           t("Language changed. Reload Obsidian to apply it everywhere.")
         );
         this.display();
@@ -6345,7 +6368,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
     );
     const activeDesc = activeProvider.descriptor;
     const activeCfg = this.plugin.getEngineConfig(activeDesc.id);
-    new import_obsidian8.Setting(containerEl).setName(t("AI Engine")).setDesc(
+    new import_obsidian9.Setting(containerEl).setName(t("AI Engine")).setDesc(
       t(
           "Select which AI backend to use. Antigravity connects directly to " +
           "your Google AI Pro subscription with no API key needed."
@@ -6370,7 +6393,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
     );
     containerEl.createEl("h3", { text: sectionTitle });
     const binSetting =
-      new import_obsidian8.Setting(containerEl).setName(t("Binary path"))
+      new import_obsidian9.Setting(containerEl).setName(t("Binary path"))
         .setDesc(t(activeDesc.binaryDesc)).addText(
       (text) =>
         text.setPlaceholder(activeDesc.defaultBinary).setValue(activeCfg.binary)
@@ -6396,7 +6419,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
       activeDesc.shortName
     );
     const modelSetting =
-      new import_obsidian8.Setting(containerEl).setName(t("Model")).setDesc(t(
+      new import_obsidian9.Setting(containerEl).setName(t("Model")).setDesc(t(
         activeDesc.modelDesc));
     const badgeEl = modelSetting.controlEl.createSpan({
       cls: "opencode-settings-model-badge" + (curModel ? "" : " is-default"),
@@ -6421,7 +6444,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
     }
     for (const opt of activeDesc.options) {
       const setting =
-        new import_obsidian8.Setting(containerEl).setName(t(opt.label)).setDesc(
+        new import_obsidian9.Setting(containerEl).setName(t(opt.label)).setDesc(
           t(opt.desc));
       if (opt.type === "select" && opt.choices) {
         setting.addDropdown((dd) => {
@@ -6454,16 +6477,16 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
       t("$1 found:"),
       t(activeDesc.shortName)
     );
-    new import_obsidian8.Setting(containerEl).setName(t("Test connection"))
+    new import_obsidian9.Setting(containerEl).setName(t("Test connection"))
       .setDesc(testDesc).addButton(
       (btn) => btn.setButtonText(t("Test")).onClick(async () => {
         btn.setDisabled(true);
         btn.setButtonText(t("Testing..."));
         try {
           const version = await activeProvider.getVersion();
-          new import_obsidian8.Notice(`${foundPrefix} ${version}`);
+          new import_obsidian9.Notice(`${foundPrefix} ${version}`);
         } catch (e) {
-          new import_obsidian8.Notice(`${t("Error:")} ${e.message}`);
+          new import_obsidian9.Notice(`${t("Error:")} ${e.message}`);
         } finally {
           btn.setDisabled(false);
           btn.setButtonText(t("Test"));
@@ -6471,7 +6494,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: t("General settings") });
-    new import_obsidian8.Setting(containerEl).setName(t(
+    new import_obsidian9.Setting(containerEl).setName(t(
       "Auto-approve permissions")).setDesc(
       t(
           "Automatically allow tool permissions (bash, file edits, etc.). " +
@@ -6485,7 +6508,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian8.Setting(containerEl).setName(t("Show reasoning"))
+    new import_obsidian9.Setting(containerEl).setName(t("Show reasoning"))
       .setDesc(t("Show the model's reasoning blocks.")).addToggle(
       (toggle) =>
         toggle.setValue(this.plugin.settings.showThinking).onChange(
@@ -6494,7 +6517,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian8.Setting(containerEl).setName(t("Show tool details"))
+    new import_obsidian9.Setting(containerEl).setName(t("Show tool details"))
       .setDesc(
       t(
           "Show the input and output of every tool executed during the " +
@@ -6508,7 +6531,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian8.Setting(containerEl).setName(t("Session ID")).setDesc(
+    new import_obsidian9.Setting(containerEl).setName(t("Session ID")).setDesc(
       t(
           "The persistent session id used for the chat. Managed " +
           "automatically. Empty = new session on next message."
@@ -6521,7 +6544,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian8.Setting(containerEl).setName(t("Reset session"))
+    new import_obsidian9.Setting(containerEl).setName(t("Reset session"))
       .setDesc(
       t(
         "Clear the saved session and start from scratch on the next message."
@@ -6530,13 +6553,13 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
       (btn) => btn.setButtonText(t("Reset")).onClick(async () => {
         this.plugin.settings.sessionId = "";
         await this.plugin.saveSettings();
-        new import_obsidian8.Notice(
+        new import_obsidian9.Notice(
           t("Session reset: the next message will start from a new session.")
         );
       })
     );
     containerEl.createEl("h3", { text: t("Document conversion") });
-    new import_obsidian8.Setting(containerEl).setName(t(
+    new import_obsidian9.Setting(containerEl).setName(t(
       "Convert documents with anydoc")).setDesc(
       t(
           "Run anydoc on attached documents (PDF, Word, Excel, etc.) and " +
@@ -6550,7 +6573,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian8.Setting(containerEl).setName(t("Anydoc binary path"))
+    new import_obsidian9.Setting(containerEl).setName(t("Anydoc binary path"))
       .setDesc(
       t(
           "Command or full path to the anydoc executable (npm install -g " +
@@ -6566,7 +6589,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
     );
     if (activeDesc.supportsDbCleanup && activeProvider.pruneOversizedParts) {
       containerEl.createEl("h3", { text: t("Database self-cleanup") });
-      new import_obsidian8.Setting(containerEl).setName(t(
+      new import_obsidian9.Setting(containerEl).setName(t(
         "Enable automatic cleanup")).setDesc(
         t(
             "Periodically remove large file attachments from the opencode " +
@@ -6582,7 +6605,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian8.Setting(containerEl).setName(t("Max part size (MB)"))
+      new import_obsidian9.Setting(containerEl).setName(t("Max part size (MB)"))
         .setDesc(
         t("File attachments larger than this (in the database) are removed.")
       ).addText(
@@ -6595,7 +6618,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian8.Setting(containerEl).setName(t("Minimum age (days)"))
+      new import_obsidian9.Setting(containerEl).setName(t("Minimum age (days)"))
         .setDesc(
         t(
             "Only attachments older than this are removed, so recent files " +
@@ -6611,7 +6634,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian8.Setting(containerEl).setName(t(
+      new import_obsidian9.Setting(containerEl).setName(t(
         "Max attachment size (MB)")).setDesc(
         t(
             "When anydoc fails to convert a document, files larger than " +
@@ -6628,7 +6651,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian8.Setting(containerEl).setName(t("Run cleanup now"))
+      new import_obsidian9.Setting(containerEl).setName(t("Run cleanup now"))
         .setDesc(
         t("Remove oversized file attachments immediately, regardless of age.")
       ).addButton(
@@ -6637,9 +6660,9 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
           btn.setButtonText(t("Cleaning..."));
           try {
             await activeProvider.pruneOversizedParts?.(true, true);
-            new import_obsidian8.Notice(t("Cleanup done."));
+            new import_obsidian9.Notice(t("Cleanup done."));
           } catch (e) {
-            new import_obsidian8.Notice(`${t("Error:")} ${e.message}`);
+            new import_obsidian9.Notice(`${t("Error:")} ${e.message}`);
           } finally {
             btn.setDisabled(false);
             btn.setButtonText(t("Cleanup"));
@@ -6659,7 +6682,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
     for (let i = 0; i < prompts.length; i++) {
       const p = prompts[i];
       const desc = p.text.length > 90 ? p.text.slice(0, 87) + "…" : p.text;
-      const s = new import_obsidian8.Setting(containerEl).setName(p.name ||
+      const s = new import_obsidian9.Setting(containerEl).setName(p.name ||
         t("(untitled)")).setDesc(desc);
       s.addButton(
         (b) => b.setButtonText(t("Edit")).onClick(() => this.editPrompt(i))
@@ -6673,7 +6696,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
         })
       );
     }
-    new import_obsidian8.Setting(containerEl).addButton(
+    new import_obsidian9.Setting(containerEl).addButton(
       (b) => b.setButtonText(t("Add prompt")).setCta().onClick(() =>
         this.editPrompt(-1))
     );
@@ -6750,7 +6773,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
         await this.plugin.saveSettings();
         this.display();
         const shownModel = item.label || item.id;
-        new import_obsidian8.Notice(
+        new import_obsidian9.Notice(
           `${t("Model set:")} ${shownModel} (${item.provider})`);
       }
     ).open();
@@ -6758,7 +6781,7 @@ var VaultAgentsSettingTab = class extends import_obsidian8.PluginSettingTab {
 };
 
 // src/main.ts
-var OpencodePlugin = class extends import_obsidian9.Plugin {
+var OpencodePlugin = class extends import_obsidian10.Plugin {
   settings;
   histories = {};
   registry;
@@ -6777,7 +6800,7 @@ var OpencodePlugin = class extends import_obsidian9.Plugin {
   }
   getVaultPath() {
     const adapter = this.app.vault.adapter;
-    if (adapter instanceof import_obsidian9.FileSystemAdapter) {
+    if (adapter instanceof import_obsidian10.FileSystemAdapter) {
       return adapter.getBasePath();
     }
     return null;
@@ -6828,7 +6851,7 @@ var OpencodePlugin = class extends import_obsidian9.Plugin {
       editorCallback: (editor, view) => {
         const selection = editor.getSelection();
         if (!selection.trim()) {
-          new import_obsidian9.Notice(t("No text selected"));
+          new import_obsidian10.Notice(t("No text selected"));
           return;
         }
         const label = view.file ? view.file.path : "selection";
@@ -6844,7 +6867,7 @@ var OpencodePlugin = class extends import_obsidian9.Plugin {
       callback: async () => {
         const file = this.app.workspace.getActiveFile();
         if (!file) {
-          new import_obsidian9.Notice(t("No active note"));
+          new import_obsidian10.Notice(t("No active note"));
           return;
         }
         const content = await this.app.vault.cachedRead(file);
@@ -6859,7 +6882,7 @@ var OpencodePlugin = class extends import_obsidian9.Plugin {
       callback: async () => {
         const file = this.app.workspace.getActiveFile();
         if (!file) {
-          new import_obsidian9.Notice(t("No active note"));
+          new import_obsidian10.Notice(t("No active note"));
           return;
         }
         const content = await this.app.vault.cachedRead(file);
@@ -6880,7 +6903,7 @@ var OpencodePlugin = class extends import_obsidian9.Plugin {
       callback: async () => {
         this.settings.sessionId = "";
         await this.saveSettings();
-        new import_obsidian9.Notice(t("Session reset."));
+        new import_obsidian10.Notice(t("Session reset."));
       }
     });
     this.addSettingTab(new VaultAgentsSettingTab(this.app, this));
