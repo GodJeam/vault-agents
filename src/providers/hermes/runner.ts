@@ -141,6 +141,37 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
       // ignore
     }
 
+    // 2. Read live probed models from ~/.hermes/provider_models_cache.json
+    // (e.g. custom OpenAI-compatible endpoints like OpenCode Go)
+    try {
+      const provCachePath = join(
+        homedir(),
+        ".hermes",
+        "provider_models_cache.json"
+      );
+      if (existsSync(provCachePath)) {
+        const parsed = JSON.parse(readFileSync(provCachePath, "utf-8")) as Record<
+          string,
+          { models?: string[]; fallback?: boolean }
+        >;
+        // Prioritize non-fallback (live probed custom/endpoint) models first
+        const entries = Object.entries(parsed);
+        entries.sort(([, a], [, b]) =>
+          (a.fallback ? 1 : 0) - (b.fallback ? 1 : 0)
+        );
+        for (const [, entry] of entries) {
+          for (const m of entry.models || []) {
+            if (typeof m === "string") {
+              addModel(m);
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. Read Hermes static/curated catalog from ~/.hermes/cache/model_catalog.json
     try {
       const catalogPath = join(
         homedir(),
@@ -216,8 +247,41 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
     }
   }
 
+  private readConfiguredDefaultModel(): string {
+    try {
+      const cfgPath = join(homedir(), ".hermes", "config.yaml");
+      if (existsSync(cfgPath)) {
+        const raw = readFileSync(cfgPath, "utf-8");
+        const modelSection = raw.match(
+          /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
+        );
+        if (modelSection) {
+          const defMatch = modelSection[0].match(
+            /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
+          );
+          if (defMatch && defMatch[1]) {
+            return defMatch[1].trim();
+          }
+        }
+        const topMatch = raw.match(
+          /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
+        );
+        if (topMatch && topMatch[1]) {
+          return topMatch[1].trim();
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return "";
+  }
+
   async getModelContextLimit(model: string): Promise<number> {
-    return this.estimateModelContextLimit(model, 128_000);
+    const effective =
+      model.trim() ||
+      this.getConfig().model.trim() ||
+      this.readConfiguredDefaultModel();
+    return this.estimateModelContextLimit(effective, 256_000);
   }
 
   async getSessionTokens(

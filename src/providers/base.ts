@@ -520,11 +520,63 @@ export abstract class BaseCliRunner {
     defaultLimit = 128_000
   ): number {
     const m = (model || "").toLowerCase();
+    if (
+      m.includes("deepseek-v4") ||
+      m.includes("deepseek-flash") ||
+      m.includes("deepseek-chat") ||
+      m.includes("deepseek-reasoner")
+    ) {
+      return 1_000_000;
+    }
     if (m.includes("gemini")) return 1_048_576; // 1M tokens
+    if (
+      m.includes("claude-fable") ||
+      m.includes("claude-opus-5") ||
+      m.includes("claude-sonnet-5") ||
+      m.includes("claude-opus-4-8") ||
+      m.includes("claude-opus-4.8") ||
+      m.includes("claude-opus-4-6") ||
+      m.includes("claude-opus-4.6") ||
+      m.includes("claude-sonnet-4-6") ||
+      m.includes("claude-sonnet-4.6") ||
+      m.includes("claude-haiku-5")
+    ) {
+      return 1_000_000;
+    }
     if (m.includes("claude")) return 200_000; // 200K tokens
+    if (
+      m.includes("gpt-6") ||
+      m.includes("gpt-5.6") ||
+      m.includes("gpt-5.5") ||
+      (m.includes("gpt-5.4") && !m.includes("mini") && !m.includes("nano"))
+    ) {
+      return 1_050_000;
+    }
     if (m.includes("gpt-5") || m.includes("codex")) return 256_000;
+    if (m.includes("gpt-4.1")) return 1_047_576;
     if (m.includes("o3") || m.includes("o4") || m.includes("gpt-4")) {
       return 200_000;
+    }
+    if (
+      m.includes("glm-5.3") ||
+      (m.includes("glm-5.2") && !m.includes(":free")) ||
+      m.includes("kimi-k3") ||
+      m.includes("mimo-v2.5") ||
+      m.includes("mimo-v2.6") ||
+      m.includes("minimax-m3") ||
+      m.includes("qwen3.6") ||
+      m.includes("qwen3.7") ||
+      m.includes("qwen3.8") ||
+      m.includes("muse-spark") ||
+      m.includes("hy4") ||
+      m.includes("beam") ||
+      m.includes("longcat") ||
+      m.includes("step-5")
+    ) {
+      return 1_000_000;
+    }
+    if (m.includes("grok-4.7") || m.includes("grok-4.6") || m.includes("grok-4.5")) {
+      return 500_000;
     }
     if (m.includes("hermes") || m.includes("deepseek")) return 128_000;
     return defaultLimit;
