@@ -24,11 +24,14 @@ export interface HermesStreamEvent {
   model?: string;
   id?: string;
   call_id?: string;
+  tool_call_id?: string;
   name?: string;
   tool?: string;
   text?: string;
+  content?: string;
   reasoning?: string;
   input?: Record<string, unknown>;
+  arguments?: Record<string, unknown>;
   output?: unknown;
   duration_ms?: number;
   is_error?: boolean;

@@ -911,6 +911,7 @@ var TOOL_PRESENTATION_MAP = {
   write_file: { labelKey: "Write file", icon: "file-plus" },
   edit: { labelKey: "Edit file", icon: "file-edit" },
   edit_file: { labelKey: "Edit file", icon: "file-edit" },
+  patch: { labelKey: "Edit file", icon: "file-edit" },
   multiedit: { labelKey: "Edit file", icon: "file-edit" },
   notebookedit: { labelKey: "Edit file", icon: "file-edit" },
   replace_file_content: { labelKey: "Edit file", icon: "file-edit" },
@@ -919,8 +920,10 @@ var TOOL_PRESENTATION_MAP = {
   terminal: { labelKey: "Run command", icon: "terminal" },
   shell: { labelKey: "Run command", icon: "terminal" },
   run_command: { labelKey: "Run command", icon: "terminal" },
+  code_execution: { labelKey: "Run command", icon: "terminal" },
   grep: { labelKey: "Search text", icon: "search" },
   grep_search: { labelKey: "Search text", icon: "search" },
+  search_files: { labelKey: "Search text", icon: "search" },
   glob: { labelKey: "Find files", icon: "folder-search" },
   find_by_name: { labelKey: "Find files", icon: "folder-search" },
   ls: { labelKey: "List folder", icon: "folder" },
@@ -928,16 +931,20 @@ var TOOL_PRESENTATION_MAP = {
   webfetch: { labelKey: "Web search", icon: "globe" },
   websearch: { labelKey: "Web search", icon: "globe" },
   web_search: { labelKey: "Web search", icon: "globe" },
+  web_extract: { labelKey: "Web search", icon: "globe" },
   search_web: { labelKey: "Web search", icon: "globe" },
   read_url_content: { labelKey: "Web search", icon: "globe" },
   todowrite: { labelKey: "Task list", icon: "list-todo" },
   todoread: { labelKey: "Task list", icon: "list-todo" },
+  todo_list: { labelKey: "Task list", icon: "list-todo" },
   task: { labelKey: "Subagent", icon: "bot" },
   agent: { labelKey: "Subagent", icon: "bot" },
   invoke_subagent: { labelKey: "Subagent", icon: "bot" },
+  delegate_task: { labelKey: "Subagent", icon: "bot" },
   question: { labelKey: "Question", icon: "help-circle" },
   ask_question: { labelKey: "Question", icon: "help-circle" },
-  askuserquestion: { labelKey: "Question", icon: "help-circle" }
+  askuserquestion: { labelKey: "Question", icon: "help-circle" },
+  clarify: { labelKey: "Question", icon: "help-circle" }
 };
 function formatToolAction(tool, rawTitle, t) {
   const key = (tool || "").toLowerCase();
@@ -3615,6 +3622,8 @@ var BaseCliRunner = class {
       (0, import_path.join)((0, import_os.homedir)(), ".gemini",
         "antigravity-cli", "bin", bin),
       (0, import_path.join)((0, import_os.homedir)(), ".hermes", "bin", bin),
+      (0, import_path.join)((0, import_os.homedir)(), ".hermes",
+        "hermes-agent", ".hermes", "bin", bin),
       (0, import_path.join)((0, import_os.homedir)(), ".claude", "local", bin),
       `/usr/local/bin/${bin}`,
       `/usr/bin/${bin}`
@@ -5732,6 +5741,19 @@ var HERMES_DESCRIPTOR = {
       type: "text",
       placeholder: "e.g. openrouter",
       default: ""
+    },
+    {
+      key: "reasoning",
+      label: "Reasoning effort",
+      desc: "Optional reasoning effort level for Hermes.",
+      type: "select",
+      choices: [
+        { value: "", label: "Default (from config.yaml)" },
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium" },
+        { value: "high", label: "High" }
+      ],
+      default: ""
     }
   ]
 };
@@ -5742,6 +5764,7 @@ var HermesRunner = class extends BaseCliRunner {
   engine = "hermes";
   included = false;
   cachedModels = null;
+  cachedModelsBin = null;
   constructor(plugin) {
     super(plugin);
   }
@@ -5758,32 +5781,104 @@ var HermesRunner = class extends BaseCliRunner {
     return first;
   }
   async listModels(forceRefresh = false) {
-    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+    const bin = this.getBin();
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0 &&
+      this.cachedModelsBin === bin) {
       return this.cachedModels;
     }
-    const models = [];
+    const seen = /* @__PURE__ */ new Set();
+    const addModel = (m) => {
+      const clean = m.trim();
+      if (clean && !seen.has(clean)) {
+        seen.add(clean);
+      }
+    };
     try {
       const cfgPath =
         (0, import_path6.join)((0, import_os5.homedir)(), ".hermes",
           "config.yaml");
       if ((0, import_fs5.existsSync)(cfgPath)) {
         const raw = (0, import_fs5.readFileSync)(cfgPath, "utf-8");
-        const m = raw.match(/^\s*(?:default_)?model\s*:\s*["']?([^\s"'#]+)/m);
-        if (m && m[1].trim()) {
-          models.push(m[1].trim());
+        const modelSection = raw.match(
+          /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
+        );
+        if (modelSection) {
+          const defMatch = modelSection[0].match(
+            /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
+          );
+          if (defMatch && defMatch[1]) {
+            addModel(defMatch[1]);
+          }
+        }
+        const topMatch = raw.match(
+          /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
+        );
+        if (topMatch && topMatch[1]) {
+          addModel(topMatch[1]);
         }
       }
     } catch {
     }
-    this.cachedModels = models;
-    return models;
+    try {
+      const catalogPath = (0, import_path6.join)(
+        (0, import_os5.homedir)(),
+        ".hermes",
+        "cache",
+        "model_catalog.json"
+      );
+      if ((0, import_fs5.existsSync)(catalogPath)) {
+        const parsed =
+          JSON.parse((0, import_fs5.readFileSync)(catalogPath, "utf-8"));
+        const providers = parsed.providers || {};
+        for (const prov of Object.values(providers)) {
+          for (const item of prov.models || []) {
+            if (typeof item.id === "string") {
+              addModel(item.id);
+            }
+          }
+        }
+      }
+    } catch {
+    }
+    if (seen.size === 0) {
+      try {
+        const out = await this.execCli(bin, ["models"]);
+        for (const line of out.split("\n")) {
+          addModel(line);
+        }
+      } catch {
+      }
+    }
+    this.cachedModels = Array.from(seen);
+    this.cachedModelsBin = bin;
+    return this.cachedModels;
   }
   async listSessions() {
     return this.listHistorySessions("hermes");
   }
-  async renameSession(_sessionId, _title) {
+  async renameSession(sessionId, title) {
+    if (!sessionId || !title.trim()) return;
+    try {
+      await this.execCli(this.getBin(), [
+        "sessions",
+        "rename",
+        sessionId,
+        title.trim()
+      ]);
+    } catch {
+    }
   }
-  async deleteSession(_sessionId) {
+  async deleteSession(sessionId) {
+    if (!sessionId) return;
+    try {
+      await this.execCli(this.getBin(), [
+        "sessions",
+        "delete",
+        sessionId,
+        "--yes"
+      ]);
+    } catch {
+    }
   }
   async getModelContextLimit(model) {
     return this.estimateModelContextLimit(model, 128e3);
@@ -5807,14 +5902,22 @@ var HermesRunner = class extends BaseCliRunner {
     const sid = req.sessionId !== void 0 ? req.sessionId : s.sessionId;
     if (sid) {
       args.push("--resume", sid);
+      return args;
+    }
+    if (s.autoApprove) {
+      args.push("--yolo");
     }
     const model = cfg.model.trim();
     if (model) {
       args.push("--model", model);
     }
-    const provider = cfg.options.provider;
+    const provider = cfg.options.provider?.trim();
     if (provider) {
       args.push("--provider", provider);
+    }
+    const reasoning = cfg.options.reasoning?.trim();
+    if (reasoning) {
+      args.push("--reasoning", reasoning);
     }
     return args;
   }
@@ -5862,8 +5965,8 @@ var HermesRunner = class extends BaseCliRunner {
       cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
       return;
     }
-    if (ev.type === "text" && typeof ev.text === "string") {
-      state.accumulatedText += ev.text;
+    if (ev.type === "text" && typeof (ev.text ?? ev.content) === "string") {
+      state.accumulatedText += String(ev.text ?? ev.content);
       cb.onActivity?.(this.plugin.t("Writing response..."));
       cb.onText(state.accumulatedText, "text");
       return;
@@ -5877,10 +5980,11 @@ var HermesRunner = class extends BaseCliRunner {
     }
     if (ev.type === "tool_use") {
       const toolName = String(ev.name || ev.tool || "tool");
-      const key = String(ev.call_id || ev.id || toolName);
+      const key = String(ev.tool_call_id || ev.call_id || ev.id || toolName);
       const stepId = `step-${ev.timestamp ?? Date.now()}-${key}`;
-      const input = ev.input;
-      if (toolName === "ask_question" || toolName === "question") {
+      const input = ev.input ?? ev.arguments;
+      if (toolName === "ask_question" || toolName === "question" ||
+        toolName === "clarify") {
         const questions = this.parseCommonQuestions(input);
         const qTitle = questions[0]?.question ||
           this.plugin.t("Agent question");
@@ -5912,8 +6016,11 @@ var HermesRunner = class extends BaseCliRunner {
     }
     if (ev.type === "tool_result") {
       const toolName = String(ev.name || ev.tool || "tool");
-      const key = String(ev.call_id || ev.id || toolName);
+      const key = String(ev.tool_call_id || ev.call_id || ev.id || toolName);
       const prev = state.activeToolSteps.get(key);
+      if (prev) {
+        state.activeToolSteps.delete(key);
+      }
       const stepId = prev?.id || `step-${ev.timestamp ?? Date.now()}-${key}`;
       const title = prev?.title || toolName;
       const isErr = Boolean(ev.is_error);

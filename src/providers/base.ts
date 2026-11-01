@@ -292,6 +292,7 @@ export abstract class BaseCliRunner {
       join(homedir(), ".opencode", "bin", bin),
       join(homedir(), ".gemini", "antigravity-cli", "bin", bin),
       join(homedir(), ".hermes", "bin", bin),
+      join(homedir(), ".hermes", "hermes-agent", ".hermes", "bin", bin),
       join(homedir(), ".claude", "local", bin),
       `/usr/local/bin/${bin}`,
       `/usr/bin/${bin}`,

@@ -44,6 +44,19 @@ export const HERMES_DESCRIPTOR: ProviderDescriptor = {
       placeholder: "e.g. openrouter",
       default: "",
     },
+    {
+      key: "reasoning",
+      label: "Reasoning effort",
+      desc: "Optional reasoning effort level for Hermes.",
+      type: "select",
+      choices: [
+        { value: "", label: "Default (from config.yaml)" },
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium" },
+        { value: "high", label: "High" },
+      ],
+      default: "",
+    },
   ],
 };
 
@@ -63,6 +76,7 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
   readonly included = false;
 
   private cachedModels: string[] | null = null;
+  private cachedModelsBin: string | null = null;
 
   constructor(plugin: RunnerHost) {
     super(plugin);
@@ -84,33 +98,123 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async listModels(forceRefresh = false): Promise<string[]> {
-    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+    const bin = this.getBin();
+    if (
+      !forceRefresh &&
+      this.cachedModels &&
+      this.cachedModels.length > 0 &&
+      this.cachedModelsBin === bin
+    ) {
       return this.cachedModels;
     }
-    const models: string[] = [];
+    const seen = new Set<string>();
+    const addModel = (m: string) => {
+      const clean = m.trim();
+      if (clean && !seen.has(clean)) {
+        seen.add(clean);
+      }
+    };
+
     try {
       const cfgPath = join(homedir(), ".hermes", "config.yaml");
       if (existsSync(cfgPath)) {
         const raw = readFileSync(cfgPath, "utf-8");
-        const m = raw.match(/^\s*(?:default_)?model\s*:\s*["']?([^\s"'#]+)/m);
-        if (m && m[1].trim()) {
-          models.push(m[1].trim());
+        const modelSection = raw.match(
+          /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
+        );
+        if (modelSection) {
+          const defMatch = modelSection[0].match(
+            /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
+          );
+          if (defMatch && defMatch[1]) {
+            addModel(defMatch[1]);
+          }
+        }
+        const topMatch = raw.match(
+          /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
+        );
+        if (topMatch && topMatch[1]) {
+          addModel(topMatch[1]);
         }
       }
     } catch {
       // ignore
     }
-    this.cachedModels = models;
-    return models;
+
+    try {
+      const catalogPath = join(
+        homedir(),
+        ".hermes",
+        "cache",
+        "model_catalog.json"
+      );
+      if (existsSync(catalogPath)) {
+        const parsed = JSON.parse(readFileSync(catalogPath, "utf-8")) as {
+          providers?: Record<
+            string,
+            { models?: Array<{ id?: string }> }
+          >;
+        };
+        const providers = parsed.providers || {};
+        for (const prov of Object.values(providers)) {
+          for (const item of prov.models || []) {
+            if (typeof item.id === "string") {
+              addModel(item.id);
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    if (seen.size === 0) {
+      try {
+        const out = await this.execCli(bin, ["models"]);
+        for (const line of out.split("\n")) {
+          addModel(line);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    this.cachedModels = Array.from(seen);
+    this.cachedModelsBin = bin;
+    return this.cachedModels;
   }
 
   async listSessions(): Promise<SessionInfo[]> {
     return this.listHistorySessions("hermes");
   }
 
-  async renameSession(_sessionId: string, _title: string): Promise<void> {}
+  async renameSession(sessionId: string, title: string): Promise<void> {
+    if (!sessionId || !title.trim()) return;
+    try {
+      await this.execCli(this.getBin(), [
+        "sessions",
+        "rename",
+        sessionId,
+        title.trim(),
+      ]);
+    } catch {
+      // ignore if session exists only in local plugin history
+    }
+  }
 
-  async deleteSession(_sessionId: string): Promise<void> {}
+  async deleteSession(sessionId: string): Promise<void> {
+    if (!sessionId) return;
+    try {
+      await this.execCli(this.getBin(), [
+        "sessions",
+        "delete",
+        sessionId,
+        "--yes",
+      ]);
+    } catch {
+      // ignore if session exists only in local plugin history
+    }
+  }
 
   async getModelContextLimit(model: string): Promise<number> {
     return this.estimateModelContextLimit(model, 128_000);
@@ -142,6 +246,11 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
     const sid = req.sessionId !== undefined ? req.sessionId : s.sessionId;
     if (sid) {
       args.push("--resume", sid);
+      return args;
+    }
+
+    if (s.autoApprove) {
+      args.push("--yolo");
     }
 
     const model = cfg.model.trim();
@@ -149,9 +258,14 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
       args.push("--model", model);
     }
 
-    const provider = cfg.options.provider;
+    const provider = cfg.options.provider?.trim();
     if (provider) {
       args.push("--provider", provider);
+    }
+
+    const reasoning = cfg.options.reasoning?.trim();
+    if (reasoning) {
+      args.push("--reasoning", reasoning);
     }
 
     return args;
@@ -214,8 +328,8 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
       return;
     }
 
-    if (ev.type === "text" && typeof ev.text === "string") {
-      state.accumulatedText += ev.text;
+    if (ev.type === "text" && typeof (ev.text ?? ev.content) === "string") {
+      state.accumulatedText += String(ev.text ?? ev.content);
       cb.onActivity?.(this.plugin.t("Writing response..."));
       cb.onText(state.accumulatedText, "text");
       return;
@@ -233,11 +347,15 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
 
     if (ev.type === "tool_use") {
       const toolName = String(ev.name || ev.tool || "tool");
-      const key = String(ev.call_id || ev.id || toolName);
+      const key = String(ev.tool_call_id || ev.call_id || ev.id || toolName);
       const stepId = `step-${ev.timestamp ?? Date.now()}-${key}`;
-      const input = ev.input;
+      const input = ev.input ?? ev.arguments;
 
-      if (toolName === "ask_question" || toolName === "question") {
+      if (
+        toolName === "ask_question" ||
+        toolName === "question" ||
+        toolName === "clarify"
+      ) {
         const questions = this.parseCommonQuestions(input);
         const qTitle =
           questions[0]?.question || this.plugin.t("Agent question");
@@ -270,8 +388,11 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
 
     if (ev.type === "tool_result") {
       const toolName = String(ev.name || ev.tool || "tool");
-      const key = String(ev.call_id || ev.id || toolName);
+      const key = String(ev.tool_call_id || ev.call_id || ev.id || toolName);
       const prev = state.activeToolSteps.get(key);
+      if (prev) {
+        state.activeToolSteps.delete(key);
+      }
       const stepId = prev?.id || `step-${ev.timestamp ?? Date.now()}-${key}`;
       const title = prev?.title || toolName;
       const isErr = Boolean(ev.is_error);
