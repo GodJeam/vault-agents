@@ -1,7 +1,7 @@
 import esbuild from "esbuild";
 import { readFileSync, writeFileSync } from "fs";
 import process from "process";
-import builtins from "builtin-modules";
+import { builtinModules as builtins } from "node:module";
 
 const prod = process.argv[2] === "production";
 const MAX_COLS = 80;
@@ -396,6 +396,7 @@ const context = await esbuild.context({
     "@lezer/highlight",
     "@lezer/lr",
     ...builtins,
+    ...builtins.map((b) => `node:${b}`),
   ],
   format: "cjs",
   target: "es2022",

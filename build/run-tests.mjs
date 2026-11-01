@@ -3,7 +3,7 @@ import { spawnSync } from "child_process";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import builtins from "builtin-modules";
+import { builtinModules as builtins } from "node:module";
 
 const tmp = mkdtempSync(join(tmpdir(), "vault-agents-test-"));
 const outfile = join(tmp, "suite.test.cjs");
