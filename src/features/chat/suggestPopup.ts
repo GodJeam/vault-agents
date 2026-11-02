@@ -1,5 +1,5 @@
 import { setIcon, type App } from "obsidian";
-import type OpencodePlugin from "../../main";
+import type VaultAgentsPlugin from "../../main";
 import type { SuggestItem } from "./types";
 
 const MAX_SUGGEST = 50;
@@ -30,7 +30,7 @@ export class SuggestPopup {
     container: HTMLElement,
     private inputEl: HTMLTextAreaElement,
     private app: App,
-    private plugin: OpencodePlugin,
+    private plugin: VaultAgentsPlugin,
     private cb: SuggestPopupCallbacks
   ) {
     this.suggestEl = container.createDiv({ cls: "opencode-suggest hidden" });

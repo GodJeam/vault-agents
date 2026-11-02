@@ -1,5 +1,5 @@
 import { App, Modal, Notice, Setting } from "obsidian";
-import type OpencodePlugin from "../main";
+import type VaultAgentsPlugin from "../main";
 import type { UsageWindow, EngineType } from "../core/types";
 import { substitute } from "../i18n";
 
@@ -14,7 +14,7 @@ export {
 export class RenameModal extends Modal {
   constructor(
     app: App,
-    private plugin: OpencodePlugin,
+    private plugin: VaultAgentsPlugin,
     private current: string,
     private onSubmit: (title: string) => void
   ) {
@@ -63,7 +63,7 @@ export class RenameModal extends Modal {
 export class StatsModal extends Modal {
   constructor(
     app: App,
-    private plugin: OpencodePlugin,
+    private plugin: VaultAgentsPlugin,
     private engine: EngineType
   ) {
     super(app);
@@ -128,7 +128,7 @@ export class StatsModal extends Modal {
 export class ConfirmModal extends Modal {
   constructor(
     app: App,
-    private plugin: OpencodePlugin,
+    private plugin: VaultAgentsPlugin,
     private title: string,
     private message: string,
     private confirmLabel: string,
@@ -169,7 +169,7 @@ export class ConfirmModal extends Modal {
 export class PromptModal extends Modal {
   constructor(
     app: App,
-    private plugin: OpencodePlugin,
+    private plugin: VaultAgentsPlugin,
     private initialName: string,
     private initialText: string,
     private onSave: (name: string, text: string) => void

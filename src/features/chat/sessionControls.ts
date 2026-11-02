@@ -1,8 +1,8 @@
-import type OpencodePlugin from "../../main";
+import type VaultAgentsPlugin from "../../main";
 import type { SessionInfo } from "../../core/types";
 
 export async function fetchDisplayedSessions(
-  plugin: OpencodePlugin,
+  plugin: VaultAgentsPlugin,
   viewSession: string,
   fallbackEngine: string
 ): Promise<SessionInfo[]> {
@@ -65,7 +65,7 @@ export async function fetchDisplayedSessions(
 }
 
 export function buildLocalContinuationPrompt(
-  plugin: OpencodePlugin,
+  plugin: VaultAgentsPlugin,
   sessionId: string,
   assistantLabel: string
 ): string {

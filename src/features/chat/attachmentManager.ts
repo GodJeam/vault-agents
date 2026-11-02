@@ -1,6 +1,6 @@
 import { App, FileSystemAdapter, Notice, setIcon } from "obsidian";
 import { stat } from "fs/promises";
-import type OpencodePlugin from "../../main";
+import type VaultAgentsPlugin from "../../main";
 import type { AgentProvider } from "../../core/provider";
 import { substitute } from "../../i18n";
 import { FileSuggestModal } from "../../shared/modals";
@@ -15,7 +15,7 @@ export class AttachmentManager {
   constructor(
     container: HTMLElement,
     private app: App,
-    private plugin: OpencodePlugin
+    private plugin: VaultAgentsPlugin
   ) {
     this.attachmentsBar = container.createDiv({
       cls: "opencode-attachments-bar hidden",

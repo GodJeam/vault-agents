@@ -14,7 +14,7 @@ import type {
   UsageStats,
   UsageWindow,
 } from "../../core/types";
-import { DEFAULT_SETTINGS } from "../../core/types";
+import { DEFAULT_ENGINE_CONFIGS } from "../../core/types";
 import { substitute } from "../../i18n";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
 import type {
@@ -65,6 +65,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   readonly included = false;
 
   private contextLimitCache = new Map<string, number>();
+  private contextLimitFailedAt = new Map<string, number>();
   private cachedModels: string[] | null = null;
 
   constructor(plugin: RunnerHost) {
@@ -80,10 +81,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async getVersion(): Promise<string> {
-    const out = await this.execCli(this.getBin(), ["--version"]);
-    const first = out.trim().split("\n")[0];
-    if (!first) throw new Error("Empty output from opencode --version");
-    return first;
+    return this.fetchCliVersion(this.getBin(), "opencode");
   }
 
   async listModels(forceRefresh = false): Promise<string[]> {
@@ -189,8 +187,8 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   async renameSession(sessionId: string, title: string): Promise<void> {
     const dbPath = await this.getDbPath();
     if (dbPath) {
-      const safeTitle = title.replace(/'/g, "''");
-      const safeId = sessionId.replace(/'/g, "''");
+      const safeTitle = this.sqlEscape(title);
+      const safeId = this.sqlEscape(sessionId);
       let updatedDb = false;
       for (const table of ["session_v2", "session"]) {
         try {
@@ -221,6 +219,10 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   async getModelContextLimit(model: string): Promise<number> {
     const cached = this.contextLimitCache.get(model);
     if (cached !== undefined) return cached;
+    const failedAt = this.contextLimitFailedAt.get(model);
+    if (failedAt !== undefined && Date.now() - failedAt < 60_000) {
+      return DEFAULT_CONTEXT_LIMIT;
+    }
     let limit = 0;
     try {
       limit = await this.fetchModelContextLimit(model);
@@ -229,8 +231,10 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     }
     if (limit > 0) {
       this.contextLimitCache.set(model, limit);
+      this.contextLimitFailedAt.delete(model);
       return limit;
     }
+    this.contextLimitFailedAt.set(model, Date.now());
     return DEFAULT_CONTEXT_LIMIT;
   }
 
@@ -386,6 +390,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   async pruneOversizedParts(force = false, ignoreAge = false): Promise<void> {
     const s = this.plugin.settings;
     if (!s.dbAutoCleanup && !force) return;
+    if (!force && this.activeProcs.size > 0) return;
     const dbPath = await this.getDbPath();
     if (!dbPath) return;
     const maxBytes = Math.max(1, s.dbCleanupMaxMB || 5) * 1024 * 1024;
@@ -400,8 +405,8 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       .join(" ");
     try {
       await this.execSqlite(dbPath, q);
-    } catch {
-      // Best effort
+    } catch (e) {
+      console.debug("[vault-agents] pruneOversizedParts skipped:", e);
     }
   }
 
@@ -416,10 +421,6 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       // ignore
     }
     return null;
-  }
-
-  private execSqlite(dbPath: string, sql: string): Promise<string> {
-    return this.execCli("sqlite3", [dbPath, sql]);
   }
 
   async getUsageStats(): Promise<UsageStats> {
@@ -482,10 +483,10 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       args.push("--session", sid);
     }
 
-    const model = cfg.model || s.model || DEFAULT_SETTINGS.model;
+    const model = cfg.model || DEFAULT_ENGINE_CONFIGS.opencode.model;
     args.push("--model", model);
 
-    const agent = cfg.options.agent ?? s.agent;
+    const agent = cfg.options.agent ?? "";
     if (agent) args.push("--agent", agent);
     if (s.autoApprove) args.push("--auto");
     if (s.showThinking) args.push("--thinking");

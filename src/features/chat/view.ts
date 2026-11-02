@@ -5,7 +5,7 @@ import {
   WorkspaceLeaf,
   setIcon,
 } from "obsidian";
-import type OpencodePlugin from "../../main";
+import type VaultAgentsPlugin from "../../main";
 import type { AgentProvider } from "../../core/provider";
 import type {
   FinishInfo,
@@ -39,7 +39,7 @@ import {
 export const CHAT_VIEW_TYPE = "opencode-chat-view";
 
 export class ChatView extends ItemView {
-  plugin: OpencodePlugin;
+  plugin: VaultAgentsPlugin;
   private messagesEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
   private contextBar!: HTMLElement;
@@ -76,7 +76,7 @@ export class ChatView extends ItemView {
   private activityTimer: number | null = null;
   private activeBubble: AssistantBubble | null = null;
 
-  constructor(leaf: WorkspaceLeaf, plugin: OpencodePlugin) {
+  constructor(leaf: WorkspaceLeaf, plugin: VaultAgentsPlugin) {
     super(leaf);
     this.plugin = plugin;
     this.viewSession = plugin.settings.sessionId;
@@ -1170,6 +1170,7 @@ export class ChatView extends ItemView {
       (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer),
       this.assistantIcon()
     );
+    this.activeBubble?.dispose();
     this.activeBubble = bubble;
     this.scrollToBottom();
     return bubble;

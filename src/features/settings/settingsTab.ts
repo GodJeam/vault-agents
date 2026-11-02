@@ -4,7 +4,7 @@ import {
   PluginSettingTab,
   Setting,
 } from "obsidian";
-import type OpencodePlugin from "../../main";
+import type VaultAgentsPlugin from "../../main";
 import {
   ModelSuggestModal,
   PromptModal,
@@ -15,9 +15,9 @@ import type { EngineType } from "../../core/types";
 import type { AgentProvider } from "../../core/provider";
 
 export class VaultAgentsSettingTab extends PluginSettingTab {
-  plugin: OpencodePlugin;
+  plugin: VaultAgentsPlugin;
 
-  constructor(app: App, plugin: OpencodePlugin) {
+  constructor(app: App, plugin: VaultAgentsPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
@@ -559,6 +559,3 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
     ).open();
   }
 }
-
-/** Backward compatibility alias */
-export { VaultAgentsSettingTab as OpencodeSettingTab };

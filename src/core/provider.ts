@@ -134,6 +134,3 @@ export interface AgentProvider {
   /** Abort and kill all running child processes for this provider */
   killAll(): void;
 }
-
-/** Backward compatibility alias */
-export type AgentRunner = AgentProvider;
