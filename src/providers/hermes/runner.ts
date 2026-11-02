@@ -78,6 +78,11 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
   private cachedModels: string[] | null = null;
   private cachedModelsBin: string | null = null;
   private contextLimits = new Map<string, number>();
+  private contextLimitFailedAt = new Map<string, number>();
+  private resolvedPythonCache = new Map<
+    string,
+    { pythonBin: string; repoRoot: string } | null
+  >();
 
   constructor(plugin: RunnerHost) {
     super(plugin);
@@ -103,12 +108,21 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
    */
   private resolveHermesPython(): { pythonBin: string; repoRoot: string } | null {
     const hermesHome = this.getHermesHome();
+    const bin = this.getBin();
+    const cacheKey = `${hermesHome}:${bin}`;
+    if (this.resolvedPythonCache.has(cacheKey)) {
+      return this.resolvedPythonCache.get(cacheKey) ?? null;
+    }
+
     const repoRoot = join(hermesHome, "hermes-agent");
-    if (!existsSync(repoRoot)) return null;
+    if (!existsSync(repoRoot)) {
+      this.resolvedPythonCache.set(cacheKey, null);
+      return null;
+    }
 
     // 1. Inspect the launcher script (`~/.local/bin/hermes` or `~/.hermes/hermes-agent/.hermes/bin/hermes`)
     const launcherCandidates = [
-      this.getBin(),
+      bin,
       join(repoRoot, ".hermes", "bin", "hermes"),
     ];
     for (const candidate of launcherCandidates) {
@@ -117,7 +131,9 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
         const text = readFileSync(candidate, "utf-8");
         const execMatch = text.match(/exec\s+([^\s"']+\/python3?(?:\.\d+)?)\b/);
         if (execMatch && execMatch[1] && existsSync(execMatch[1])) {
-          return { pythonBin: execMatch[1], repoRoot };
+          const found = { pythonBin: execMatch[1], repoRoot };
+          this.resolvedPythonCache.set(cacheKey, found);
+          return found;
         }
       } catch {
         // ignore
@@ -136,7 +152,9 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
               process.platform === "win32" ? "python.exe" : "bin/python3"
             );
             if (existsSync(py)) {
-              return { pythonBin: py, repoRoot };
+              const found = { pythonBin: py, repoRoot };
+              this.resolvedPythonCache.set(cacheKey, found);
+              return found;
             }
           }
         }
@@ -152,9 +170,12 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
       process.platform === "win32" ? "Scripts/python.exe" : "bin/python"
     );
     if (existsSync(venvPy)) {
-      return { pythonBin: venvPy, repoRoot };
+      const found = { pythonBin: venvPy, repoRoot };
+      this.resolvedPythonCache.set(cacheKey, found);
+      return found;
     }
 
+    this.resolvedPythonCache.set(cacheKey, null);
     return null;
   }
 
@@ -188,10 +209,7 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async getVersion(): Promise<string> {
-    const out = await this.execCli(this.getBin(), ["--version"]);
-    const first = out.trim().split("\n")[0];
-    if (!first) throw new Error("Empty output from hermes --version");
-    return first;
+    return this.fetchCliVersion(this.getBin(), "hermes");
   }
 
   async listModels(forceRefresh = false): Promise<string[]> {
@@ -266,30 +284,8 @@ print(json.dumps({"models": models}))
 
     // 2. Fallback: read ~/.hermes/config.yaml and ~/.hermes/provider_models_cache.json
     const hermesHome = this.getHermesHome();
-    try {
-      const cfgPath = join(hermesHome, "config.yaml");
-      if (existsSync(cfgPath)) {
-        const raw = readFileSync(cfgPath, "utf-8");
-        const modelSection = raw.match(
-          /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
-        );
-        if (modelSection) {
-          const defMatch = modelSection[0].match(
-            /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
-          );
-          if (defMatch && defMatch[1]) {
-            addModel(defMatch[1]);
-          }
-        }
-        const topMatch = raw.match(
-          /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
-        );
-        if (topMatch && topMatch[1]) {
-          addModel(topMatch[1]);
-        }
-      }
-    } catch {
-      // ignore
+    for (const cfgModel of this.readConfiguredDefaultModels()) {
+      addModel(cfgModel);
     }
 
     try {
@@ -389,33 +385,41 @@ print(json.dumps({"models": models}))
     }
   }
 
-  private readConfiguredDefaultModel(): string {
+  public parseHermesConfigModels(raw: string): string[] {
+    const found: string[] = [];
+    const modelSection = raw.match(/^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m);
+    if (modelSection) {
+      const defMatch = modelSection[0].match(
+        /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
+      );
+      if (defMatch && defMatch[1]) {
+        found.push(defMatch[1].trim());
+      }
+    }
+    const topMatch = raw.match(
+      /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
+    );
+    if (topMatch && topMatch[1]) {
+      const top = topMatch[1].trim();
+      if (!found.includes(top)) found.push(top);
+    }
+    return found;
+  }
+
+  private readConfiguredDefaultModels(): string[] {
     try {
-      const cfgPath = join(homedir(), ".hermes", "config.yaml");
+      const cfgPath = join(this.getHermesHome(), "config.yaml");
       if (existsSync(cfgPath)) {
-        const raw = readFileSync(cfgPath, "utf-8");
-        const modelSection = raw.match(
-          /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
-        );
-        if (modelSection) {
-          const defMatch = modelSection[0].match(
-            /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
-          );
-          if (defMatch && defMatch[1]) {
-            return defMatch[1].trim();
-          }
-        }
-        const topMatch = raw.match(
-          /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
-        );
-        if (topMatch && topMatch[1]) {
-          return topMatch[1].trim();
-        }
+        return this.parseHermesConfigModels(readFileSync(cfgPath, "utf-8"));
       }
     } catch {
       // ignore
     }
-    return "";
+    return [];
+  }
+
+  private readConfiguredDefaultModel(): string {
+    return this.readConfiguredDefaultModels()[0] ?? "";
   }
 
   async getModelContextLimit(model: string): Promise<number> {
@@ -426,8 +430,14 @@ print(json.dumps({"models": models}))
     const configuredProvider =
       (this.getConfig().options.provider ?? "").trim();
     const cacheKey = `${configuredProvider}:${effective}`;
-    const cached = this.contextLimits.get(cacheKey) ?? this.contextLimits.get(effective);
+    const cached =
+      this.contextLimits.get(cacheKey) ?? this.contextLimits.get(effective);
     if (cached && cached > 0) return cached;
+
+    const failedAt = this.contextLimitFailedAt.get(cacheKey);
+    if (failedAt !== undefined && Date.now() - failedAt < 60_000) {
+      return this.estimateModelContextLimit(effective, 256_000);
+    }
 
     try {
       const script = [
@@ -467,7 +477,10 @@ print(json.dumps({"models": models}))
           parsed.context_length > 0
         ) {
           this.contextLimits.set(cacheKey, parsed.context_length);
-          if (effective) this.contextLimits.set(effective, parsed.context_length);
+          this.contextLimitFailedAt.delete(cacheKey);
+          if (effective) {
+            this.contextLimits.set(effective, parsed.context_length);
+          }
           if (parsed.model) {
             this.contextLimits.set(parsed.model, parsed.context_length);
           }
@@ -478,6 +491,7 @@ print(json.dumps({"models": models}))
       // Fallback to heuristic estimation below
     }
 
+    this.contextLimitFailedAt.set(cacheKey, Date.now());
     return this.estimateModelContextLimit(effective, 256_000);
   }
 

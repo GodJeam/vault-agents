@@ -315,6 +315,30 @@ export abstract class BaseCliRunner {
   }
 
   /**
+   * Escape a string value for safe single-quoted SQLite literals.
+   */
+  public sqlEscape(value: string): string {
+    return String(value ?? "").replace(/'/g, "''");
+  }
+
+  /**
+   * Execute a SQL query against a local SQLite database file via sqlite3 CLI.
+   */
+  protected execSqlite(dbPath: string, sql: string): Promise<string> {
+    return this.execCli("sqlite3", [dbPath, sql]);
+  }
+
+  /**
+   * Run `<bin> --version` and return the first non-empty line.
+   */
+  protected async fetchCliVersion(bin: string, label: string): Promise<string> {
+    const out = await this.execCli(bin, ["--version"]);
+    const first = out.trim().split("\n")[0];
+    if (!first) throw new Error(`Empty output from ${label} --version`);
+    return first;
+  }
+
+  /**
    * Check whether the CLI executable is installed and reachable on the system
    */
   public isAvailable(): boolean {

@@ -99,10 +99,7 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async getVersion(): Promise<string> {
-    const out = await this.execCli(this.getBin(), ["--version"]);
-    const first = out.trim().split("\n")[0];
-    if (!first) throw new Error("Empty output from pi --version");
-    return first;
+    return this.fetchCliVersion(this.getBin(), "pi");
   }
 
   async listModels(forceRefresh = false): Promise<string[]> {

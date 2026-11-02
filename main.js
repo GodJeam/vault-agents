@@ -3610,6 +3610,27 @@ var BaseCliRunner = class {
     });
   }
   /**
+   * Escape a string value for safe single-quoted SQLite literals.
+   */
+  sqlEscape(value) {
+    return String(value ?? "").replace(/'/g, "''");
+  }
+  /**
+   * Execute a SQL query against a local SQLite database file via sqlite3 CLI.
+   */
+  execSqlite(dbPath, sql) {
+    return this.execCli("sqlite3", [dbPath, sql]);
+  }
+  /**
+   * Run `<bin> --version` and return the first non-empty line.
+   */
+  async fetchCliVersion(bin, label) {
+    const out = await this.execCli(bin, ["--version"]);
+    const first = out.trim().split("\n")[0];
+    if (!first) throw new Error(`Empty output from ${label} --version`);
+    return first;
+  }
+  /**
    * Check whether the CLI executable is installed and reachable on the system
    */
   isAvailable() {
@@ -4156,10 +4177,7 @@ var AntigravityRunner = class extends BaseCliRunner {
   }
   async getVersion() {
     const bin = this.resolveBinaryPath(this.getConfig().binary || "agy");
-    const out = await this.execCli(bin, ["--version"]);
-    const first = out.trim().split("\n")[0];
-    if (!first) throw new Error("Empty output from agy --version");
-    return first;
+    return this.fetchCliVersion(bin, "agy");
   }
   async listModels(forceRefresh = false) {
     if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
@@ -4269,15 +4287,16 @@ var AntigravityRunner = class extends BaseCliRunner {
     const dbPath = this.getDbPath();
     if ((0, import_fs2.existsSync)(dbPath)) {
       try {
-        const safeTitle = title.replace(/'/g, "''");
-        const safeId = sessionId.replace(/'/g, "''");
+        const safeTitle = this.sqlEscape(title);
+        const safeId = this.sqlEscape(sessionId);
         const query = [
           "UPDATE conversation_summaries",
           `SET title = '${safeTitle}'`,
           `WHERE conversation_id = '${safeId}'`
         ].join(" ");
         await this.execSqlite(dbPath, query);
-      } catch {
+      } catch (e) {
+        console.debug("[vault-agents] Antigravity renameSession failed:", e);
       }
     }
   }
@@ -4285,13 +4304,14 @@ var AntigravityRunner = class extends BaseCliRunner {
     const dbPath = this.getDbPath();
     if ((0, import_fs2.existsSync)(dbPath)) {
       try {
-        const safeId = sessionId.replace(/'/g, "''");
+        const safeId = this.sqlEscape(sessionId);
         const query = [
           "DELETE FROM conversation_summaries",
           `WHERE conversation_id = '${safeId}'`
         ].join(" ");
         await this.execSqlite(dbPath, query);
-      } catch {
+      } catch (e) {
+        console.debug("[vault-agents] Antigravity deleteSession failed:", e);
       }
     }
   }
@@ -4486,9 +4506,6 @@ var AntigravityRunner = class extends BaseCliRunner {
       const msg = ev.error?.message || JSON.stringify(ev.error || ev);
       cb.onError(String(msg));
     }
-  }
-  execSqlite(dbPath, query) {
-    return this.execCli("sqlite3", [dbPath, query]);
   }
   getDbPath() {
     return (0, import_path2.join)(
@@ -4696,6 +4713,7 @@ var OpencodeRunner = class extends BaseCliRunner {
   engine = "opencode";
   included = false;
   contextLimitCache = /* @__PURE__ */ new Map();
+  contextLimitFailedAt = /* @__PURE__ */ new Map();
   cachedModels = null;
   constructor(plugin) {
     super(plugin);
@@ -4707,10 +4725,7 @@ var OpencodeRunner = class extends BaseCliRunner {
     return this.resolveBinaryPath(this.getConfig().binary || "opencode");
   }
   async getVersion() {
-    const out = await this.execCli(this.getBin(), ["--version"]);
-    const first = out.trim().split("\n")[0];
-    if (!first) throw new Error("Empty output from opencode --version");
-    return first;
+    return this.fetchCliVersion(this.getBin(), "opencode");
   }
   async listModels(forceRefresh = false) {
     if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
@@ -4799,8 +4814,8 @@ var OpencodeRunner = class extends BaseCliRunner {
   async renameSession(sessionId, title) {
     const dbPath = await this.getDbPath();
     if (dbPath) {
-      const safeTitle = title.replace(/'/g, "''");
-      const safeId = sessionId.replace(/'/g, "''");
+      const safeTitle = this.sqlEscape(title);
+      const safeId = this.sqlEscape(sessionId);
       let updatedDb = false;
       for (const table of ["session_v2", "session"]) {
         try {
@@ -4827,6 +4842,10 @@ var OpencodeRunner = class extends BaseCliRunner {
   async getModelContextLimit(model) {
     const cached = this.contextLimitCache.get(model);
     if (cached !== void 0) return cached;
+    const failedAt = this.contextLimitFailedAt.get(model);
+    if (failedAt !== void 0 && Date.now() - failedAt < 6e4) {
+      return DEFAULT_CONTEXT_LIMIT;
+    }
     let limit = 0;
     try {
       limit = await this.fetchModelContextLimit(model);
@@ -4835,8 +4854,10 @@ var OpencodeRunner = class extends BaseCliRunner {
     }
     if (limit > 0) {
       this.contextLimitCache.set(model, limit);
+      this.contextLimitFailedAt.delete(model);
       return limit;
     }
+    this.contextLimitFailedAt.set(model, Date.now());
     return DEFAULT_CONTEXT_LIMIT;
   }
   /**
@@ -4990,9 +5011,6 @@ var OpencodeRunner = class extends BaseCliRunner {
     } catch {
     }
     return null;
-  }
-  execSqlite(dbPath, sql) {
-    return this.execCli("sqlite3", [dbPath, sql]);
   }
   async getUsageStats() {
     const now = Date.now();
@@ -5255,6 +5273,8 @@ var HermesRunner = class extends BaseCliRunner {
   cachedModels = null;
   cachedModelsBin = null;
   contextLimits = /* @__PURE__ */ new Map();
+  contextLimitFailedAt = /* @__PURE__ */ new Map();
+  resolvedPythonCache = /* @__PURE__ */ new Map();
   constructor(plugin) {
     super(plugin);
   }
@@ -5276,10 +5296,18 @@ var HermesRunner = class extends BaseCliRunner {
    */
   resolveHermesPython() {
     const hermesHome = this.getHermesHome();
+    const bin = this.getBin();
+    const cacheKey = `${hermesHome}:${bin}`;
+    if (this.resolvedPythonCache.has(cacheKey)) {
+      return this.resolvedPythonCache.get(cacheKey) ?? null;
+    }
     const repoRoot = (0, import_path4.join)(hermesHome, "hermes-agent");
-    if (!(0, import_fs3.existsSync)(repoRoot)) return null;
+    if (!(0, import_fs3.existsSync)(repoRoot)) {
+      this.resolvedPythonCache.set(cacheKey, null);
+      return null;
+    }
     const launcherCandidates = [
-      this.getBin(),
+      bin,
       (0, import_path4.join)(repoRoot, ".hermes", "bin", "hermes")
     ];
     for (const candidate of launcherCandidates) {
@@ -5289,7 +5317,9 @@ var HermesRunner = class extends BaseCliRunner {
         const execMatch = text.match(/exec\s+([^\s"']+\/python3?(?:\.\d+)?)\b/);
         if (execMatch && execMatch[1] &&
           (0, import_fs3.existsSync)(execMatch[1])) {
-          return { pythonBin: execMatch[1], repoRoot };
+          const found = { pythonBin: execMatch[1], repoRoot };
+          this.resolvedPythonCache.set(cacheKey, found);
+          return found;
         }
       } catch {
       }
@@ -5305,7 +5335,9 @@ var HermesRunner = class extends BaseCliRunner {
               process.platform === "win32" ? "python.exe" : "bin/python3"
             );
             if ((0, import_fs3.existsSync)(py)) {
-              return { pythonBin: py, repoRoot };
+              const found = { pythonBin: py, repoRoot };
+              this.resolvedPythonCache.set(cacheKey, found);
+              return found;
             }
           }
         }
@@ -5318,8 +5350,11 @@ var HermesRunner = class extends BaseCliRunner {
       process.platform === "win32" ? "Scripts/python.exe" : "bin/python"
     );
     if ((0, import_fs3.existsSync)(venvPy)) {
-      return { pythonBin: venvPy, repoRoot };
+      const found = { pythonBin: venvPy, repoRoot };
+      this.resolvedPythonCache.set(cacheKey, found);
+      return found;
     }
+    this.resolvedPythonCache.set(cacheKey, null);
     return null;
   }
   /**
@@ -5348,10 +5383,7 @@ var HermesRunner = class extends BaseCliRunner {
     }
   }
   async getVersion() {
-    const out = await this.execCli(this.getBin(), ["--version"]);
-    const first = out.trim().split("\n")[0];
-    if (!first) throw new Error("Empty output from hermes --version");
-    return first;
+    return this.fetchCliVersion(this.getBin(), "hermes");
   }
   async listModels(forceRefresh = false) {
     const bin = this.getBin();
@@ -5422,29 +5454,8 @@ print(json.dumps({"models": models}))
       }
     }
     const hermesHome = this.getHermesHome();
-    try {
-      const cfgPath = (0, import_path4.join)(hermesHome, "config.yaml");
-      if ((0, import_fs3.existsSync)(cfgPath)) {
-        const raw = (0, import_fs3.readFileSync)(cfgPath, "utf-8");
-        const modelSection = raw.match(
-          /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
-        );
-        if (modelSection) {
-          const defMatch = modelSection[0].match(
-            /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
-          );
-          if (defMatch && defMatch[1]) {
-            addModel(defMatch[1]);
-          }
-        }
-        const topMatch = raw.match(
-          /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
-        );
-        if (topMatch && topMatch[1]) {
-          addModel(topMatch[1]);
-        }
-      }
-    } catch {
+    for (const cfgModel of this.readConfiguredDefaultModels()) {
+      addModel(cfgModel);
     }
     try {
       const provCachePath =
@@ -5525,34 +5536,40 @@ print(json.dumps({"models": models}))
     } catch {
     }
   }
-  readConfiguredDefaultModel() {
+  parseHermesConfigModels(raw) {
+    const found = [];
+    const modelSection = raw.match(/^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m);
+    if (modelSection) {
+      const defMatch = modelSection[0].match(
+        /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
+      );
+      if (defMatch && defMatch[1]) {
+        found.push(defMatch[1].trim());
+      }
+    }
+    const topMatch = raw.match(
+      /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
+    );
+    if (topMatch && topMatch[1]) {
+      const top = topMatch[1].trim();
+      if (!found.includes(top)) found.push(top);
+    }
+    return found;
+  }
+  readConfiguredDefaultModels() {
     try {
       const cfgPath =
-        (0, import_path4.join)((0, import_os3.homedir)(), ".hermes",
-          "config.yaml");
+        (0, import_path4.join)(this.getHermesHome(), "config.yaml");
       if ((0, import_fs3.existsSync)(cfgPath)) {
-        const raw = (0, import_fs3.readFileSync)(cfgPath, "utf-8");
-        const modelSection = raw.match(
-          /^model:\s*\n((?:[ \t]+.*|\s*)\n)*/m
-        );
-        if (modelSection) {
-          const defMatch = modelSection[0].match(
-            /^\s+(?:default|model)\s*:\s*["']?([^\s"'#]+)/m
-          );
-          if (defMatch && defMatch[1]) {
-            return defMatch[1].trim();
-          }
-        }
-        const topMatch = raw.match(
-          /^\s*(?:default_)?model\s*:\s*["']?([^\s"'#:]+)["']?\s*$/m
-        );
-        if (topMatch && topMatch[1]) {
-          return topMatch[1].trim();
-        }
+        return this.parseHermesConfigModels((0,
+          import_fs3.readFileSync)(cfgPath, "utf-8"));
       }
     } catch {
     }
-    return "";
+    return [];
+  }
+  readConfiguredDefaultModel() {
+    return this.readConfiguredDefaultModels()[0] ?? "";
   }
   async getModelContextLimit(model) {
     const effective = model.trim() || this.getConfig().model.trim() ||
@@ -5562,6 +5579,10 @@ print(json.dumps({"models": models}))
     const cached = this.contextLimits.get(cacheKey) ??
       this.contextLimits.get(effective);
     if (cached && cached > 0) return cached;
+    const failedAt = this.contextLimitFailedAt.get(cacheKey);
+    if (failedAt !== void 0 && Date.now() - failedAt < 6e4) {
+      return this.estimateModelContextLimit(effective, 256e3);
+    }
     try {
       const script = [
         "import json, sys",
@@ -5595,8 +5616,10 @@ print(json.dumps({"models": models}))
         if (typeof parsed.context_length === "number" &&
           parsed.context_length > 0) {
           this.contextLimits.set(cacheKey, parsed.context_length);
-          if (effective) this.contextLimits.set(effective,
-            parsed.context_length);
+          this.contextLimitFailedAt.delete(cacheKey);
+          if (effective) {
+            this.contextLimits.set(effective, parsed.context_length);
+          }
           if (parsed.model) {
             this.contextLimits.set(parsed.model, parsed.context_length);
           }
@@ -5605,6 +5628,7 @@ print(json.dumps({"models": models}))
       }
     } catch {
     }
+    this.contextLimitFailedAt.set(cacheKey, Date.now());
     return this.estimateModelContextLimit(effective, 256e3);
   }
   async getSessionTokens(sessionId) {
@@ -5872,10 +5896,7 @@ var PiRunner = class extends BaseCliRunner {
     return Math.round(val * (unit === "M" ? 1e6 : 1e3));
   }
   async getVersion() {
-    const out = await this.execCli(this.getBin(), ["--version"]);
-    const first = out.trim().split("\n")[0];
-    if (!first) throw new Error("Empty output from pi --version");
-    return first;
+    return this.fetchCliVersion(this.getBin(), "pi");
   }
   async listModels(forceRefresh = false) {
     const bin = this.getBin();

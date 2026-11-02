@@ -82,10 +82,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
 
   async getVersion(): Promise<string> {
     const bin = this.resolveBinaryPath(this.getConfig().binary || "agy");
-    const out = await this.execCli(bin, ["--version"]);
-    const first = out.trim().split("\n")[0];
-    if (!first) throw new Error("Empty output from agy --version");
-    return first;
+    return this.fetchCliVersion(bin, "agy");
   }
 
   async listModels(forceRefresh = false): Promise<string[]> {
@@ -213,16 +210,16 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     const dbPath = this.getDbPath();
     if (existsSync(dbPath)) {
       try {
-        const safeTitle = title.replace(/'/g, "''");
-        const safeId = sessionId.replace(/'/g, "''");
+        const safeTitle = this.sqlEscape(title);
+        const safeId = this.sqlEscape(sessionId);
         const query = [
           "UPDATE conversation_summaries",
           `SET title = '${safeTitle}'`,
           `WHERE conversation_id = '${safeId}'`,
         ].join(" ");
         await this.execSqlite(dbPath, query);
-      } catch {
-        // Best effort
+      } catch (e) {
+        console.debug("[vault-agents] Antigravity renameSession failed:", e);
       }
     }
   }
@@ -231,14 +228,14 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     const dbPath = this.getDbPath();
     if (existsSync(dbPath)) {
       try {
-        const safeId = sessionId.replace(/'/g, "''");
+        const safeId = this.sqlEscape(sessionId);
         const query = [
           "DELETE FROM conversation_summaries",
           `WHERE conversation_id = '${safeId}'`,
         ].join(" ");
         await this.execSqlite(dbPath, query);
-      } catch {
-        // Best effort
+      } catch (e) {
+        console.debug("[vault-agents] Antigravity deleteSession failed:", e);
       }
     }
   }
@@ -487,10 +484,6 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       const msg = ev.error?.message || JSON.stringify(ev.error || ev);
       cb.onError(String(msg));
     }
-  }
-
-  private execSqlite(dbPath: string, query: string): Promise<string> {
-    return this.execCli("sqlite3", [dbPath, query]);
   }
 
   private getDbPath(): string {
