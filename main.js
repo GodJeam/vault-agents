@@ -10,13 +10,11 @@ var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
       if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc =
-          __getOwnPropDesc(from, key)) || desc.enumerable });
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
   }
   return to;
 };
-var __toCommonJS = (mod) =>
-  __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/main.ts
 var main_exports = {};
@@ -33,86 +31,45 @@ var import_obsidian8 = require("obsidian");
 var IT = {
   // --- settings ---
   "Language": "Lingua",
-  ["Interface language. English is the default. Some command names " +
-    "update after reloading Obsidian."]:
-    "Lingua dell'interfaccia. L'inglese è il default. Alcuni nomi dei " +
-    "comandi si aggiornano dopo il ricaricamento di Obsidian.",
-  "Language changed. Reload Obsidian to apply it everywhere.":
-    "Lingua cambiata. Ricarica Obsidian per applicarla ovunque.",
+  ["Interface language. English is the default. Some command names update after reloading Obsidian."]: "Lingua dell'interfaccia. L'inglese è il default. Alcuni nomi dei comandi si aggiornano dopo il ricaricamento di Obsidian.",
+  "Language changed. Reload Obsidian to apply it everywhere.": "Lingua cambiata. Ricarica Obsidian per applicarla ovunque.",
   "English": "Inglese",
   "Italian": "Italiano",
   "Binary path": "Percorso binario",
   "Convert documents with anydoc": "Converti i documenti con anydoc",
   "Anydoc binary path": "Percorso binario anydoc",
-  ["Command or full path to the anydoc executable (npm install -g " +
-    "@firecrawl/anydoc)."]:
-    "Comando o percorso completo dell'eseguibile anydoc (npm install -g " +
-    "@firecrawl/anydoc).",
+  ["Command or full path to the anydoc executable (npm install -g @firecrawl/anydoc)."]: "Comando o percorso completo dell'eseguibile anydoc (npm install -g @firecrawl/anydoc).",
   "anydoc conversion failed": "Conversione anydoc fallita",
-  ["Command or full path to the opencode executable. Usually 'opencode' " +
-    "is enough if it is on your PATH."]:
-    "Comando o percorso completo dell'eseguibile opencode. Di solito basta " +
-    "'opencode' se è nel PATH.",
+  ["Command or full path to the opencode executable. Usually 'opencode' is enough if it is on your PATH."]: "Comando o percorso completo dell'eseguibile opencode. Di solito basta 'opencode' se è nel PATH.",
   "Model": "Modello",
   "Agent": "Agent",
-  "The opencode agent to use (e.g. build, plan). Leave empty for the default.":
-    "Agente opencode da usare (es. build, plan). Lascia vuoto per il " +
-    "default.",
+  "The opencode agent to use (e.g. build, plan). Leave empty for the default.": "Agente opencode da usare (es. build, plan). Lascia vuoto per il default.",
   "e.g. build": "es. build",
   "Session ID": "Session ID",
   "(automatic)": "(automatico)",
   "Reset session": "Azzera sessione",
-  "Clear the saved session and start from scratch on the next message.":
-    "Cancella la sessione salvata e riparte da zero al prossimo messaggio.",
+  "Clear the saved session and start from scratch on the next message.": "Cancella la sessione salvata e riparte da zero al prossimo messaggio.",
   "Reset": "Azzera",
-  "Session reset: the next message will start from a new session.":
-    "Sessione azzerata: il prossimo messaggio partirà da una nuova " +
-    "sessione.",
+  "Session reset: the next message will start from a new session.": "Sessione azzerata: il prossimo messaggio partirà da una nuova sessione.",
   "Auto-approve permissions": "Auto-approve permessi",
   "Show reasoning": "Mostra ragionamento",
   "Show tool details": "Mostra dettagli degli strumenti",
-  ["Show the input and output of every tool executed during the request, " +
-    "in collapsible blocks."]:
-    "Mostra input e output di ogni strumento eseguito durante la richiesta," +
-    " in blocchi apribili con un clic.",
+  ["Show the input and output of every tool executed during the request, in collapsible blocks."]: "Mostra input e output di ogni strumento eseguito durante la richiesta, in blocchi apribili con un clic.",
   "Database self-cleanup": "Pulizia automatica del database",
   "Enable automatic cleanup": "Attiva pulizia automatica",
-  ["Periodically remove large file attachments from the opencode " +
-    "database (opencode.db), which would otherwise bloat it. Only file " +
-    "attachments older than the minimum age and larger than the max size " +
-    "are removed; conversation text is never touched."]:
-    "Rimuove periodicamente gli allegati file di grandi dimensioni dal " +
-    "database di opencode (opencode.db), che altrimenti si gonfia. Vengono " +
-    "rimossi solo gli allegati più vecchi dell'età minima e più grandi " +
-    "della dimensione massima; il testo delle conversazioni non viene mai " +
-    "toccato.",
+  ["Periodically remove large file attachments from the opencode database (opencode.db), which would otherwise bloat it. Only file attachments older than the minimum age and larger than the max size are removed; conversation text is never touched."]: "Rimuove periodicamente gli allegati file di grandi dimensioni dal database di opencode (opencode.db), che altrimenti si gonfia. Vengono rimossi solo gli allegati più vecchi dell'età minima e più grandi della dimensione massima; il testo delle conversazioni non viene mai toccato.",
   "Max part size (MB)": "Dimensione massima parte (MB)",
-  "File attachments larger than this (in the database) are removed.":
-    "Gli allegati file più grandi di questo valore (nel database) vengono " +
-    "rimossi.",
+  "File attachments larger than this (in the database) are removed.": "Gli allegati file più grandi di questo valore (nel database) vengono rimossi.",
   "Minimum age (days)": "Età minima (giorni)",
-  ["Only attachments older than this are removed, so recent files stay " +
-    "available."]:
-    "Vengono rimossi solo gli allegati più vecchi di questo periodo, così " +
-    "i file recenti restano disponibili.",
+  ["Only attachments older than this are removed, so recent files stay available."]: "Vengono rimossi solo gli allegati più vecchi di questo periodo, così i file recenti restano disponibili.",
   "Max attachment size (MB)": "Dimensione massima allegato (MB)",
-  ["When anydoc fails to convert a document, files larger than this are " +
-    "not attached to the request, to avoid storing unusable copies in the " +
-    "database."]:
-    "Quando anydoc non riesce a convertire un documento, i file più grandi " +
-    "di questo valore non vengono allegati alla richiesta, per evitare di " +
-    "salvare copie inutilizzabili nel database.",
+  ["When anydoc fails to convert a document, files larger than this are not attached to the request, to avoid storing unusable copies in the database."]: "Quando anydoc non riesce a convertire un documento, i file più grandi di questo valore non vengono allegati alla richiesta, per evitare di salvare copie inutilizzabili nel database.",
   "Run cleanup now": "Esegui pulizia ora",
-  "Remove oversized file attachments immediately, regardless of age.":
-    "Rimuove subito gli allegati file troppo grandi, indipendentemente " +
-    "dall'età.",
+  "Remove oversized file attachments immediately, regardless of age.": "Rimuove subito gli allegati file troppo grandi, indipendentemente dall'età.",
   "Cleanup": "Pulisci",
   "Cleaning...": "Pulizia in corso...",
   "Cleanup done.": "Pulizia completata.",
-  ["Attachment skipped: the file is larger than $1 MB and could not be " +
-    "converted, so it was not attached."]:
-    "Allegato saltato: il file è più grande di $1 MB e non è stato " +
-    "possibile convertirlo, quindi non è stato allegato.",
+  ["Attachment skipped: the file is larger than $1 MB and could not be converted, so it was not attached."]: "Allegato saltato: il file è più grande di $1 MB e non è stato possibile convertirlo, quindi non è stato allegato.",
   "Test connection": "Testa connessione",
   "Test": "Test",
   "Testing...": "Test in corso...",
@@ -121,20 +78,13 @@ var IT = {
   // --- main commands ---
   "New Vault Agents chat": "Nuova chat Vault Agents",
   "Open Vault Agents chat": "Apri chat Vault Agents",
-  "Continue in a new session (by summarizing)":
-    "Continua in una nuova sessione (riassumendo)",
+  "Continue in a new session (by summarizing)": "Continua in una nuova sessione (riassumendo)",
   "Send selection to agent": "Invia selezione all'agente",
   "No text selected": "Nessun testo selezionato",
   "Use the current note as context": "Usa la nota corrente come contesto",
   "No active note": "Nessuna nota attiva",
-  "Analyze the current note with agent":
-    "Analizza la nota corrente con l'agente",
-  ["Analyze the content of the attached note below: provide a summary, " +
-    "key points, possible links with other vault notes and suggestions to " +
-    "develop it."]:
-    "Analizza il contenuto della nota allegata qui sotto: fornisci un " +
-    "riassunto, i punti chiave, eventuali collegamenti con altre note del " +
-    "vault e suggerimenti per svilupparla.",
+  "Analyze the current note with agent": "Analizza la nota corrente con l'agente",
+  ["Analyze the content of the attached note below: provide a summary, key points, possible links with other vault notes and suggestions to develop it."]: "Analizza il contenuto della nota allegata qui sotto: fornisci un riassunto, i punti chiave, eventuali collegamenti con altre note del vault e suggerimenti per svilupparla.",
   "Reset the active session": "Azzera la sessione attiva",
   "Session reset.": "Sessione azzerata.",
   // --- chat view ---
@@ -144,16 +94,8 @@ var IT = {
   "Error": "Errore",
   "Copy text": "Copia testo",
   "Text copied.": "Testo copiato.",
-  ["Type a message for the agent... (Enter to send, Shift+Enter for a " +
-    "new line)"]:
-    "Scrivi un messaggio per l'agente... (Invio per inviare, Shift+Invio " +
-    "per andare a capo)",
-  ["Hi! I am Vault Agents, connecting AI agents directly to your notes. " +
-    "Write a message below. Try the commands: / for commands, @ to attach " +
-    "a file, ! for quick actions."]:
-    "Ciao! Sono Vault Agents, il plugin che connette gli agenti AI " +
-    "direttamente alle tue note. Scrivi un messaggio qui sotto. Prova i " +
-    "comandi: / per le azioni, @ per allegare file, ! per azioni rapide.",
+  ["Type a message for the agent... (Enter to send, Shift+Enter for a new line)"]: "Scrivi un messaggio per l'agente... (Invio per inviare, Shift+Invio per andare a capo)",
+  ["Hi! I am Vault Agents, connecting AI agents directly to your notes. Write a message below. Try the commands: / for commands, @ to attach a file, ! for quick actions."]: "Ciao! Sono Vault Agents, il plugin che connette gli agenti AI direttamente alle tue note. Scrivi un messaggio qui sotto. Prova i comandi: / per le azioni, @ per allegare file, ! per azioni rapide.",
   "Send": "Invia",
   "Stop": "Stop",
   "New session": "Nuova sessione",
@@ -171,10 +113,7 @@ var IT = {
   "The title cannot be empty.": "Il titolo non può essere vuoto.",
   "Session renamed.": "Sessione rinominata.",
   "Session deleted.": "Sessione eliminata.",
-  ['Do you want to delete the session "$1"? The history saved in ' +
-    'Obsidian will also be removed.']:
-    'Vuoi eliminare la sessione "$1"? Verrà rimossa anche la cronologia ' +
-    'salvata in Obsidian.',
+  ['Do you want to delete the session "$1"? The history saved in Obsidian will also be removed.']: 'Vuoi eliminare la sessione "$1"? Verrà rimossa anche la cronologia salvata in Obsidian.',
   "Delete": "Elimina",
   "Cancel": "Annulla",
   "Context:": "Contesto:",
@@ -182,14 +121,10 @@ var IT = {
   "Possibly stuck": "Possibilmente bloccato",
   "with context:": "con contesto:",
   "Note added to context.": "Nota aggiunta al contesto.",
-  "Image attached: check that the selected model supports images (vision).":
-    "Immagine allegata: verifica che il modello selezionato supporti le " +
-    "immagini (vision).",
-  "New session: the next message will start from scratch.":
-    "Nuova sessione: il prossimo messaggio partirà da zero.",
+  "Image attached: check that the selected model supports images (vision).": "Immagine allegata: verifica che il modello selezionato supporti le immagini (vision).",
+  "New session: the next message will start from scratch.": "Nuova sessione: il prossimo messaggio partirà da zero.",
   "There is already a request in progress.": "C'è già una richiesta in corso.",
-  "Select first the session to summarize.":
-    "Seleziona prima la sessione da riassumere.",
+  "Select first the session to summarize.": "Seleziona prima la sessione da riassumere.",
   "Model set:": "Modello impostato:",
   "navigate": "navigare",
   "attach": "allegare",
@@ -207,8 +142,7 @@ var IT = {
   "Total tokens": "Totale token",
   "Cost": "Costo",
   "Generating session summary...": "Generazione riassunto della sessione...",
-  "The session summary could not be generated.":
-    "Riassunto della sessione non riuscito.",
+  "The session summary could not be generated.": "Riassunto della sessione non riuscito.",
   "Details": "Dettagli",
   "Reasoning": "Ragionamento",
   "Tool": "Strumento",
@@ -220,34 +154,17 @@ var IT = {
   "out": "out",
   "included": "incluso",
   "Cost:": "Costo:",
-  ["The selected model does not support images. Remove the attached " +
-    "image or choose a multimodal (vision) model from the Model menu."]:
-    "Il modello selezionato non supporta le immagini. Rimuovi l'allegato " +
-    "immagine oppure scegli un modello multimodale (con supporto vision) " +
-    "dal menu Modello.",
-  ["The saved session no longer exists: a new one will be created, " +
-    "resend the message."]:
-    "La sessione salvata non esiste più: ne verrà creata una nuova, " +
-    "rispedisci il messaggio.",
-  ["The agent process exited with code $1. Check the binary path and the " +
-    "model in the settings."]:
-    "Il processo dell'agente è terminato con codice $1. Verifica il " +
-    "percorso del binario e il modello nelle impostazioni.",
-  "Session at the limit: new session created with the recent history.":
-    "Sessione al limite: nuova sessione creata con la cronologia recente.",
-  "New session created with the summary of the previous one.":
-    "Nuova sessione creata con il riassunto della precedente.",
+  ["The selected model does not support images. Remove the attached image or choose a multimodal (vision) model from the Model menu."]: "Il modello selezionato non supporta le immagini. Rimuovi l'allegato immagine oppure scegli un modello multimodale (con supporto vision) dal menu Modello.",
+  ["The saved session no longer exists: a new one will be created, resend the message."]: "La sessione salvata non esiste più: ne verrà creata una nuova, rispedisci il messaggio.",
+  ["The agent process exited with code $1. Check the binary path and the model in the settings."]: "Il processo dell'agente è terminato con codice $1. Verifica il percorso del binario e il modello nelle impostazioni.",
+  "Session at the limit: new session created with the recent history.": "Sessione al limite: nuova sessione creata con la cronologia recente.",
+  "New session created with the summary of the previous one.": "Nuova sessione creata con il riassunto della precedente.",
   "[SUMMARY OF THE PREVIOUS SESSION]": "[RIASSUNTO DELLA SESSIONE PRECEDENTE]",
-  "[RECENT HISTORY OF THE PREVIOUS SESSION]":
-    "[CRONOLOGIA RECENTE DELLA SESSIONE PRECEDENTE]",
+  "[RECENT HISTORY OF THE PREVIOUS SESSION]": "[CRONOLOGIA RECENTE DELLA SESSIONE PRECEDENTE]",
   "Continue the work from here.": "Continua il lavoro da qui.",
-  "Continue the work from the previous session.":
-    "Continua il lavoro dalla sessione precedente.",
-  "Continue the work from here, keeping the context above in mind.":
-    "Continua il lavoro da qui, tenendo conto del contesto sopra.",
-  "The previous session has no saved history. Continue the work from here.":
-    "La sessione precedente non ha una cronologia salvata. Continua il " +
-    "lavoro da qui.",
+  "Continue the work from the previous session.": "Continua il lavoro dalla sessione precedente.",
+  "Continue the work from here, keeping the context above in mind.": "Continua il lavoro da qui, tenendo conto del contesto sopra.",
+  "The previous session has no saved history. Continue the work from here.": "La sessione precedente non ha una cronologia salvata. Continua il lavoro da qui.",
   "User": "Utente",
   "Unknown error": "Errore sconosciuto",
   // --- suggestions ---
@@ -273,8 +190,7 @@ var IT = {
   "Prompt": "Prompt",
   "Prompt name": "Nome prompt",
   "Prompt text": "Testo prompt",
-  "No saved prompts — add them in Settings":
-    "Nessun prompt salvato — aggiungili nelle impostazioni",
+  "No saved prompts — add them in Settings": "Nessun prompt salvato — aggiungili nelle impostazioni",
   "The prompt cannot be empty.": "Il prompt non può essere vuoto.",
   "(untitled)": "(senza titolo)",
   "Attached": "Allegato",
@@ -289,44 +205,20 @@ var IT = {
   "pin/unpin session": "fissa/rimuovi sessione",
   "Pin the session in the list": "Fissa la sessione nella lista",
   "active model": "modello attivo",
-  ["Summarize in detail this conversation: goals, decisions made, work " +
-    "done, current state and next steps. Write the summary so the work " +
-    "can continue in a new session without losing context."]:
-    "Riassumi in dettaglio questa conversazione: obiettivi, decisioni " +
-    "prese, lavoro svolto, stato attuale e prossimi passi. Scrivi il " +
-    "riassunto in modo che si possa continuare il lavoro in una nuova " +
-    "sessione senza perdere il contesto.",
+  ["Summarize in detail this conversation: goals, decisions made, work done, current state and next steps. Write the summary so the work can continue in a new session without losing context."]: "Riassumi in dettaglio questa conversazione: obiettivi, decisioni prese, lavoro svolto, stato attuale e prossimi passi. Scrivi il riassunto in modo che si possa continuare il lavoro in una nuova sessione senza perdere il contesto.",
   // --- Antigravity & multi-engine ---
   "AI Engine": "Motore AI",
-  ["Select which AI backend to use. Antigravity connects directly to " +
-    "your Google AI Pro subscription with no API key needed."]:
-    "Seleziona quale backend AI usare. Antigravity si collega direttamente " +
-    "al tuo abbonamento Google AI Pro senza alcuna API key.",
+  ["Select which AI backend to use. Antigravity connects directly to your Google AI Pro subscription with no API key needed."]: "Seleziona quale backend AI usare. Antigravity si collega direttamente al tuo abbonamento Google AI Pro senza alcuna API key.",
   "Antigravity CLI (Google AI Pro)": "Antigravity CLI (Google AI Pro)",
   "OpenCode CLI": "OpenCode CLI",
   "OpenCode settings": "Impostazioni OpenCode",
   "General settings": "Impostazioni generali",
   "Document conversion": "Conversione documenti",
-  ["Command or full path to the agy executable. Default is 'agy' or '~/" +
-    ".local/bin/agy'."]:
-    "Comando o percorso completo dell'eseguibile agy. Il default è 'agy' o " +
-    "'~/.local/bin/agy'.",
-  ["Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet " +
-    "5.5). The effort is part of the model name. Included with Google AI " +
-    "Pro."]:
-    "Scegli un modello da Antigravity (Gemini 3.8 Flash, Claude Opus/" +
-    "Sonnet 5.5). L'effort fa parte del nome del modello. Incluso con " +
-    "Google AI Pro.",
-  ["Pick a model from the opencode list. Default uses the OpenCode Go " +
-    "provider."]:
-    "Scegli un modello dall'elenco opencode. Il default usa il provider " +
-    "OpenCode Go.",
+  ["Command or full path to the agy executable. Default is 'agy' or '~/.local/bin/agy'."]: "Comando o percorso completo dell'eseguibile agy. Il default è 'agy' o '~/.local/bin/agy'.",
+  ["Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet 5.5). The effort is part of the model name. Included with Google AI Pro."]: "Scegli un modello da Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet 5.5). L'effort fa parte del nome del modello. Incluso con Google AI Pro.",
+  ["Pick a model from the opencode list. Default uses the OpenCode Go provider."]: "Scegli un modello dall'elenco opencode. Il default usa il provider OpenCode Go.",
   "Reasoning effort": "Livello di ragionamento (Effort)",
-  ["Effort sent only for models whose name does not already include it. " +
-    "Antigravity model names usually end with -low/-medium/-high."]:
-    "Effort inviato solo per i modelli il cui nome non lo include già. I " +
-    "nomi dei modelli Antigravity di solito terminano con -low/-medium/-" +
-    "high.",
+  ["Effort sent only for models whose name does not already include it. Antigravity model names usually end with -low/-medium/-high."]: "Effort inviato solo per i modelli il cui nome non lo include già. I nomi dei modelli Antigravity di solito terminano con -low/-medium/-high.",
   "Low": "Basso",
   "Medium": "Medio",
   "High": "Alto",
@@ -334,78 +226,38 @@ var IT = {
   "Max": "Massimo",
   "$1 settings": "Impostazioni $1",
   "$1 found:": "$1 trovato:",
-  "Run '$1 --version' to verify the binary is reachable.":
-    "Esegue '$1 --version' per verificare che il binario sia raggiungibile.",
+  "Run '$1 --version' to verify the binary is reachable.": "Esegue '$1 --version' per verificare che il binario sia raggiungibile.",
   "Hermes Agent CLI (Nous Research)": "Hermes Agent CLI (Nous Research)",
   "Pi Coding Agent CLI": "Pi Coding Agent CLI",
-  ["Command or full path to the hermes executable. Default is 'hermes' " +
-    "or '~/.hermes/bin/hermes'."]:
-    "Comando o percorso completo dell'eseguibile hermes. Il default è " +
-    "'hermes' o '~/.hermes/bin/hermes'.",
-  ["Pick a model for Hermes Agent (e.g. anthropic/claude-sonnet-4, nous/" +
-    "hermes-4-405b)."]:
-    "Scegli un modello per Hermes Agent (es. anthropic/claude-sonnet-4, " +
-    "nous/hermes-4-405b).",
+  ["Command or full path to the hermes executable. Default is 'hermes' or '~/.hermes/bin/hermes'."]: "Comando o percorso completo dell'eseguibile hermes. Il default è 'hermes' o '~/.hermes/bin/hermes'.",
+  ["Pick a model for Hermes Agent (e.g. anthropic/claude-sonnet-4, nous/hermes-4-405b)."]: "Scegli un modello per Hermes Agent (es. anthropic/claude-sonnet-4, nous/hermes-4-405b).",
   "Provider": "Provider",
-  "Optional Hermes backend provider (e.g. openrouter, nous, anthropic).":
-    "Provider backend opzionale per Hermes (es. openrouter, nous, " +
-    "anthropic).",
+  "Optional Hermes backend provider (e.g. openrouter, nous, anthropic).": "Provider backend opzionale per Hermes (es. openrouter, nous, anthropic).",
   "e.g. openrouter": "es. openrouter",
-  ["Command or full path to the pi executable. Usually 'pi' is enough if " +
-    "it is on your PATH."]:
-    "Comando o percorso completo dell'eseguibile pi. Di solito basta 'pi' " +
-    "se è nel PATH.",
-  ["Pick a model for the Pi coding agent (e.g. claude-sonnet-4-5, gpt-5, " +
-    "gemini-2.5-pro)."]:
-    "Scegli un modello per l'agente Pi (es. claude-sonnet-4-5, gpt-5, " +
-    "gemini-2.5-pro).",
-  "Optional model provider for Pi (e.g. anthropic, openai, google).":
-    "Provider opzionale per Pi (es. anthropic, openai, google).",
+  ["Command or full path to the pi executable. Usually 'pi' is enough if it is on your PATH."]: "Comando o percorso completo dell'eseguibile pi. Di solito basta 'pi' se è nel PATH.",
+  ["Pick a model for the Pi coding agent (e.g. claude-sonnet-4-5, gpt-5, gemini-2.5-pro)."]: "Scegli un modello per l'agente Pi (es. claude-sonnet-4-5, gpt-5, gemini-2.5-pro).",
+  "Optional model provider for Pi (e.g. anthropic, openai, google).": "Provider opzionale per Pi (es. anthropic, openai, google).",
   "e.g. anthropic": "es. anthropic",
-  "Thinking level passed to Pi (--thinking).":
-    "Livello di ragionamento passato a Pi (--thinking).",
+  "Thinking level passed to Pi (--thinking).": "Livello di ragionamento passato a Pi (--thinking).",
   "Off": "Disattivato",
   "Minimal": "Minimo",
-  ["Automatically allow tool permissions (bash, file edits, etc.). Turn " +
-    "it off for extra safety."]:
-    "Concede automaticamente i permessi degli strumenti (bash, edit file, " +
-    "ecc.). Disattivalo per maggiore sicurezza.",
-  "Show the model's reasoning blocks.":
-    "Mostra i blocchi di ragionamento del modello.",
-  ["The persistent session id used for the chat. Managed automatically. " +
-    "Empty = new session on next message."]:
-    "L'ID di sessione persistente usato per la chat. Gestito " +
-    "automaticamente. Vuoto = nuova sessione al prossimo messaggio.",
-  ["Run anydoc on attached documents (PDF, Word, Excel, etc.) and attach " +
-    "them as Markdown instead of the original file."]:
-    "Esegue anydoc sui documenti allegati (PDF, Word, Excel, ecc.) e li " +
-    "allega come Markdown anziché il file originale.",
-  ["Save reusable prompt templates. In the chat, type /prompt to quickly " +
-    "insert them into the composer."]:
-    "Salva modelli di prompt riutilizzabili. Nella chat, digita /prompt " +
-    "per inserirli rapidamente nel compositore.",
+  ["Automatically allow tool permissions (bash, file edits, etc.). Turn it off for extra safety."]: "Concede automaticamente i permessi degli strumenti (bash, edit file, ecc.). Disattivalo per maggiore sicurezza.",
+  "Show the model's reasoning blocks.": "Mostra i blocchi di ragionamento del modello.",
+  ["The persistent session id used for the chat. Managed automatically. Empty = new session on next message."]: "L'ID di sessione persistente usato per la chat. Gestito automaticamente. Vuoto = nuova sessione al prossimo messaggio.",
+  ["Run anydoc on attached documents (PDF, Word, Excel, etc.) and attach them as Markdown instead of the original file."]: "Esegue anydoc sui documenti allegati (PDF, Word, Excel, ecc.) e li allega come Markdown anziché il file originale.",
+  ["Save reusable prompt templates. In the chat, type /prompt to quickly insert them into the composer."]: "Salva modelli di prompt riutilizzabili. Nella chat, digita /prompt per inserirli rapidamente nel compositore.",
   "Included with $1 ($0.00)": "Incluso con $1 ($0.00)",
   "Included ($0.00)": "Incluso ($0.00)",
-  ["Type any exact model ID or alias manually. Leave empty to use the " +
-    "CLI's own configured default model."]:
-    "Digita manualmente qualsiasi ID modello o alias esatto. Lascia vuoto " +
-    "per usare il modello predefinito configurato nella CLI.",
+  ["Type any exact model ID or alias manually. Leave empty to use the CLI's own configured default model."]: "Digita manualmente qualsiasi ID modello o alias esatto. Lascia vuoto per usare il modello predefinito configurato nella CLI.",
   "(CLI default)": "(default della CLI)",
   "(default from $1)": "(default di $1)",
   "(default)": "(default)",
   "default": "default",
-  ["Leave on default to use your ~/.hermes/config.yaml model, or enter a " +
-    "provider/model ID."]:
-    "Lascia su default per usare il modello in ~/.hermes/config.yaml, " +
-    "oppure inserisci un ID provider/modello.",
-  ["Leave on default to use your Pi config, or pick a model from 'pi --" +
-    "list-models'."]:
-    "Lascia su default per usare la configurazione di Pi, oppure scegli un " +
-    "modello da 'pi --list-models'.",
+  ["Leave on default to use your ~/.hermes/config.yaml model, or enter a provider/model ID."]: "Lascia su default per usare il modello in ~/.hermes/config.yaml, oppure inserisci un ID provider/modello.",
+  ["Leave on default to use your Pi config, or pick a model from 'pi --list-models'."]: "Lascia su default per usare la configurazione di Pi, oppure scegli un modello da 'pi --list-models'.",
   "select": "seleziona",
   "Select an AI Agent...": "Seleziona un Agente AI...",
-  "Search $1 models or type a custom ID...":
-    "Cerca i modelli di $1 o digita un ID personalizzato...",
+  "Search $1 models or type a custom ID...": "Cerca i modelli di $1 o digita un ID personalizzato...",
   "Installed": "Installato",
   "Not found": "Non trovato",
   "Default": "Default",
@@ -438,10 +290,8 @@ var IT = {
   "Other / custom answer...": "Altro / risposta personalizzata...",
   "Send answer": "Invia risposta",
   "Answer sent": "Risposta inviata",
-  "Please select or type an answer before sending.":
-    "Seleziona o scrivi almeno una risposta prima di inviare.",
-  "Here are my answers to your questions:":
-    "Ecco le mie risposte alle tue domande:"
+  "Please select or type an answer before sending.": "Seleziona o scrivi almeno una risposta prima di inviare.",
+  "Here are my answers to your questions:": "Ecco le mie risposte alle tue domande:"
 };
 function translate(lang, text) {
   if (lang === "it") return IT[text] ?? text;
@@ -475,8 +325,7 @@ var FileSuggestModal = class extends import_obsidian.SuggestModal {
   items = null;
   getItems() {
     if (!this.items) {
-      this.items = this.app.vault.getFiles().sort((a, b) =>
-        a.path.localeCompare(b.path));
+      this.items = this.app.vault.getFiles().sort((a, b) => a.path.localeCompare(b.path));
     }
     return this.items;
   }
@@ -514,10 +363,7 @@ var AgentSuggestModal = class extends import_obsidian.SuggestModal {
     const q = query.trim().toLowerCase();
     if (!q) return this.items;
     return this.items.filter(
-      (item) => item.shortName.toLowerCase().includes(q) ||
-        item.displayName.toLowerCase().includes(q) ||
-          item.id.toLowerCase().includes(q) ||
-            item.activeModel.toLowerCase().includes(q)
+      (item) => item.shortName.toLowerCase().includes(q) || item.displayName.toLowerCase().includes(q) || item.id.toLowerCase().includes(q) || item.activeModel.toLowerCase().includes(q)
     );
   }
   renderSuggestion(item, el) {
@@ -536,12 +382,9 @@ var AgentSuggestModal = class extends import_obsidian.SuggestModal {
       text: item.displayName,
       cls: "opencode-agent-suggest-fullname"
     });
-    const rightGroup =
-      topRow.createDiv({ cls: "opencode-agent-suggest-right" });
+    const rightGroup = topRow.createDiv({ cls: "opencode-agent-suggest-right" });
     const statusBadge = rightGroup.createSpan({
-      cls:
-        "opencode-suggest-" +
-        "badge " + (item.installed ? "opencode-suggest-badge--ok" : "opencode-suggest-badge--muted"),
+      cls: "opencode-suggest-badge " + (item.installed ? "opencode-suggest-badge--ok" : "opencode-suggest-badge--muted"),
       text: item.installed ? t("Installed") : t("Not found")
     });
     statusBadge.setAttribute("title", item.binary);
@@ -598,8 +441,7 @@ var ModelSuggestModal = class extends import_obsidian.SuggestModal {
     }
     const tokens = q.split(/\s+/).filter(Boolean);
     const filtered = this.items.filter((item) => {
-      const hay =
-        `${item.id} ${item.label ?? ""} ${item.provider}`.toLowerCase();
+      const hay = `${item.id} ${item.label ?? ""} ${item.provider}`.toLowerCase();
       return tokens.every((tok) => hay.includes(tok));
     }).slice(0, 59);
     const exactExists = this.items.some(
@@ -624,10 +466,8 @@ var ModelSuggestModal = class extends import_obsidian.SuggestModal {
     el.addClass("opencode-model-suggest-item");
     if (item.isActive) el.addClass("is-selected");
     const slashIdx = item.id.indexOf("/");
-    const vendorPrefix = !item.isDefault && !item.isCustom && slashIdx > 0 ?
-      item.id.slice(0, slashIdx) : "";
-    const shortModelName = vendorPrefix && slashIdx > 0 ?
-      item.id.slice(slashIdx + 1) : item.label || item.id;
+    const vendorPrefix = !item.isDefault && !item.isCustom && slashIdx > 0 ? item.id.slice(0, slashIdx) : "";
+    const shortModelName = vendorPrefix && slashIdx > 0 ? item.id.slice(slashIdx + 1) : item.label || item.id;
     const titleEl = el.createDiv({ cls: "opencode-model-suggest-title" });
     const leftEl = titleEl.createDiv({ cls: "opencode-model-suggest-left" });
     const iconEl = leftEl.createSpan({ cls: "opencode-model-suggest-icon" });
@@ -669,8 +509,7 @@ var ModelSuggestModal = class extends import_obsidian.SuggestModal {
       subTextParts.push(t("active model"));
     }
     el.createDiv({
-      cls:
-        `opencode-model-suggest-desc opencode-model-suggest-desc--${item.engine}`,
+      cls: `opencode-model-suggest-desc opencode-model-suggest-desc--${item.engine}`,
       text: subTextParts.join(" · ")
     });
   }
@@ -693,8 +532,7 @@ var RenameModal = class extends import_obsidian2.Modal {
     contentEl.empty();
     contentEl.createEl("h3", { text: t("Rename session") });
     let input;
-    new import_obsidian2.Setting(contentEl).setName(t("New title")).addText(
-      (txt) => {
+    new import_obsidian2.Setting(contentEl).setName(t("New title")).addText((txt) => {
       input = txt.inputEl;
       txt.setValue(this.current);
       txt.inputEl.select();
@@ -733,8 +571,7 @@ var StatsModal = class extends import_obsidian2.Modal {
       cls: "opencode-stats-loading",
       text: t("Loading...")
     });
-    this.plugin.registry.resolveProvider(this.engine).getUsageStats().then(
-      (s) => {
+    this.plugin.registry.resolveProvider(this.engine).getUsageStats().then((s) => {
       status.remove();
       this.renderWindow(contentEl, t("Last 5 hours"), s.h5);
       this.renderWindow(contentEl, t("Last week"), s.week);
@@ -747,19 +584,13 @@ var StatsModal = class extends import_obsidian2.Modal {
     const locale = this.plugin.settings.language === "it" ? "it-IT" : "en-US";
     const t = (s) => this.plugin.t(s);
     container.createEl("h4", { text: label });
-    new import_obsidian2.Setting(container).setName(t("Input tokens")).setDesc(
-      w.input.toLocaleString(locale));
-    new import_obsidian2.Setting(container).setName(t("Output tokens")).setDesc(
-      w.output.toLocaleString(locale));
-    new import_obsidian2.Setting(container).setName(t("Total tokens")).setDesc((
-      w.input + w.output).toLocaleString(locale));
+    new import_obsidian2.Setting(container).setName(t("Input tokens")).setDesc(w.input.toLocaleString(locale));
+    new import_obsidian2.Setting(container).setName(t("Output tokens")).setDesc(w.output.toLocaleString(locale));
+    new import_obsidian2.Setting(container).setName(t("Total tokens")).setDesc((w.input + w.output).toLocaleString(locale));
     const provider = this.plugin.registry.resolveProvider(this.engine);
-    const incKey = provider.costNote ? t("Included with $1 ($0.00)") :
-      t("Included ($0.00)");
-    const costDesc = provider.included ?
-      substitute(incKey, provider.costNote ?? "") : `${w.cost.toFixed(4)} $`;
-    new import_obsidian2.Setting(container).setName(t("Cost")).setDesc(
-      costDesc);
+    const incKey = provider.costNote ? t("Included with $1 ($0.00)") : t("Included ($0.00)");
+    const costDesc = provider.included ? substitute(incKey, provider.costNote ?? "") : `${w.cost.toFixed(4)} $`;
+    new import_obsidian2.Setting(container).setName(t("Cost")).setDesc(costDesc);
   }
   onClose() {
     this.contentEl.empty();
@@ -811,13 +642,11 @@ var PromptModal = class extends import_obsidian2.Modal {
     contentEl.createEl("h3", { text: t("Prompt") });
     let nameInput;
     let textArea;
-    new import_obsidian2.Setting(contentEl).setName(t("Prompt name")).addText(
-      (x) => {
+    new import_obsidian2.Setting(contentEl).setName(t("Prompt name")).addText((x) => {
       nameInput = x.inputEl;
       x.setValue(this.initialName);
     });
-    new import_obsidian2.Setting(contentEl).setName(t("Prompt text"))
-      .addTextArea((x) => {
+    new import_obsidian2.Setting(contentEl).setName(t("Prompt text")).addTextArea((x) => {
       textArea = x.inputEl;
       x.setValue(this.initialText);
       x.inputEl.rows = 10;
@@ -898,10 +727,8 @@ function formatToolAction(tool, rawTitle, t) {
   const label = mapped ? t(mapped.labelKey) : tool || t("Tool");
   const icon = mapped ? mapped.icon : "wrench";
   const cleanTitle = (rawTitle || "").trim();
-  const isDuplicate = !cleanTitle || cleanTitle.toLowerCase() === key ||
-    cleanTitle.toLowerCase() === label.toLowerCase();
-  const target = isDuplicate ? "" : cleanTitle.length > 110 ?
-    cleanTitle.slice(0, 107) + "…" : cleanTitle;
+  const isDuplicate = !cleanTitle || cleanTitle.toLowerCase() === key || cleanTitle.toLowerCase() === label.toLowerCase();
+  const target = isDuplicate ? "" : cleanTitle.length > 110 ? cleanTitle.slice(0, 107) + "…" : cleanTitle;
   return { label, target, icon };
 }
 var StepManager = class {
@@ -1016,8 +843,7 @@ var StepManager = class {
   }
   renderTodoPreview(main, step) {
     if (step.tool !== "todowrite") return;
-    const inp = step.input && typeof step.input === "object" ? step.input :
-      null;
+    const inp = step.input && typeof step.input === "object" ? step.input : null;
     const todos = inp && Array.isArray(inp.todos) ? inp.todos : null;
     if (!todos || todos.length === 0) return;
     const existingList = main.querySelector(".opencode-todo-list");
@@ -1031,8 +857,7 @@ var StepManager = class {
       const itemEl = listEl.createDiv({
         cls: `opencode-todo-item opencode-todo-item--${status}`
       });
-      const mark = td.status === "completed" ? "✓" :
-        td.status === "in_progress" ? "▸" : "○";
+      const mark = td.status === "completed" ? "✓" : td.status === "in_progress" ? "▸" : "○";
       itemEl.createSpan({ cls: "opencode-todo-mark", text: mark });
       itemEl.createSpan({ cls: "opencode-todo-text", text: td.content });
     }
@@ -1083,8 +908,7 @@ function formatQuestionAnswers(questions, selectedByIdx, customByIdx, t) {
   }
   return lines.join("\n").trim();
 }
-function renderQuestionCard(container, questions, t, onSubmit,
-  onScrollRequest) {
+function renderQuestionCard(container, questions, t, onSubmit, onScrollRequest) {
   if (!questions || questions.length === 0) return;
   const card = container.createDiv({ cls: "opencode-question-card" });
   const headerRow = card.createDiv({ cls: "opencode-question-card-header" });
@@ -1106,8 +930,7 @@ function renderQuestionCard(container, questions, t, onSubmit,
       block.createDiv({ cls: "opencode-question-badge", text: q.header });
     }
     block.createDiv({ cls: "opencode-question-prompt", text: q.question });
-    const hintText = q.multiple ? t("Select one or more options") :
-      t("Select an option");
+    const hintText = q.multiple ? t("Select one or more options") : t("Select an option");
     block.createDiv({
       cls: "opencode-question-hint",
       text: hintText
@@ -1120,8 +943,7 @@ function renderQuestionCard(container, questions, t, onSubmit,
         attr: { type: "button" }
       });
       const checkSpan = btn.createSpan({ cls: "opencode-question-opt-check" });
-      (0, import_obsidian4.setIcon)(checkSpan, q.multiple ? "square" :
-        "circle");
+      (0, import_obsidian4.setIcon)(checkSpan, q.multiple ? "square" : "circle");
       const textCol = btn.createDiv({ cls: "opencode-question-opt-content" });
       textCol.createDiv({
         cls: "opencode-question-opt-label",
@@ -1200,8 +1022,7 @@ function renderQuestionCard(container, questions, t, onSubmit,
       t
     );
     if (!formatted) {
-      new import_obsidian4.Notice(t(
-        "Please select or type an answer before sending."));
+      new import_obsidian4.Notice(t("Please select or type an answer before sending."));
       return;
     }
     card.addClass("is-submitted");
@@ -1215,8 +1036,7 @@ function renderQuestionCard(container, questions, t, onSubmit,
 }
 
 // src/features/chat/messageBubble.ts
-function metaWithCopy(row, label, getText, onCopy, copyTitle, iconName =
-  "bot") {
+function metaWithCopy(row, label, getText, onCopy, copyTitle, iconName = "bot") {
   const meta = row.createDiv({ cls: "opencode-meta" });
   const iconEl = meta.createSpan({ cls: "opencode-meta-icon" });
   (0, import_obsidian5.setIcon)(iconEl, iconName);
@@ -1257,8 +1077,7 @@ function renderErrorBubble(container, msg, t, onCopy) {
   row.createDiv({ cls: "opencode-bubble", text: msg });
 }
 var AssistantBubble = class {
-  constructor(row, app, component, assistantLabel, t, showIO, onScrollRequest,
-    onCopy, fmtTokens, onAnswerQuestion, assistantIcon = "bot") {
+  constructor(row, app, component, assistantLabel, t, showIO, onScrollRequest, onCopy, fmtTokens, onAnswerQuestion, assistantIcon = "bot") {
     this.row = row;
     this.app = app;
     this.component = component;
@@ -1438,9 +1257,7 @@ var AssistantBubble = class {
       this.reasoningTimer = null;
     }
     const MAX = 5e4;
-    const shown = this.rawReasoning.length > MAX ? "… " +
-      this.rawReasoning.slice(this.rawReasoning.length - MAX) :
-        this.rawReasoning;
+    const shown = this.rawReasoning.length > MAX ? "… " + this.rawReasoning.slice(this.rawReasoning.length - MAX) : this.rawReasoning;
     this.reasoningContent.textContent = shown;
   }
   addStep(step) {
@@ -1475,8 +1292,7 @@ var AssistantBubble = class {
         input: this.turnInput,
         output: this.turnOutput,
         reasoning: this.turnReasoning,
-        cache: this.lastCacheRead > 0 || this.lastCacheWrite > 0 ?
-          { read: this.lastCacheRead, write: this.lastCacheWrite } : void 0
+        cache: this.lastCacheRead > 0 || this.lastCacheWrite > 0 ? { read: this.lastCacheRead, write: this.lastCacheWrite } : void 0
       };
       this.lastCost = this.turnCost;
       this.statsEl.removeClass("hidden");
@@ -1640,11 +1456,9 @@ var SuggestPopup = class {
   buildSuggestItems(char, query) {
     const q = query.toLowerCase();
     if (char === "/") {
-      const isPrompt = q === "prompt" || q.startsWith("prompt:") ||
-        q.startsWith("prompt ");
+      const isPrompt = q === "prompt" || q.startsWith("prompt:") || q.startsWith("prompt ");
       if (isPrompt) {
-        const sub = q.startsWith("prompt") ?
-          query.slice(6).replace(/^[:\s]+/, "") : "";
+        const sub = q.startsWith("prompt") ? query.slice(6).replace(/^[:\s]+/, "") : "";
         return this.promptItems(sub);
       }
       return this.filterItems(this.commandItems(), q);
@@ -1657,8 +1471,7 @@ var SuggestPopup = class {
   filterItems(items, q) {
     if (!q) return items;
     return items.filter(
-      (x) => x.label.toLowerCase().includes(q) || (x.desc ??
-        "").toLowerCase().includes(q)
+      (x) => x.label.toLowerCase().includes(q) || (x.desc ?? "").toLowerCase().includes(q)
     );
   }
   promptItems(sub) {
@@ -1674,8 +1487,7 @@ var SuggestPopup = class {
       ];
     }
     const q = sub.trim().toLowerCase();
-    const list = q ? prompts.filter((p) => p.name.toLowerCase().includes(q)) :
-      prompts;
+    const list = q ? prompts.filter((p) => p.name.toLowerCase().includes(q)) : prompts;
     return list.map((p) => ({
       label: p.name,
       desc: p.text.length > 80 ? p.text.slice(0, 77) + "…" : p.text,
@@ -1798,8 +1610,7 @@ var SuggestPopup = class {
   }
   fileItems(query) {
     if (!this.vaultPaths) {
-      this.vaultPaths = this.app.vault.getFiles().map((f) =>
-        f.path).sort((a, b) => a.localeCompare(b));
+      this.vaultPaths = this.app.vault.getFiles().map((f) => f.path).sort((a, b) => a.localeCompare(b));
       this.vaultPathsLower = this.vaultPaths.map((p) => p.toLowerCase());
     }
     const paths = this.vaultPaths;
@@ -1972,8 +1783,7 @@ var AttachmentManager = class {
     if (isImage) {
       new import_obsidian7.Notice(
         this.plugin.t(
-            "Image attached: check that the selected model supports images " +
-            "(vision)."
+          "Image attached: check that the selected model supports images (vision)."
         )
       );
     }
@@ -1999,11 +1809,8 @@ var AttachmentManager = class {
           if (abs) {
             const st = await (0, import_promises.stat)(abs);
             if (st.size > maxMB * 1024 * 1024) {
-              const skipKey = 
-                "Attachment skipped: the file is larger than $1 MB and " +
-                "could not be converted, so it was not attached.";
-              new import_obsidian7.Notice(substitute(this.plugin.t(skipKey),
-                maxMB));
+              const skipKey = "Attachment skipped: the file is larger than $1 MB and could not be converted, so it was not attached.";
+              new import_obsidian7.Notice(substitute(this.plugin.t(skipKey), maxMB));
               return null;
             }
           }
@@ -2087,8 +1894,7 @@ async function fetchDisplayedSessions(plugin, viewSession, fallbackEngine) {
       const firstUser = hist.find(
         (m) => m.role === "user" && m.text.trim()
       );
-      const fallbackTitle = firstUser ?
-        firstUser.text.trim().replace(/\s+/g, " ").slice(0, 40) : viewSession;
+      const fallbackTitle = firstUser ? firstUser.text.trim().replace(/\s+/g, " ").slice(0, 40) : viewSession;
       displayed.push({
         id: viewSession,
         title: fallbackTitle,
@@ -2110,12 +1916,10 @@ function buildLocalContinuationPrompt(plugin, sessionId, assistantLabel) {
   const lines = [];
   for (const rec of recent) {
     const who = rec.role === "user" ? plugin.t("User") : assistantLabel;
-    const text = rec.text.length > 800 ? rec.text.slice(0, 800) + "…" :
-      rec.text;
+    const text = rec.text.length > 800 ? rec.text.slice(0, 800) + "…" : rec.text;
     lines.push(`${who}: ${text}`);
   }
-  return plugin.t("[RECENT HISTORY OF THE PREVIOUS SESSION]") + "\n" +
-    lines.join("\n\n") + "\n\n---\n\n" + plugin.t(
+  return plugin.t("[RECENT HISTORY OF THE PREVIOUS SESSION]") + "\n" + lines.join("\n\n") + "\n\n---\n\n" + plugin.t(
     "Continue the work from here, keeping the context above in mind."
   );
 }
@@ -2352,8 +2156,7 @@ var ChatView = class extends import_obsidian8.ItemView {
     this.plugin.settings.pinned = pinned;
     void this.plugin.saveSettings();
     void this.populateSessionSelect();
-    const msg = idx >= 0 ? this.plugin.t("Session unpinned.") :
-      this.plugin.t("Session pinned.");
+    const msg = idx >= 0 ? this.plugin.t("Session unpinned.") : this.plugin.t("Session pinned.");
     new import_obsidian8.Notice(msg);
   }
   renameCurrentSession() {
@@ -2368,8 +2171,7 @@ var ChatView = class extends import_obsidian8.ItemView {
         void this.populateSessionSelect();
         new import_obsidian8.Notice(this.plugin.t("Session renamed."));
       }).catch(
-        (e) =>
-          new import_obsidian8.Notice(`${this.plugin.t("Error:")} ${e.message}`)
+        (e) => new import_obsidian8.Notice(`${this.plugin.t("Error:")} ${e.message}`)
       );
     }).open();
   }
@@ -2381,8 +2183,7 @@ var ChatView = class extends import_obsidian8.ItemView {
     }
     const title = this.sessionSelect.selectedOptions[0]?.textContent ?? id;
     const confirmTpl = this.plugin.t(
-        'Do you want to delete the session "$1"? The history saved in ' +
-        'Obsidian will also be removed.'
+      'Do you want to delete the session "$1"? The history saved in Obsidian will also be removed.'
     );
     new ConfirmModal(
       this.app,
@@ -2409,9 +2210,7 @@ var ChatView = class extends import_obsidian8.ItemView {
           this.loadHistoryForSession(this.viewSession);
           new import_obsidian8.Notice(this.plugin.t("Session deleted."));
         }).catch(
-          (e) =>
-            new import_obsidian8.Notice(
-              `${this.plugin.t("Error:")} ${e.message}`)
+          (e) => new import_obsidian8.Notice(`${this.plugin.t("Error:")} ${e.message}`)
         );
       }
     ).open();
@@ -2522,8 +2321,7 @@ var ChatView = class extends import_obsidian8.ItemView {
       const tokens = await runner.getSessionTokens(sid);
       this.contextBaseInput = tokens.input;
       this.contextUsed = tokens.input;
-      if (typeof tokens.totalTokens === "number" &&
-        tokens.totalTokens > this.stats.total) {
+      if (typeof tokens.totalTokens === "number" && tokens.totalTokens > this.stats.total) {
         this.stats.input = tokens.totalInput ?? this.stats.input;
         this.stats.output = tokens.totalOutput ?? this.stats.output;
         this.stats.total = tokens.totalTokens;
@@ -2571,9 +2369,7 @@ var ChatView = class extends import_obsidian8.ItemView {
   }
   buildInputArea(container) {
     const inputArea = container.createDiv({ cls: "opencode-input-area" });
-    const placeholderKey = 
-      "Type a message for the agent... (Enter to send, Shift+Enter for a " +
-      "new line)";
+    const placeholderKey = "Type a message for the agent... (Enter to send, Shift+Enter for a new line)";
     this.inputEl = inputArea.createEl("textarea", {
       cls: "opencode-input",
       attr: {
@@ -2591,8 +2387,7 @@ var ChatView = class extends import_obsidian8.ItemView {
         onStartNewSession: () => this.startNewSession(),
         onAttachCurrentNote: () => void this.attachCurrentNote(),
         onOpenFilePicker: () => this.attachmentManager.openFilePicker(),
-        onOpenStats: () =>
-          new StatsModal(this.app, this.plugin, this.sessionEngine()).open(),
+        onOpenStats: () => new StatsModal(this.app, this.plugin, this.sessionEngine()).open(),
         onTogglePin: () => this.togglePin(),
         onRenameSession: () => this.renameCurrentSession(),
         onAddAttachment: (path) => this.attachmentManager.addAttachment(path)
@@ -2674,8 +2469,7 @@ var ChatView = class extends import_obsidian8.ItemView {
       const iconEl = this.modelBtn.createSpan({ cls: "opencode-chip-icon" });
       (0, import_obsidian8.setIcon)(iconEl, "cpu");
       const slashIdx = m.indexOf("/");
-      const shortModel = m && slashIdx > 0 ? m.slice(slashIdx + 1) : m ||
-        this.plugin.t("Default");
+      const shortModel = m && slashIdx > 0 ? m.slice(slashIdx + 1) : m || this.plugin.t("Default");
       const vendor = m && slashIdx > 0 ? m.slice(0, slashIdx) : "";
       if (vendor) {
         this.modelBtn.createSpan({
@@ -2683,8 +2477,7 @@ var ChatView = class extends import_obsidian8.ItemView {
           cls: "opencode-chip-vendor"
         });
       }
-      const display = shortModel.length > 26 ? shortModel.slice(0, 24) + "…" :
-        shortModel;
+      const display = shortModel.length > 26 ? shortModel.slice(0, 24) + "…" : shortModel;
       this.modelBtn.createSpan({
         text: display,
         cls: "opencode-chip-text"
@@ -2740,8 +2533,7 @@ var ChatView = class extends import_obsidian8.ItemView {
     const provider = this.plugin.registry.resolveProvider(activeEngine);
     try {
       const models = await provider.listModels();
-      const providerLabel = provider.costNote ||
-        this.plugin.t(provider.descriptor.shortName);
+      const providerLabel = provider.costNote || this.plugin.t(provider.descriptor.shortName);
       const items = [];
       const seen = /* @__PURE__ */ new Set();
       if (!provider.descriptor.defaultModel) {
@@ -2789,8 +2581,7 @@ var ChatView = class extends import_obsidian8.ItemView {
             if (!this.plugin.settings.sessionEngines) {
               this.plugin.settings.sessionEngines = {};
             }
-            this.plugin.settings.sessionEngines[this.viewSession] =
-              activeEngine;
+            this.plugin.settings.sessionEngines[this.viewSession] = activeEngine;
           }
           void this.plugin.saveSettings();
           this.updateModelBtn();
@@ -2799,8 +2590,7 @@ var ChatView = class extends import_obsidian8.ItemView {
           void this.refreshContext();
           const shownModel = item.label || item.id;
           const setPrefix = this.plugin.t("Model set:");
-          new import_obsidian8.Notice(
-            `${setPrefix} ${shownModel} (${item.provider})`);
+          new import_obsidian8.Notice(`${setPrefix} ${shownModel} (${item.provider})`);
         }
       ).open();
     } catch (e) {
@@ -2809,14 +2599,12 @@ var ChatView = class extends import_obsidian8.ItemView {
   }
   continueInNewSession() {
     if (this.running) {
-      new import_obsidian8.Notice(this.plugin.t(
-        "There is already a request in progress."));
+      new import_obsidian8.Notice(this.plugin.t("There is already a request in progress."));
       return;
     }
     const oldSession = this.viewSession;
     if (!oldSession) {
-      new import_obsidian8.Notice(this.plugin.t(
-        "Select first the session to summarize."));
+      new import_obsidian8.Notice(this.plugin.t("Select first the session to summarize."));
       return;
     }
     const bubble = this.addAssistantMessage();
@@ -2826,9 +2614,7 @@ var ChatView = class extends import_obsidian8.ItemView {
     this.stoppedByUser = false;
     this.setRunningUI(true);
     const promptText = this.plugin.t(
-        "Summarize in detail this conversation: goals, decisions made, work " +
-        "done, current state and next steps. Write the summary so the work " +
-        "can continue in a new session without losing context."
+      "Summarize in detail this conversation: goals, decisions made, work done, current state and next steps. Write the summary so the work can continue in a new session without losing context."
     );
     const runner = this.getRunner();
     const proc = runner.runStream(
@@ -2871,8 +2657,7 @@ var ChatView = class extends import_obsidian8.ItemView {
           const failed = code !== 0 && !summary || this.hadStreamError;
           if (failed && !this.stoppedByUser) {
             if (!this.hadStreamError) {
-              const detail =
-                this.lastStderr.trim().replace(/\s+/g, " ").slice(0, 300);
+              const detail = this.lastStderr.trim().replace(/\s+/g, " ").slice(0, 300);
               const failMsg = this.plugin.t(
                 "The session summary could not be generated."
               );
@@ -2880,8 +2665,7 @@ var ChatView = class extends import_obsidian8.ItemView {
               this.addErrorBubble(detail ? `${base} ${detail}` : base);
             }
             const limitNotice = this.plugin.t(
-                "Session at the limit: new session created with the recent " +
-                "history."
+              "Session at the limit: new session created with the recent history."
             );
             this.finishContinuation(
               this.buildLocalContinuation(oldSession),
@@ -2893,9 +2677,7 @@ var ChatView = class extends import_obsidian8.ItemView {
             "[SUMMARY OF THE PREVIOUS SESSION]"
           );
           const contFooter = this.plugin.t("Continue the work from here.");
-          const prompt = summary ?
-            [sumHeader, summary, "---", contFooter].join("\n\n") :
-              this.plugin.t("Continue the work from the previous session.");
+          const prompt = summary ? [sumHeader, summary, "---", contFooter].join("\n\n") : this.plugin.t("Continue the work from the previous session.");
           const okNotice = this.plugin.t(
             "New session created with the summary of the previous one."
           );
@@ -2927,9 +2709,7 @@ var ChatView = class extends import_obsidian8.ItemView {
       cls: "opencode-message opencode-message--assistant"
     });
     const text = this.plugin.t(
-        "Hi! I am Vault Agents, connecting AI agents directly to your " +
-        "notes. Write a message below. Try the commands: / for commands, @ " +
-        "to attach a file, ! for quick actions."
+      "Hi! I am Vault Agents, connecting AI agents directly to your notes. Write a message below. Try the commands: / for commands, @ to attach a file, ! for quick actions."
     );
     metaWithCopy(
       row,
@@ -3077,8 +2857,7 @@ ${this.context.content}
           bubble.setFinish(info);
           this.addStats(info);
           if (info.tokens) {
-            const stepContextTokens = (info.tokens.input ?? 0) +
-              (info.tokens.cache?.read ?? 0) + (info.tokens.cache?.write ?? 0);
+            const stepContextTokens = (info.tokens.input ?? 0) + (info.tokens.cache?.read ?? 0) + (info.tokens.cache?.write ?? 0);
             if (stepContextTokens > 0) {
               this.contextRunInput = stepContextTokens;
               this.contextUsed = Math.max(
@@ -3156,8 +2935,7 @@ ${this.context.content}
       this.plugin.settings.showToolIO,
       () => this.scheduleScroll(),
       (t) => this.copyText(t),
-      (total, input, output, cost) =>
-        this.fmtTokens(total, input, output, cost, this.sessionEngine()),
+      (total, input, output, cost) => this.fmtTokens(total, input, output, cost, this.sessionEngine()),
       (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer),
       this.assistantIcon()
     );
@@ -3192,25 +2970,20 @@ ${this.context.content}
     new import_obsidian8.Notice(this.plugin.t("Text copied."));
   }
   handleStreamError(err) {
-    const isImageError = /does not support image/i.test(err) ||
-      /multimodal/i.test(err) || /image.*not supported/i.test(err);
+    const isImageError = /does not support image/i.test(err) || /multimodal/i.test(err) || /image.*not supported/i.test(err);
     if (isImageError) {
       this.addErrorBubble(
         this.plugin.t(
-            "The selected model does not support images. Remove the " +
-            "attached image or choose a multimodal (vision) model from the " +
-            "Model menu."
+          "The selected model does not support images. Remove the attached image or choose a multimodal (vision) model from the Model menu."
         )
       );
       return;
     }
-    const isSessionMissing = /session.*not found/i.test(err) ||
-      /no such session/i.test(err) || /session does not exist/i.test(err);
+    const isSessionMissing = /session.*not found/i.test(err) || /no such session/i.test(err) || /session does not exist/i.test(err);
     if (isSessionMissing) {
       this.addErrorBubble(
         this.plugin.t(
-            "The saved session no longer exists: a new one will be created, " +
-            "resend the message."
+          "The saved session no longer exists: a new one will be created, resend the message."
         )
       );
       if (this.viewSession && this.plugin.settings.sessionEngines) {
@@ -3227,9 +3000,7 @@ ${this.context.content}
   handleProcessFailure(code) {
     if (this.hadStreamError) return;
     const detail = this.lastStderr.trim().replace(/\s+/g, " ").slice(0, 300);
-    const exitKey = 
-      "The agent process exited with code $1. Check the binary path and the " +
-      "model in the settings.";
+    const exitKey = "The agent process exited with code $1. Check the binary path and the model in the settings.";
     const base = substitute(this.plugin.t(exitKey), code);
     this.addErrorBubble(detail ? `${base} (${detail})` : base);
   }
@@ -3270,8 +3041,7 @@ ${this.context.content}
         if (rec.reasoning) {
           const det = row.createEl("details", { cls: "opencode-reasoning" });
           const summary = det.createEl("summary");
-          const brainIcon =
-            summary.createSpan({ cls: "opencode-reasoning-icon" });
+          const brainIcon = summary.createSpan({ cls: "opencode-reasoning-icon" });
           (0, import_obsidian8.setIcon)(brainIcon, "brain");
           summary.createSpan({ text: this.plugin.t("Reasoning") });
           det.createDiv({
@@ -3283,8 +3053,7 @@ ${this.context.content}
           cls: "opencode-bubble opencode-bubble--assistant"
         });
         if (rec.text.length <= 3e4) {
-          import_obsidian8.MarkdownRenderer.render(this.app, rec.text, bubble,
-            "", this);
+          import_obsidian8.MarkdownRenderer.render(this.app, rec.text, bubble, "", this);
         } else {
           bubble.textContent = rec.text;
         }
@@ -3351,8 +3120,7 @@ var import_os = require("os");
 var MAX_STREAM_LINE_BYTES = 2e7;
 var MAX_INLINE_ATTACHMENT_BYTES = 256 * 1024;
 var BINARY_EXT_REGEX = new RegExp(
-    "\\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|7z|rar|bin|exe|dmg|" +
-    "iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$",
+  "\\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|7z|rar|bin|exe|dmg|iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$",
   "i"
 );
 var BaseCliRunner = class {
@@ -3378,8 +3146,7 @@ var BaseCliRunner = class {
     if (!child || child.pid === void 0) return;
     try {
       if (process.platform === "win32") {
-        (0, import_child_process.spawn)("taskkill", ["/pid", String(child.pid),
-          "/T", "/F"], {
+        (0, import_child_process.spawn)("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
           windowsHide: true,
           stdio: "ignore"
         });
@@ -3401,8 +3168,7 @@ var BaseCliRunner = class {
     if (!watch) return;
     const deadline = Date.now() + 6e3;
     const timer = setInterval(() => {
-      if (child.exitCode !== null || child.signalCode !== null ||
-        Date.now() > deadline) {
+      if (child.exitCode !== null || child.signalCode !== null || Date.now() > deadline) {
         clearInterval(timer);
         return;
       }
@@ -3477,8 +3243,7 @@ var BaseCliRunner = class {
       return {
         req: {
           prompt: reqOrPrompt,
-          fileAttachments: Array.isArray(fileAttachmentsOrCb) ?
-            fileAttachmentsOrCb : []
+          fileAttachments: Array.isArray(fileAttachmentsOrCb) ? fileAttachmentsOrCb : []
         },
         cb: maybeCb
       };
@@ -3638,19 +3403,14 @@ var BaseCliRunner = class {
     const defaultCandidates = [
       (0, import_path.join)((0, import_os.homedir)(), ".local", "bin", bin),
       (0, import_path.join)((0, import_os.homedir)(), ".opencode", "bin", bin),
-      (0, import_path.join)((0, import_os.homedir)(), ".gemini",
-        "antigravity-cli", "bin", bin),
+      (0, import_path.join)((0, import_os.homedir)(), ".gemini", "antigravity-cli", "bin", bin),
       (0, import_path.join)((0, import_os.homedir)(), ".hermes", "bin", bin),
-      (0, import_path.join)((0, import_os.homedir)(), ".hermes",
-        "hermes-agent", ".hermes", "bin", bin),
+      (0, import_path.join)((0, import_os.homedir)(), ".hermes", "hermes-agent", ".hermes", "bin", bin),
       `/usr/local/bin/${bin}`,
       `/usr/bin/${bin}`
     ];
-    const pathDirs = (process.env.PATH ??
-      "").split(process.platform === "win32" ? ";" :
-        ":").filter(Boolean).map((dir) => (0, import_path.join)(dir, bin));
-    const allCandidates =
-      [...candidatePaths, ...defaultCandidates, ...pathDirs];
+    const pathDirs = (process.env.PATH ?? "").split(process.platform === "win32" ? ";" : ":").filter(Boolean).map((dir) => (0, import_path.join)(dir, bin));
+    const allCandidates = [...candidatePaths, ...defaultCandidates, ...pathDirs];
     for (const p of allCandidates) {
       if ((0, import_fs.existsSync)(p)) {
         this.resolvedBinaries.set(bin, p);
@@ -3666,9 +3426,7 @@ var BaseCliRunner = class {
       const resolved = this.resolveCmdShim(bin);
       if (resolved) return resolved;
       const dir = (0, import_path.join)(bin, "..");
-      const exe =
-        (0, import_path.join)(dir, bin.replace(/\.(cmd|bat|ps1)$/i, "") +
-          ".exe");
+      const exe = (0, import_path.join)(dir, bin.replace(/\.(cmd|bat|ps1)$/i, "") + ".exe");
       return (0, import_fs.existsSync)(exe) ? exe : null;
     }
     const dirs = (process.env.PATH ?? "").split(";").filter(Boolean);
@@ -3737,8 +3495,7 @@ var BaseCliRunner = class {
       Math.max(1, s.maxAttachMB || 20) * 1024 * 1024
     );
     for (const p of fileAttachments) {
-      const fullPath = !(0, import_path.isAbsolute)(p) && cwd ?
-        (0, import_path.join)(cwd, p) : p;
+      const fullPath = !(0, import_path.isAbsolute)(p) && cwd ? (0, import_path.join)(cwd, p) : p;
       if (BINARY_EXT_REGEX.test(fullPath)) {
         finalPrompt = `[ATTACHMENT PATH: ${fullPath}]
 
@@ -3778,21 +3535,17 @@ ${content}
   /**
    * List sessions saved in Obsidian histories for a given engine.
    */
-  listHistorySessions(engineId, seenIds =
-    /* @__PURE__ */ new Set(), legacyIdMatcher) {
+  listHistorySessions(engineId, seenIds = /* @__PURE__ */ new Set(), legacyIdMatcher) {
     const sessions = [];
     const histories = this.plugin.histories ?? {};
     const sessionEngines = this.plugin.settings.sessionEngines ?? {};
     for (const [id, msgs] of Object.entries(histories)) {
       if (seenIds.has(id)) continue;
-      const matchesEngine = sessionEngines[id] === engineId ||
-        !sessionEngines[id] && Boolean(legacyIdMatcher?.test(id));
+      const matchesEngine = sessionEngines[id] === engineId || !sessionEngines[id] && Boolean(legacyIdMatcher?.test(id));
       if (matchesEngine) {
         const firstUser = msgs.find((m) => m.role === "user" && m.text.trim());
-        const rawTitle = firstUser?.text ?
-          firstUser.text.trim().replace(/\s+/g, " ") : id;
-        const title = rawTitle.length > 44 ? rawTitle.slice(0, 41) + "…" :
-          rawTitle;
+        const rawTitle = firstUser?.text ? firstUser.text.trim().replace(/\s+/g, " ") : id;
+        const title = rawTitle.length > 44 ? rawTitle.slice(0, 41) + "…" : rawTitle;
         const lastTs = msgs[msgs.length - 1]?.timestamp ?? Date.now();
         sessions.push({
           id,
@@ -3814,8 +3567,7 @@ ${content}
       const msg = history[i];
       if (msg.role === "assistant" && msg.tokens) {
         const tk = msg.tokens;
-        const input = Number(tk.input ?? 0) + Number(tk.cache?.read ?? 0) +
-          Number(tk.cache?.write ?? 0);
+        const input = Number(tk.input ?? 0) + Number(tk.cache?.read ?? 0) + Number(tk.cache?.write ?? 0);
         const output = Number(tk.output ?? 0);
         if (input > 0 || output > 0) {
           return { input, output };
@@ -3838,8 +3590,7 @@ ${content}
     const histories = this.plugin.histories ?? {};
     const sessionEngines = this.plugin.settings.sessionEngines ?? {};
     for (const [id, msgs] of Object.entries(histories)) {
-      const matchesEngine = sessionEngines[id] === engineId ||
-        !sessionEngines[id] && Boolean(legacyIdMatcher?.test(id));
+      const matchesEngine = sessionEngines[id] === engineId || !sessionEngines[id] && Boolean(legacyIdMatcher?.test(id));
       if (!matchesEngine) continue;
       for (const msg of msgs) {
         if (msg.role === "assistant" && msg.tokens) {
@@ -3872,22 +3623,15 @@ ${content}
    */
   estimateModelContextLimit(model, defaultLimit = 128e3) {
     const m = (model || "").toLowerCase();
-    if (m.includes("deepseek-v4") || m.includes("deepseek-flash") ||
-      m.includes("deepseek-chat") || m.includes("deepseek-reasoner")) {
+    if (m.includes("deepseek-v4") || m.includes("deepseek-flash") || m.includes("deepseek-chat") || m.includes("deepseek-reasoner")) {
       return 1e6;
     }
     if (m.includes("gemini")) return 1048576;
-    if (m.includes("claude-fable") || m.includes("claude-opus-5") ||
-      m.includes("claude-sonnet-5") || m.includes("claude-opus-4-8") ||
-        m.includes("claude-opus-4.8") || m.includes("claude-opus-4-6") ||
-          m.includes("claude-opus-4.6") || m.includes("claude-sonnet-4-6") ||
-            m.includes("claude-sonnet-4.6") || m.includes("claude-haiku-5")) {
+    if (m.includes("claude-fable") || m.includes("claude-opus-5") || m.includes("claude-sonnet-5") || m.includes("claude-opus-4-8") || m.includes("claude-opus-4.8") || m.includes("claude-opus-4-6") || m.includes("claude-opus-4.6") || m.includes("claude-sonnet-4-6") || m.includes("claude-sonnet-4.6") || m.includes("claude-haiku-5")) {
       return 1e6;
     }
     if (m.includes("claude")) return 2e5;
-    if (m.includes("gpt-6") || m.includes("gpt-5.6") ||
-      m.includes("gpt-5.5") || m.includes("gpt-5.4") && !m.includes("mini") &&
-        !m.includes("nano")) {
+    if (m.includes("gpt-6") || m.includes("gpt-5.6") || m.includes("gpt-5.5") || m.includes("gpt-5.4") && !m.includes("mini") && !m.includes("nano")) {
       return 105e4;
     }
     if (m.includes("gpt-5")) return 256e3;
@@ -3895,18 +3639,10 @@ ${content}
     if (m.includes("gpt-4")) {
       return 2e5;
     }
-    if (m.includes("glm-5.3") || m.includes("glm-5.2") &&
-      !m.includes(":free") || m.includes("kimi-k3") ||
-        m.includes("mimo-v2.5") || m.includes("mimo-v2.6") ||
-          m.includes("minimax-m3") || m.includes("qwen3.6") ||
-            m.includes("qwen3.7") || m.includes("qwen3.8") ||
-              m.includes("muse-spark") || m.includes("hy4") ||
-                m.includes("beam") || m.includes("longcat") ||
-                  m.includes("step-5")) {
+    if (m.includes("glm-5.3") || m.includes("glm-5.2") && !m.includes(":free") || m.includes("kimi-k3") || m.includes("mimo-v2.5") || m.includes("mimo-v2.6") || m.includes("minimax-m3") || m.includes("qwen3.6") || m.includes("qwen3.7") || m.includes("qwen3.8") || m.includes("muse-spark") || m.includes("hy4") || m.includes("beam") || m.includes("longcat") || m.includes("step-5")) {
       return 1e6;
     }
-    if (m.includes("grok-4.7") || m.includes("grok-4.6") ||
-      m.includes("grok-4.5")) {
+    if (m.includes("grok-4.7") || m.includes("grok-4.6") || m.includes("grok-4.5")) {
       return 5e5;
     }
     if (m.includes("hermes") || m.includes("deepseek")) return 128e3;
@@ -3938,8 +3674,7 @@ ${content}
         const dp = inp.DirectoryPath.trim();
         return (0, import_path.basename)(dp) || dp;
       }
-      if (typeof inp.SearchDirectory === "string" &&
-        inp.SearchDirectory.trim()) {
+      if (typeof inp.SearchDirectory === "string" && inp.SearchDirectory.trim()) {
         const dirName = (0, import_path.basename)(inp.SearchDirectory.trim());
         const q = typeof inp.Query === "string" ? inp.Query.trim() : "";
         return q ? `"${q}" in ${dirName}` : dirName;
@@ -3973,8 +3708,7 @@ ${content}
         return `${inp.todos.length} ${tasksWord} (${doneCount} ${doneWord})`;
       }
     }
-    if (stateTitle && stateTitle.trim() &&
-      stateTitle.trim().toLowerCase() !== toolName.toLowerCase()) {
+    if (stateTitle && stateTitle.trim() && stateTitle.trim().toLowerCase() !== toolName.toLowerCase()) {
       return stateTitle.trim();
     }
     return toolName;
@@ -3998,11 +3732,9 @@ ${content}
     for (const item of rawQuestions) {
       if (!item || typeof item !== "object") continue;
       const qObj = item;
-      const question = typeof qObj.question === "string" ?
-        qObj.question.trim() : "";
+      const question = typeof qObj.question === "string" ? qObj.question.trim() : "";
       if (!question) continue;
-      const header = typeof qObj.header === "string" ? qObj.header.trim() :
-        void 0;
+      const header = typeof qObj.header === "string" ? qObj.header.trim() : void 0;
       const multiple = Boolean(qObj.is_multi_select ?? qObj.multiple);
       const rawOpts = Array.isArray(qObj.options) ? qObj.options : [];
       const options = [];
@@ -4013,8 +3745,7 @@ ${content}
           const o = opt;
           const label = typeof o.label === "string" ? o.label.trim() : "";
           if (label) {
-            const desc = typeof o.description === "string" ?
-              o.description.trim() : void 0;
+            const desc = typeof o.description === "string" ? o.description.trim() : void 0;
             options.push({ label, description: desc });
           }
         }
@@ -4027,17 +3758,12 @@ ${content}
    * Convert a document (PDF, Word, Excel, etc.) to Markdown using anydoc
    */
   async convertDocument(absPath) {
-    const hash =
-      (0, import_crypto.createHash)("sha256").update(absPath).digest("hex")
-        .slice(0, 16);
-    const dir =
-      (0, import_path.join)((0, import_os.tmpdir)(), "vault-agents-anydoc");
+    const hash = (0, import_crypto.createHash)("sha256").update(absPath).digest("hex").slice(0, 16);
+    const dir = (0, import_path.join)((0, import_os.tmpdir)(), "vault-agents-anydoc");
     await (0, import_promises2.mkdir)(dir, { recursive: true });
     const outPath = (0, import_path.join)(dir, hash + ".md");
     try {
-      const [src, out] =
-        await Promise.all([(0, import_promises2.stat)(absPath), (0,
-          import_promises2.stat)(outPath)]);
+      const [src, out] = await Promise.all([(0, import_promises2.stat)(absPath), (0, import_promises2.stat)(outPath)]);
       if (out.mtimeMs >= src.mtimeMs) return outPath;
     } catch {
     }
@@ -4108,13 +3834,8 @@ var ANTIGRAVITY_DESCRIPTOR = {
   icon: "sparkles",
   defaultBinary: "agy",
   defaultModel: "gemini-3.8-flash-high",
-  binaryDesc:
-    "Command or full path to the agy executable. Default is 'agy' or '~/" +
-    ".local/bin/agy'.",
-  modelDesc:
-    "Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet " +
-    "5.5). The effort is part of the model name. Included with Google AI " +
-    "Pro.",
+  binaryDesc: "Command or full path to the agy executable. Default is 'agy' or '~/.local/bin/agy'.",
+  modelDesc: "Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet 5.5). The effort is part of the model name. Included with Google AI Pro.",
   included: true,
   costNote: "Google AI Pro",
   supportsSessions: "local-db",
@@ -4124,9 +3845,7 @@ var ANTIGRAVITY_DESCRIPTOR = {
     {
       key: "effort",
       label: "Reasoning effort",
-      desc:
-        "Effort sent only for models whose name does not already include " +
-        "it. Antigravity model names usually end with -low/-medium/-high.",
+      desc: "Effort sent only for models whose name does not already include it. Antigravity model names usually end with -low/-medium/-high.",
       type: "select",
       default: "high",
       choices: [
@@ -4208,10 +3927,7 @@ var AntigravityRunner = class extends BaseCliRunner {
     const dbPath = this.getDbPath();
     if ((0, import_fs2.existsSync)(dbPath)) {
       try {
-        const query = 
-          "SELECT conversation_id AS id, title, CAST(strftime('%s', " +
-          "last_modified_time) AS INTEGER) AS sec FROM " +
-          "conversation_summaries ORDER BY last_modified_time DESC LIMIT 50";
+        const query = "SELECT conversation_id AS id, title, CAST(strftime('%s', last_modified_time) AS INTEGER) AS sec FROM conversation_summaries ORDER BY last_modified_time DESC LIMIT 50";
         const out = await this.execCli("sqlite3", ["-json", dbPath, query]);
         const rows = JSON.parse(out.trim() || "[]");
         for (const row of rows) {
@@ -4219,8 +3935,7 @@ var AntigravityRunner = class extends BaseCliRunner {
           if (!id) continue;
           const title = row.title?.trim() || id;
           const sec = Number(row.sec);
-          const updated = Number.isFinite(sec) && sec > 0 ? sec * 1e3 :
-            Date.now();
+          const updated = Number.isFinite(sec) && sec > 0 ? sec * 1e3 : Date.now();
           sessions.push({
             id,
             title,
@@ -4231,11 +3946,7 @@ var AntigravityRunner = class extends BaseCliRunner {
         }
       } catch {
         try {
-          const query = 
-            "SELECT conversation_id, replace(replace(title, char(10), ' '), " +
-            "'|', ' '), strftime('%s', last_modified_time) FROM " +
-            "conversation_summaries ORDER BY last_modified_time DESC LIMIT " +
-            "50";
+          const query = "SELECT conversation_id, replace(replace(title, char(10), ' '), '|', ' '), strftime('%s', last_modified_time) FROM conversation_summaries ORDER BY last_modified_time DESC LIMIT 50";
           const out = await this.execSqlite(dbPath, query);
           for (const line of out.trim().split("\n")) {
             const parts = line.split("|");
@@ -4407,19 +4118,15 @@ var AntigravityRunner = class extends BaseCliRunner {
         const isDone = su.state === "DONE";
         const isError = su.status === "ERROR" || Boolean(su.error);
         const params = su.tool_info?.parameters;
-        const durationMs = typeof su.duration_seconds === "number" &&
-          su.duration_seconds > 0 ? Math.round(su.duration_seconds * 1e3) :
-            void 0;
+        const durationMs = typeof su.duration_seconds === "number" && su.duration_seconds > 0 ? Math.round(su.duration_seconds * 1e3) : void 0;
         if (toolName === "ask_question" || toolName === "question") {
           const questions = this.parseCommonQuestions(params);
-          const qSummary = questions[0]?.question ||
-            this.plugin.t("Agent question");
+          const qSummary = questions[0]?.question || this.plugin.t("Agent question");
           const stepKey = String(stepIndex ?? qSummary);
           if (!streamState.emittedQuestionSteps) {
             streamState.emittedQuestionSteps = /* @__PURE__ */ new Set();
           }
-          if (questions.length > 0 &&
-            !streamState.emittedQuestionSteps.has(stepKey)) {
+          if (questions.length > 0 && !streamState.emittedQuestionSteps.has(stepKey)) {
             streamState.emittedQuestionSteps.add(stepKey);
             cb.onQuestion?.(questions);
           }
@@ -4465,8 +4172,7 @@ var AntigravityRunner = class extends BaseCliRunner {
       const inputTokens = u.input_tokens ?? 0;
       const outputTokens = u.output_tokens ?? 0;
       const reasoningTokens = u.thinking_tokens ?? 0;
-      const totalTokens = u.total_tokens && u.total_tokens > 0 ?
-        u.total_tokens : inputTokens + outputTokens + reasoningTokens;
+      const totalTokens = u.total_tokens && u.total_tokens > 0 ? u.total_tokens : inputTokens + outputTokens + reasoningTokens;
       cb.onFinish({
         tokens: {
           total: totalTokens,
@@ -4623,10 +4329,8 @@ function migrateSettings(raw) {
         options: { ...DEFAULT_ENGINE_CONFIGS[id]?.options ?? {} }
       };
       base.engines[id] = {
-        binary: typeof cfg.binary === "string" && cfg.binary.trim() ?
-          cfg.binary.trim() : existing.binary,
-        model: typeof cfg.model === "string" ? cfg.model.trim() :
-          existing.model,
+        binary: typeof cfg.binary === "string" && cfg.binary.trim() ? cfg.binary.trim() : existing.binary,
+        model: typeof cfg.model === "string" ? cfg.model.trim() : existing.model,
         options: {
           ...existing.options,
           ...cfg.options && typeof cfg.options === "object" ? cfg.options : {}
@@ -4649,12 +4353,8 @@ var OPENCODE_DESCRIPTOR = {
   icon: "terminal-square",
   defaultBinary: "opencode",
   defaultModel: "opencode-go/deepseek-v4.1-flash",
-  binaryDesc:
-    "Command or full path to the opencode executable. Usually 'opencode' " +
-    "is enough if it is on your PATH.",
-  modelDesc:
-    "Pick a model from the opencode list. Default uses the OpenCode Go " +
-    "provider.",
+  binaryDesc: "Command or full path to the opencode executable. Usually 'opencode' is enough if it is on your PATH.",
+  modelDesc: "Pick a model from the opencode list. Default uses the OpenCode Go provider.",
   included: false,
   supportsSessions: "api",
   supportsUsageStats: true,
@@ -4663,9 +4363,7 @@ var OPENCODE_DESCRIPTOR = {
     {
       key: "agent",
       label: "Agent",
-      desc:
-        "The opencode agent to use (e.g. build, plan). Leave empty for the " +
-        "default.",
+      desc: "The opencode agent to use (e.g. build, plan). Leave empty for the default.",
       type: "text",
       placeholder: "e.g. build",
       default: ""
@@ -4698,8 +4396,7 @@ var OpencodeRunner = class extends BaseCliRunner {
       return this.cachedModels;
     }
     const out = await this.execCli(this.getBin(), ["models"]);
-    this.cachedModels = out.split("\n").map((l) => l.trim()).filter((l) =>
-      /^[a-zA-Z0-9_.:/+-]+$/.test(l)).sort();
+    this.cachedModels = out.split("\n").map((l) => l.trim()).filter((l) => /^[a-zA-Z0-9_.:/+-]+$/.test(l)).sort();
     return this.cachedModels;
   }
   async listSessions() {
@@ -4785,8 +4482,7 @@ var OpencodeRunner = class extends BaseCliRunner {
       let updatedDb = false;
       for (const table of ["session_v2", "session"]) {
         try {
-          const query =
-            `UPDATE ${table} SET title = '${safeTitle}' WHERE id = '${safeId}'`;
+          const query = `UPDATE ${table} SET title = '${safeTitle}' WHERE id = '${safeId}'`;
           await this.execSqlite(dbPath, query);
           updatedDb = true;
         } catch {
@@ -4839,8 +4535,7 @@ var OpencodeRunner = class extends BaseCliRunner {
     const wantProvider = slash >= 0 ? target.slice(0, slash) : "";
     const wantModel = slash >= 0 ? target.slice(slash + 1) : target;
     const match = models.find(
-      (m) => m.providerID === wantProvider && m.modelID === wantModel ||
-        m.modelID === target || m.id === target
+      (m) => m.providerID === wantProvider && m.modelID === wantModel || m.modelID === target || m.id === target
     );
     const ctx = match?.limit?.context;
     return typeof ctx === "number" && ctx > 0 ? ctx : 0;
@@ -4858,13 +4553,11 @@ var OpencodeRunner = class extends BaseCliRunner {
       for (const table of ["session_message", "message"]) {
         try {
           const safeId = sessionId.replace(/'/g, "''");
-          const whereClause = table === "session_message" ?
-            `session_id = '${safeId}' AND type = 'assistant'` : [
+          const whereClause = table === "session_message" ? `session_id = '${safeId}' AND type = 'assistant'` : [
             `session_id = '${safeId}'`,
             "AND json_extract(data, '$.role') = 'assistant'"
           ].join(" ");
-          const orderCol = table === "session_message" ? "seq DESC" :
-            "time_created DESC";
+          const orderCol = table === "session_message" ? "seq DESC" : "time_created DESC";
           const latestQuery = [
             `SELECT json_extract(data, '$.tokens') FROM ${table}`,
             `WHERE ${whereClause} ORDER BY ${orderCol} LIMIT 5`
@@ -4875,8 +4568,7 @@ var OpencodeRunner = class extends BaseCliRunner {
             if (!trimmed || trimmed === "null") continue;
             const tk = JSON.parse(trimmed);
             if (tk) {
-              const inp = Number(tk.input ?? 0) + Number(tk.cache?.read ?? 0) +
-                Number(tk.cache?.write ?? 0);
+              const inp = Number(tk.input ?? 0) + Number(tk.cache?.read ?? 0) + Number(tk.cache?.write ?? 0);
               const outTok = Number(tk.output ?? 0);
               if (inp > 0 || outTok > 0) {
                 ctxInput = inp;
@@ -4919,8 +4611,7 @@ var OpencodeRunner = class extends BaseCliRunner {
       const msg = history[i];
       if (msg.role === "assistant" && msg.tokens) {
         const tk = msg.tokens;
-        const input = Number(tk.input ?? 0) + Number(tk.cache?.read ?? 0) +
-          Number(tk.cache?.write ?? 0);
+        const input = Number(tk.input ?? 0) + Number(tk.cache?.read ?? 0) + Number(tk.cache?.write ?? 0);
         const output = Number(tk.output ?? 0);
         if (input > 0 || output > 0) {
           return { input, output };
@@ -4938,8 +4629,7 @@ var OpencodeRunner = class extends BaseCliRunner {
       for (let i = messages.length - 1; i >= 0; i--) {
         const tk = messages[i]?.tokens;
         if (tk) {
-          const input = Number(tk.input ?? 0) + Number(tk.cache?.read ?? 0) +
-            Number(tk.cache?.write ?? 0);
+          const input = Number(tk.input ?? 0) + Number(tk.cache?.read ?? 0) + Number(tk.cache?.write ?? 0);
           return { input, output: Number(tk.output ?? 0) };
         }
       }
@@ -5034,8 +4724,7 @@ var OpencodeRunner = class extends BaseCliRunner {
     if (s.showThinking) args.push("--thinking");
     args.push(req.prompt);
     for (const f of req.fileAttachments) {
-      const fullPath = !(0, import_path3.isAbsolute)(f) && cwd ?
-        (0, import_path3.join)(cwd, f) : f;
+      const fullPath = !(0, import_path3.isAbsolute)(f) && cwd ? (0, import_path3.join)(cwd, f) : f;
       args.push("--file", fullPath);
     }
     return args;
@@ -5097,13 +4786,10 @@ var OpencodeRunner = class extends BaseCliRunner {
           const input = part.state?.input;
           const startMs = part.state?.time?.start;
           const endMs = part.state?.time?.end;
-          const durationMs = typeof startMs === "number" &&
-            typeof endMs === "number" && endMs >= startMs ? endMs - startMs :
-              void 0;
+          const durationMs = typeof startMs === "number" && typeof endMs === "number" && endMs >= startMs ? endMs - startMs : void 0;
           if (toolName === "question" || toolName === "ask_question") {
             const questions = this.parseCommonQuestions(input);
-            const qTitle = questions[0]?.question ||
-              this.plugin.t("Agent question");
+            const qTitle = questions[0]?.question || this.plugin.t("Agent question");
             if (questions.length > 0) {
               cb.onQuestion?.(questions);
             }
@@ -5169,8 +4855,7 @@ var OpencodeRunner = class extends BaseCliRunner {
       default:
         break;
     }
-    if (type !== "reasoning" && part?.type === "reasoning" &&
-      typeof part?.text === "string") {
+    if (type !== "reasoning" && part?.type === "reasoning" && typeof part?.text === "string") {
       cb.onActivity?.(this.plugin.t("Thinking..."));
       cb.onReasoning(part.text, String(part.id));
     }
@@ -5194,12 +4879,8 @@ var HERMES_DESCRIPTOR = {
   icon: "zap",
   defaultBinary: "hermes",
   defaultModel: "",
-  binaryDesc:
-    "Command or full path to the hermes executable. Default is 'hermes' or " +
-    "'~/.hermes/bin/hermes'.",
-  modelDesc:
-    "Leave on default to use your ~/.hermes/config.yaml model, or enter a " +
-    "provider/model ID.",
+  binaryDesc: "Command or full path to the hermes executable. Default is 'hermes' or '~/.hermes/bin/hermes'.",
+  modelDesc: "Leave on default to use your ~/.hermes/config.yaml model, or enter a provider/model ID.",
   included: false,
   supportsSessions: "local-db",
   supportsUsageStats: true,
@@ -5208,9 +4889,7 @@ var HERMES_DESCRIPTOR = {
     {
       key: "provider",
       label: "Provider",
-      desc:
-        "Optional Hermes backend provider (e.g. openrouter, nous, " +
-        "anthropic).",
+      desc: "Optional Hermes backend provider (e.g. openrouter, nous, anthropic).",
       type: "text",
       placeholder: "e.g. openrouter",
       default: ""
@@ -5251,8 +4930,7 @@ var HermesRunner = class extends BaseCliRunner {
     return this.resolveBinaryPath(this.getConfig().binary || "hermes");
   }
   getHermesHome() {
-    return process.env.HERMES_HOME ||
-      (0, import_path4.join)((0, import_os3.homedir)(), ".hermes");
+    return process.env.HERMES_HOME || (0, import_path4.join)((0, import_os3.homedir)(), ".hermes");
   }
   /**
    * Resolve the Python interpreter and checkout root of the user's Hermes
@@ -5281,8 +4959,7 @@ var HermesRunner = class extends BaseCliRunner {
         if (!(0, import_fs3.existsSync)(candidate)) continue;
         const text = (0, import_fs3.readFileSync)(candidate, "utf-8");
         const execMatch = text.match(/exec\s+([^\s"']+\/python3?(?:\.\d+)?)\b/);
-        if (execMatch && execMatch[1] &&
-          (0, import_fs3.existsSync)(execMatch[1])) {
+        if (execMatch && execMatch[1] && (0, import_fs3.existsSync)(execMatch[1])) {
           const found = { pythonBin: execMatch[1], repoRoot };
           this.resolvedPythonCache.set(cacheKey, found);
           return found;
@@ -5353,8 +5030,7 @@ var HermesRunner = class extends BaseCliRunner {
   }
   async listModels(forceRefresh = false) {
     const bin = this.getBin();
-    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0 &&
-      this.cachedModelsBin === bin) {
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0 && this.cachedModelsBin === bin) {
       return this.cachedModels;
     }
     const seen = /* @__PURE__ */ new Set();
@@ -5368,18 +5044,14 @@ var HermesRunner = class extends BaseCliRunner {
     const pyScript = `
 import json, sys
 from hermes_cli.config import load_config
-from hermes_cli.models import list_available_providers,
-  cached_provider_model_ids, provider_model_ids
+from hermes_cli.models import list_available_providers, cached_provider_model_ids, provider_model_ids
 
 req_prov = sys.argv[1] if len(sys.argv) > 1 else ""
 force = sys.argv[2] == "1" if len(sys.argv) > 2 else False
 cfg = load_config()
 m = cfg.get("model") if isinstance(cfg, dict) else {}
-default_model =
-  (m.get("default") or m.get("model") or "") if isinstance(m,
-    dict) else (m if isinstance(m, str) else "")
-cfg_provider =
-  req_prov or ((m.get("provider") or "") if isinstance(m, dict) else "")
+default_model = (m.get("default") or m.get("model") or "") if isinstance(m, dict) else (m if isinstance(m, str) else "")
+cfg_provider = req_prov or ((m.get("provider") or "") if isinstance(m, dict) else "")
 
 providers = []
 if cfg_provider and cfg_provider != "auto":
@@ -5395,10 +5067,7 @@ if default_model:
 
 for pid in providers:
     try:
-        rows =
-          provider_model_ids(pid,
-            force_refresh=force) if force else (cached_provider_model_ids(
-              pid) or provider_model_ids(pid))
+        rows = provider_model_ids(pid, force_refresh=force) if force else (cached_provider_model_ids(pid) or provider_model_ids(pid))
         for mid in (rows or []):
             models.append(str(mid).strip())
     except Exception:
@@ -5424,11 +5093,9 @@ print(json.dumps({"models": models}))
       addModel(cfgModel);
     }
     try {
-      const provCachePath =
-        (0, import_path4.join)(hermesHome, "provider_models_cache.json");
+      const provCachePath = (0, import_path4.join)(hermesHome, "provider_models_cache.json");
       if ((0, import_fs3.existsSync)(provCachePath)) {
-        const parsed =
-          JSON.parse((0, import_fs3.readFileSync)(provCachePath, "utf-8"));
+        const parsed = JSON.parse((0, import_fs3.readFileSync)(provCachePath, "utf-8"));
         const entries = Object.entries(parsed);
         entries.sort(
           ([, a], [, b]) => (a.fallback ? 1 : 0) - (b.fallback ? 1 : 0)
@@ -5445,11 +5112,9 @@ print(json.dumps({"models": models}))
     }
     if (seen.size <= 1) {
       try {
-        const catalogPath =
-          (0, import_path4.join)(hermesHome, "cache", "model_catalog.json");
+        const catalogPath = (0, import_path4.join)(hermesHome, "cache", "model_catalog.json");
         if ((0, import_fs3.existsSync)(catalogPath)) {
-          const parsed =
-            JSON.parse((0, import_fs3.readFileSync)(catalogPath, "utf-8"));
+          const parsed = JSON.parse((0, import_fs3.readFileSync)(catalogPath, "utf-8"));
           const providers = parsed.providers || {};
           for (const prov of Object.values(providers)) {
             for (const item of prov.models || []) {
@@ -5524,11 +5189,9 @@ print(json.dumps({"models": models}))
   }
   readConfiguredDefaultModels() {
     try {
-      const cfgPath =
-        (0, import_path4.join)(this.getHermesHome(), "config.yaml");
+      const cfgPath = (0, import_path4.join)(this.getHermesHome(), "config.yaml");
       if ((0, import_fs3.existsSync)(cfgPath)) {
-        return this.parseHermesConfigModels((0,
-          import_fs3.readFileSync)(cfgPath, "utf-8"));
+        return this.parseHermesConfigModels((0, import_fs3.readFileSync)(cfgPath, "utf-8"));
       }
     } catch {
     }
@@ -5538,12 +5201,10 @@ print(json.dumps({"models": models}))
     return this.readConfiguredDefaultModels()[0] ?? "";
   }
   async getModelContextLimit(model) {
-    const effective = model.trim() || this.getConfig().model.trim() ||
-      this.readConfiguredDefaultModel();
+    const effective = model.trim() || this.getConfig().model.trim() || this.readConfiguredDefaultModel();
     const configuredProvider = (this.getConfig().options.provider ?? "").trim();
     const cacheKey = `${configuredProvider}:${effective}`;
-    const cached = this.contextLimits.get(cacheKey) ??
-      this.contextLimits.get(effective);
+    const cached = this.contextLimits.get(cacheKey) ?? this.contextLimits.get(effective);
     if (cached && cached > 0) return cached;
     const failedAt = this.contextLimitFailedAt.get(cacheKey);
     if (failedAt !== void 0 && Date.now() - failedAt < 6e4) {
@@ -5562,8 +5223,7 @@ print(json.dumps({"models": models}))
         "    if prefix in PROVIDER_REGISTRY and prefix != 'openrouter':",
         "        req_prov = prefix",
         "        mod = rest",
-          "rt = resolve_runtime_provider(requested=req_prov or None, " +
-          "target_model=mod or None)",
+        "rt = resolve_runtime_provider(requested=req_prov or None, target_model=mod or None)",
         "eff_mod = mod or rt.get('model') or ''",
         "ctx = get_model_context_length(",
         "    eff_mod,",
@@ -5579,8 +5239,7 @@ print(json.dumps({"models": models}))
       ]);
       if (out) {
         const parsed = JSON.parse(out);
-        if (typeof parsed.context_length === "number" &&
-          parsed.context_length > 0) {
+        if (typeof parsed.context_length === "number" && parsed.context_length > 0) {
           this.contextLimits.set(cacheKey, parsed.context_length);
           this.contextLimitFailedAt.delete(cacheKey);
           if (effective) {
@@ -5685,8 +5344,7 @@ print(json.dumps({"models": models}))
       cb.onText(state.accumulatedText, "text");
       return;
     }
-    if ((ev.type === "reasoning" || ev.type === "thought") &&
-      typeof (ev.text ?? ev.reasoning) === "string") {
+    if ((ev.type === "reasoning" || ev.type === "thought") && typeof (ev.text ?? ev.reasoning) === "string") {
       const thought = String(ev.text ?? ev.reasoning);
       cb.onActivity?.(this.plugin.t("Thinking..."));
       cb.onReasoning(thought, "reasoning");
@@ -5697,11 +5355,9 @@ print(json.dumps({"models": models}))
       const key = String(ev.tool_call_id || ev.call_id || ev.id || toolName);
       const stepId = `step-${ev.timestamp ?? Date.now()}-${key}`;
       const input = ev.input ?? ev.arguments;
-      if (toolName === "ask_question" || toolName === "question" ||
-        toolName === "clarify") {
+      if (toolName === "ask_question" || toolName === "question" || toolName === "clarify") {
         const questions = this.parseCommonQuestions(input);
-        const qTitle = questions[0]?.question ||
-          this.plugin.t("Agent question");
+        const qTitle = questions[0]?.question || this.plugin.t("Agent question");
         if (questions.length > 0) {
           cb.onQuestion?.(questions);
         }
@@ -5716,8 +5372,7 @@ print(json.dumps({"models": models}))
         return;
       }
       const title = this.extractCommonToolTitle(toolName, input);
-      state.activeToolSteps.set(key, { id: stepId, tool: toolName, title,
-        input });
+      state.activeToolSteps.set(key, { id: stepId, tool: toolName, title, input });
       cb.onActivity?.(substitute(this.plugin.t("Running: $1"), title));
       cb.onStep({
         id: stepId,
@@ -5752,8 +5407,7 @@ print(json.dumps({"models": models}))
     }
     if (ev.type === "result") {
       if (ev.error) {
-        const msg = typeof ev.error === "string" ? ev.error :
-          ev.error?.message || JSON.stringify(ev.error);
+        const msg = typeof ev.error === "string" ? ev.error : ev.error?.message || JSON.stringify(ev.error);
         cb.onError(String(msg));
         return;
       }
@@ -5775,16 +5429,14 @@ print(json.dumps({"models": models}))
           input,
           output,
           reasoning,
-          cache: cacheRead > 0 || cacheWrite > 0 ?
-            { read: cacheRead, write: cacheWrite } : void 0
+          cache: cacheRead > 0 || cacheWrite > 0 ? { read: cacheRead, write: cacheWrite } : void 0
         },
         cost: typeof ev.cost === "number" ? ev.cost : void 0
       });
       return;
     }
     if (ev.type === "error" || ev.error) {
-      const msg = typeof ev.error === "string" ? ev.error :
-        ev.error?.message || JSON.stringify(ev.error || ev);
+      const msg = typeof ev.error === "string" ? ev.error : ev.error?.message || JSON.stringify(ev.error || ev);
       cb.onError(String(msg));
     }
   }
@@ -5799,12 +5451,8 @@ var PI_DESCRIPTOR = {
   icon: "compass",
   defaultBinary: "pi",
   defaultModel: "",
-  binaryDesc:
-    "Command or full path to the pi executable. Usually 'pi' is enough if " +
-    "it is on your PATH.",
-  modelDesc:
-    "Leave on default to use your Pi config, or pick a model from 'pi --" +
-    "list-models'.",
+  binaryDesc: "Command or full path to the pi executable. Usually 'pi' is enough if it is on your PATH.",
+  modelDesc: "Leave on default to use your Pi config, or pick a model from 'pi --list-models'.",
   included: false,
   supportsSessions: "local-db",
   supportsUsageStats: true,
@@ -5866,8 +5514,7 @@ var PiRunner = class extends BaseCliRunner {
   }
   async listModels(forceRefresh = false) {
     const bin = this.getBin();
-    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0 &&
-      this.cachedModelsBin === bin) {
+    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0 && this.cachedModelsBin === bin) {
       return this.cachedModels;
     }
     try {
@@ -5875,20 +5522,17 @@ var PiRunner = class extends BaseCliRunner {
       const models = [];
       for (const line of out.split(/\r?\n/)) {
         const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("No models") ||
-          trimmed.startsWith("Warning:") || trimmed.startsWith("/")) {
+        if (!trimmed || trimmed.startsWith("No models") || trimmed.startsWith("Warning:") || trimmed.startsWith("/")) {
           continue;
         }
         const cols = trimmed.split(/\s{2,}|\s+/);
         if (cols.length >= 2) {
           const prov = cols[0];
           const mod = cols[1];
-          if (prov.toLowerCase() === "provider" &&
-            mod.toLowerCase() === "model") {
+          if (prov.toLowerCase() === "provider" && mod.toLowerCase() === "model") {
             continue;
           }
-          if (/^[a-zA-Z0-9_.-]+$/.test(prov) &&
-            /^[a-zA-Z0-9_.:/+-]+$/.test(mod)) {
+          if (/^[a-zA-Z0-9_.-]+$/.test(prov) && /^[a-zA-Z0-9_.:/+-]+$/.test(mod)) {
             const full = mod.includes("/") ? mod : `${prov}/${mod}`;
             if (!models.includes(full)) models.push(full);
             if (cols[2]) {
@@ -5902,10 +5546,7 @@ var PiRunner = class extends BaseCliRunner {
           }
         }
         const firstToken = cols[0];
-        if (firstToken && /^[a-zA-Z0-9_.:/+-]+$/.test(firstToken) &&
-          firstToken.toLowerCase() !== "provider" &&
-            firstToken.toLowerCase() !== "model" &&
-              !models.includes(firstToken)) {
+        if (firstToken && /^[a-zA-Z0-9_.:/+-]+$/.test(firstToken) && firstToken.toLowerCase() !== "provider" && firstToken.toLowerCase() !== "model" && !models.includes(firstToken)) {
           models.push(firstToken);
         }
       }
@@ -5934,8 +5575,7 @@ var PiRunner = class extends BaseCliRunner {
       }
       const exact = this.contextLimits.get(target);
       if (exact && exact > 0) return exact;
-      const bare = target.includes("/") ? target.slice(target.indexOf("/") +
-        1) : target;
+      const bare = target.includes("/") ? target.slice(target.indexOf("/") + 1) : target;
       const byBare = this.contextLimits.get(bare);
       if (byBare && byBare > 0) return byBare;
     }
@@ -5969,8 +5609,7 @@ var PiRunner = class extends BaseCliRunner {
       args.push("--thinking", thinking);
     }
     for (const f of req.fileAttachments) {
-      const fullPath = !(0, import_path5.isAbsolute)(f) && cwd ?
-        (0, import_path5.join)(cwd, f) : f;
+      const fullPath = !(0, import_path5.isAbsolute)(f) && cwd ? (0, import_path5.join)(cwd, f) : f;
       args.push(`@${fullPath}`);
     }
     args.push(req.prompt);
@@ -6032,8 +5671,7 @@ var PiRunner = class extends BaseCliRunner {
         state.accumulatedText += ame.delta;
         cb.onActivity?.(this.plugin.t("Writing response..."));
         cb.onText(state.accumulatedText, String(ame.contentIndex ?? 0));
-      } else if (ame.type === "thinking_delta" &&
-        typeof ame.delta === "string") {
+      } else if (ame.type === "thinking_delta" && typeof ame.delta === "string") {
         state.accumulatedReasoning += ame.delta;
         cb.onActivity?.(this.plugin.t("Thinking..."));
         cb.onReasoning(
@@ -6063,8 +5701,7 @@ var PiRunner = class extends BaseCliRunner {
       const stepId = String(ev.toolCallId || `step-${Date.now()}`);
       const prev = state.toolTitles.get(stepId);
       const toolName = prev?.tool || String(ev.toolName || "tool");
-      const title = prev?.title ||
-        this.extractCommonToolTitle(toolName, ev.args);
+      const title = prev?.title || this.extractCommonToolTitle(toolName, ev.args);
       const isErr = Boolean(ev.isError);
       cb.onActivity?.(this.plugin.t("Analyzing and planning..."));
       cb.onStep({
@@ -6092,8 +5729,7 @@ var PiRunner = class extends BaseCliRunner {
       return;
     }
     if (ev.type === "error" || ev.error) {
-      const msg = typeof ev.error === "string" ? ev.error :
-        ev.error?.message || JSON.stringify(ev.error || ev);
+      const msg = typeof ev.error === "string" ? ev.error : ev.error?.message || JSON.stringify(ev.error || ev);
       cb.onError(String(msg));
     }
   }
@@ -6103,12 +5739,10 @@ var PiRunner = class extends BaseCliRunner {
     }
     if (Array.isArray(msg.content)) {
       for (const block of msg.content) {
-        if (block?.type === "text" && typeof block.text === "string" &&
-          block.text.trim()) {
+        if (block?.type === "text" && typeof block.text === "string" && block.text.trim()) {
           state.accumulatedText = block.text;
           cb.onText(state.accumulatedText, "final");
-        } else if (block?.type === "thinking" &&
-          typeof block.thinking === "string" && block.thinking.trim()) {
+        } else if (block?.type === "thinking" && typeof block.thinking === "string" && block.thinking.trim()) {
           state.accumulatedReasoning = block.thinking;
           cb.onReasoning(state.accumulatedReasoning, "final");
         }
@@ -6127,8 +5761,7 @@ var PiRunner = class extends BaseCliRunner {
             total,
             input,
             output,
-            cache: cacheRead > 0 || cacheWrite > 0 ?
-              { read: cacheRead, write: cacheWrite } : void 0
+            cache: cacheRead > 0 || cacheWrite > 0 ? { read: cacheRead, write: cacheWrite } : void 0
           },
           cost: typeof u.cost?.total === "number" ? u.cost.total : void 0
         });
@@ -6165,8 +5798,7 @@ var ProviderRegistry = class {
    * Resolve provider for a specific session or fall back to default
    */
   resolveProvider(activeEngine, sessionId, sessionEngines) {
-    const targetEngine = sessionId && sessionEngines?.[sessionId] ||
-      activeEngine;
+    const targetEngine = sessionId && sessionEngines?.[sessionId] || activeEngine;
     const provider = this.get(targetEngine);
     if (provider) return provider;
     const first = this.getAll()[0];
@@ -6192,14 +5824,10 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
     containerEl.createEl("h2", { text: "Vault Agents" });
     new import_obsidian9.Setting(containerEl).setName(t("Language")).setDesc(
       t(
-          "Interface language. English is the default. Some command names " +
-          "update after reloading Obsidian."
+        "Interface language. English is the default. Some command names update after reloading Obsidian."
       )
     ).addDropdown(
-      (dd) =>
-        dd.addOption("en", t("English")).addOption("it",
-          t("Italian")).setValue(this.plugin.settings.language).onChange(
-            async (value) => {
+      (dd) => dd.addOption("en", t("English")).addOption("it", t("Italian")).setValue(this.plugin.settings.language).onChange(async (value) => {
         this.plugin.settings.language = value;
         await this.plugin.saveSettings();
         new import_obsidian9.Notice(
@@ -6216,8 +5844,7 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
     const activeCfg = this.plugin.getEngineConfig(activeDesc.id);
     new import_obsidian9.Setting(containerEl).setName(t("AI Engine")).setDesc(
       t(
-          "Select which AI backend to use. Antigravity connects directly to " +
-          "your Google AI Pro subscription with no API key needed."
+        "Select which AI backend to use. Antigravity connects directly to your Google AI Pro subscription with no API key needed."
       )
     ).addDropdown((dd) => {
       for (const desc of descriptors) {
@@ -6238,21 +5865,15 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
       t(activeDesc.displayName)
     );
     containerEl.createEl("h3", { text: sectionTitle });
-    const binSetting =
-      new import_obsidian9.Setting(containerEl).setName(t("Binary path"))
-        .setDesc(t(activeDesc.binaryDesc)).addText(
-      (text) =>
-        text.setPlaceholder(activeDesc.defaultBinary).setValue(activeCfg.binary)
-          .onChange(async (value) => {
+    const binSetting = new import_obsidian9.Setting(containerEl).setName(t("Binary path")).setDesc(t(activeDesc.binaryDesc)).addText(
+      (text) => text.setPlaceholder(activeDesc.defaultBinary).setValue(activeCfg.binary).onChange(async (value) => {
         activeCfg.binary = value.trim() || activeDesc.defaultBinary;
         await this.plugin.saveSettings();
       })
     );
     if (activeCfg.binary && activeCfg.binary !== activeDesc.defaultBinary) {
       binSetting.addExtraButton(
-        (btn) =>
-          btn.setIcon("rotate-ccw").setTooltip(t("Reset to default")).onClick(
-            async () => {
+        (btn) => btn.setIcon("rotate-ccw").setTooltip(t("Reset to default")).onClick(async () => {
           activeCfg.binary = activeDesc.defaultBinary;
           await this.plugin.saveSettings();
           this.display();
@@ -6264,9 +5885,7 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
       t("(default from $1)"),
       activeDesc.shortName
     );
-    const modelSetting =
-      new import_obsidian9.Setting(containerEl).setName(t("Model")).setDesc(t(
-        activeDesc.modelDesc));
+    const modelSetting = new import_obsidian9.Setting(containerEl).setName(t("Model")).setDesc(t(activeDesc.modelDesc));
     const badgeEl = modelSetting.controlEl.createSpan({
       cls: "opencode-settings-model-badge" + (curModel ? "" : " is-default"),
       text: curModel || defaultLabel
@@ -6279,9 +5898,7 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
     );
     if (activeCfg.model && activeCfg.model !== activeDesc.defaultModel) {
       modelSetting.addExtraButton(
-        (btn) =>
-          btn.setIcon("rotate-ccw").setTooltip(t("Reset to default")).onClick(
-            async () => {
+        (btn) => btn.setIcon("rotate-ccw").setTooltip(t("Reset to default")).onClick(async () => {
           activeCfg.model = activeDesc.defaultModel;
           await this.plugin.saveSettings();
           this.display();
@@ -6289,9 +5906,7 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
       );
     }
     for (const opt of activeDesc.options) {
-      const setting =
-        new import_obsidian9.Setting(containerEl).setName(t(opt.label)).setDesc(
-          t(opt.desc));
+      const setting = new import_obsidian9.Setting(containerEl).setName(t(opt.label)).setDesc(t(opt.desc));
       if (opt.type === "select" && opt.choices) {
         setting.addDropdown((dd) => {
           for (const ch of opt.choices) {
@@ -6305,9 +5920,7 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
         });
       } else {
         setting.addText(
-          (text) => text.setPlaceholder(opt.placeholder ? t(opt.placeholder) :
-            "").setValue(activeCfg.options[opt.key] ??
-              opt.default).onChange(async (value) => {
+          (text) => text.setPlaceholder(opt.placeholder ? t(opt.placeholder) : "").setValue(activeCfg.options[opt.key] ?? opt.default).onChange(async (value) => {
             activeCfg.options[opt.key] = value.trim();
             await this.plugin.saveSettings();
           })
@@ -6323,8 +5936,7 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
       t("$1 found:"),
       t(activeDesc.shortName)
     );
-    new import_obsidian9.Setting(containerEl).setName(t("Test connection"))
-      .setDesc(testDesc).addButton(
+    new import_obsidian9.Setting(containerEl).setName(t("Test connection")).setDesc(testDesc).addButton(
       (btn) => btn.setButtonText(t("Test")).onClick(async () => {
         btn.setDisabled(true);
         btn.setButtonText(t("Testing..."));
@@ -6340,58 +5952,43 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: t("General settings") });
-    new import_obsidian9.Setting(containerEl).setName(t(
-      "Auto-approve permissions")).setDesc(
+    new import_obsidian9.Setting(containerEl).setName(t("Auto-approve permissions")).setDesc(
       t(
-          "Automatically allow tool permissions (bash, file edits, etc.). " +
-          "Turn it off for extra safety."
+        "Automatically allow tool permissions (bash, file edits, etc.). Turn it off for extra safety."
       )
     ).addToggle(
-      (toggle) =>
-        toggle.setValue(this.plugin.settings.autoApprove).onChange(
-          async (value) => {
+      (toggle) => toggle.setValue(this.plugin.settings.autoApprove).onChange(async (value) => {
         this.plugin.settings.autoApprove = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName(t("Show reasoning"))
-      .setDesc(t("Show the model's reasoning blocks.")).addToggle(
-      (toggle) =>
-        toggle.setValue(this.plugin.settings.showThinking).onChange(
-          async (value) => {
+    new import_obsidian9.Setting(containerEl).setName(t("Show reasoning")).setDesc(t("Show the model's reasoning blocks.")).addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.showThinking).onChange(async (value) => {
         this.plugin.settings.showThinking = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName(t("Show tool details"))
-      .setDesc(
+    new import_obsidian9.Setting(containerEl).setName(t("Show tool details")).setDesc(
       t(
-          "Show the input and output of every tool executed during the " +
-          "request, in collapsible blocks."
+        "Show the input and output of every tool executed during the request, in collapsible blocks."
       )
     ).addToggle(
-      (toggle) =>
-        toggle.setValue(this.plugin.settings.showToolIO).onChange(
-          async (value) => {
+      (toggle) => toggle.setValue(this.plugin.settings.showToolIO).onChange(async (value) => {
         this.plugin.settings.showToolIO = value;
         await this.plugin.saveSettings();
       })
     );
     new import_obsidian9.Setting(containerEl).setName(t("Session ID")).setDesc(
       t(
-          "The persistent session id used for the chat. Managed " +
-          "automatically. Empty = new session on next message."
+        "The persistent session id used for the chat. Managed automatically. Empty = new session on next message."
       )
     ).addText(
-      (text) =>
-        text.setPlaceholder(t("(automatic)")).setValue(
-          this.plugin.settings.sessionId).onChange(async (value) => {
+      (text) => text.setPlaceholder(t("(automatic)")).setValue(this.plugin.settings.sessionId).onChange(async (value) => {
         this.plugin.settings.sessionId = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName(t("Reset session"))
-      .setDesc(
+    new import_obsidian9.Setting(containerEl).setName(t("Reset session")).setDesc(
       t(
         "Clear the saved session and start from scratch on the next message."
       )
@@ -6405,100 +6002,73 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: t("Document conversion") });
-    new import_obsidian9.Setting(containerEl).setName(t(
-      "Convert documents with anydoc")).setDesc(
+    new import_obsidian9.Setting(containerEl).setName(t("Convert documents with anydoc")).setDesc(
       t(
-          "Run anydoc on attached documents (PDF, Word, Excel, etc.) and " +
-          "attach them as Markdown instead of the original file."
+        "Run anydoc on attached documents (PDF, Word, Excel, etc.) and attach them as Markdown instead of the original file."
       )
     ).addToggle(
-      (toggle) =>
-        toggle.setValue(this.plugin.settings.anydocEnabled).onChange(
-          async (value) => {
+      (toggle) => toggle.setValue(this.plugin.settings.anydocEnabled).onChange(async (value) => {
         this.plugin.settings.anydocEnabled = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian9.Setting(containerEl).setName(t("Anydoc binary path"))
-      .setDesc(
+    new import_obsidian9.Setting(containerEl).setName(t("Anydoc binary path")).setDesc(
       t(
-          "Command or full path to the anydoc executable (npm install -g " +
-          "@firecrawl/anydoc)."
+        "Command or full path to the anydoc executable (npm install -g @firecrawl/anydoc)."
       )
     ).addText(
-      (text) =>
-        text.setPlaceholder("anydoc").setValue(
-          this.plugin.settings.anydocBinary).onChange(async (value) => {
+      (text) => text.setPlaceholder("anydoc").setValue(this.plugin.settings.anydocBinary).onChange(async (value) => {
         this.plugin.settings.anydocBinary = value.trim() || "anydoc";
         await this.plugin.saveSettings();
       })
     );
     if (activeDesc.supportsDbCleanup && activeProvider.pruneOversizedParts) {
       containerEl.createEl("h3", { text: t("Database self-cleanup") });
-      new import_obsidian9.Setting(containerEl).setName(t(
-        "Enable automatic cleanup")).setDesc(
+      new import_obsidian9.Setting(containerEl).setName(t("Enable automatic cleanup")).setDesc(
         t(
-            "Periodically remove large file attachments from the opencode " +
-            "database (opencode.db), which would otherwise bloat it. Only " +
-            "file attachments older than the minimum age and larger than " +
-            "the max size are removed; conversation text is never touched."
+          "Periodically remove large file attachments from the opencode database (opencode.db), which would otherwise bloat it. Only file attachments older than the minimum age and larger than the max size are removed; conversation text is never touched."
         )
       ).addToggle(
-        (toggle) =>
-          toggle.setValue(this.plugin.settings.dbAutoCleanup).onChange(
-            async (value) => {
+        (toggle) => toggle.setValue(this.plugin.settings.dbAutoCleanup).onChange(async (value) => {
           this.plugin.settings.dbAutoCleanup = value;
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian9.Setting(containerEl).setName(t("Max part size (MB)"))
-        .setDesc(
+      new import_obsidian9.Setting(containerEl).setName(t("Max part size (MB)")).setDesc(
         t("File attachments larger than this (in the database) are removed.")
       ).addText(
-        (text) =>
-          text.setPlaceholder("5").setValue(String(
-            this.plugin.settings.dbCleanupMaxMB)).onChange(async (value) => {
+        (text) => text.setPlaceholder("5").setValue(String(this.plugin.settings.dbCleanupMaxMB)).onChange(async (value) => {
           const n = parseInt(value, 10);
           const val = Number.isFinite(n) && n > 0 ? n : 5;
           this.plugin.settings.dbCleanupMaxMB = val;
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian9.Setting(containerEl).setName(t("Minimum age (days)"))
-        .setDesc(
+      new import_obsidian9.Setting(containerEl).setName(t("Minimum age (days)")).setDesc(
         t(
-            "Only attachments older than this are removed, so recent files " +
-            "stay available."
+          "Only attachments older than this are removed, so recent files stay available."
         )
       ).addText(
-        (text) =>
-          text.setPlaceholder("7").setValue(String(
-            this.plugin.settings.dbCleanupAgeDays)).onChange(async (value) => {
+        (text) => text.setPlaceholder("7").setValue(String(this.plugin.settings.dbCleanupAgeDays)).onChange(async (value) => {
           const n = parseInt(value, 10);
           const val = Number.isFinite(n) && n >= 0 ? n : 7;
           this.plugin.settings.dbCleanupAgeDays = val;
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian9.Setting(containerEl).setName(t(
-        "Max attachment size (MB)")).setDesc(
+      new import_obsidian9.Setting(containerEl).setName(t("Max attachment size (MB)")).setDesc(
         t(
-            "When anydoc fails to convert a document, files larger than " +
-            "this are not attached to the request, to avoid storing " +
-            "unusable copies in the database."
+          "When anydoc fails to convert a document, files larger than this are not attached to the request, to avoid storing unusable copies in the database."
         )
       ).addText(
-        (text) =>
-          text.setPlaceholder("20").setValue(String(
-            this.plugin.settings.maxAttachMB)).onChange(async (value) => {
+        (text) => text.setPlaceholder("20").setValue(String(this.plugin.settings.maxAttachMB)).onChange(async (value) => {
           const n = parseInt(value, 10);
           const val = Number.isFinite(n) && n > 0 ? n : 20;
           this.plugin.settings.maxAttachMB = val;
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian9.Setting(containerEl).setName(t("Run cleanup now"))
-        .setDesc(
+      new import_obsidian9.Setting(containerEl).setName(t("Run cleanup now")).setDesc(
         t("Remove oversized file attachments immediately, regardless of age.")
       ).addButton(
         (btn) => btn.setButtonText(t("Cleanup")).onClick(async () => {
@@ -6519,8 +6089,7 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
     containerEl.createEl("h3", { text: t("Prompt templates") });
     containerEl.createEl("p", {
       text: t(
-          "Save reusable prompt templates. In the chat, type /prompt to " +
-          "quickly insert them into the composer."
+        "Save reusable prompt templates. In the chat, type /prompt to quickly insert them into the composer."
       ),
       cls: "setting-item-description"
     });
@@ -6528,8 +6097,7 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
     for (let i = 0; i < prompts.length; i++) {
       const p = prompts[i];
       const desc = p.text.length > 90 ? p.text.slice(0, 87) + "…" : p.text;
-      const s = new import_obsidian9.Setting(containerEl).setName(p.name ||
-        t("(untitled)")).setDesc(desc);
+      const s = new import_obsidian9.Setting(containerEl).setName(p.name || t("(untitled)")).setDesc(desc);
       s.addButton(
         (b) => b.setButtonText(t("Edit")).onClick(() => this.editPrompt(i))
       );
@@ -6543,8 +6111,7 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
       );
     }
     new import_obsidian9.Setting(containerEl).addButton(
-      (b) => b.setButtonText(t("Add prompt")).setCta().onClick(() =>
-        this.editPrompt(-1))
+      (b) => b.setButtonText(t("Add prompt")).setCta().onClick(() => this.editPrompt(-1))
     );
   }
   editPrompt(index) {
@@ -6619,8 +6186,7 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
         await this.plugin.saveSettings();
         this.display();
         const shownModel = item.label || item.id;
-        new import_obsidian9.Notice(
-          `${t("Model set:")} ${shownModel} (${item.provider})`);
+        new import_obsidian9.Notice(`${t("Model set:")} ${shownModel} (${item.provider})`);
       }
     ).open();
   }
@@ -6734,9 +6300,7 @@ var VaultAgentsPlugin = class extends import_obsidian10.Plugin {
         chat.setContext({ label: file.path, content });
         chat.sendText(
           t(
-              "Analyze the content of the attached note below: provide a " +
-              "summary, key points, possible links with other vault notes " +
-              "and suggestions to develop it."
+            "Analyze the content of the attached note below: provide a summary, key points, possible links with other vault notes and suggestions to develop it."
           )
         );
       }
@@ -6766,8 +6330,7 @@ var VaultAgentsPlugin = class extends import_obsidian10.Plugin {
   }
   async openNewChatView(resetSession = true) {
     const { workspace } = this.app;
-    const hadExistingChat =
-      workspace.getLeavesOfType(CHAT_VIEW_TYPE).length > 0;
+    const hadExistingChat = workspace.getLeavesOfType(CHAT_VIEW_TYPE).length > 0;
     let leaf;
     try {
       leaf = workspace.getLeaf("split", "vertical");
