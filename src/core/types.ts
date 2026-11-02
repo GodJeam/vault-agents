@@ -125,16 +125,8 @@ export interface PromptTemplate {
 export interface PluginSettings {
   language: Language;
   engine: EngineType;
-  /** Per-engine configuration map (Phase 1 multi-agent architecture) */
+  /** Per-engine configuration map */
   engines: Record<string, EngineConfig>;
-  // Legacy OpenCode settings (kept synced for backward compatibility)
-  binaryPath: string;
-  model: string;
-  agent: string;
-  // Legacy Antigravity settings (kept synced for backward compatibility)
-  antigravityBinary: string;
-  antigravityModel: string;
-  antigravityEffort: ReasoningEffort;
   // Shared settings
   anydocEnabled: boolean;
   anydocBinary: string;
@@ -150,8 +142,6 @@ export interface PluginSettings {
   dbCleanupAgeDays: number;
   maxAttachMB: number;
 }
-
-export type OpencodeSettings = PluginSettings;
 
 export const DEFAULT_ENGINE_CONFIGS: Record<string, EngineConfig> = {
   antigravity: {
@@ -201,12 +191,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   language: "en",
   engine: "antigravity",
   engines: createDefaultEnginesMap(),
-  binaryPath: "opencode",
-  model: "opencode-go/deepseek-v4.1-flash",
-  agent: "",
-  antigravityBinary: "agy",
-  antigravityModel: "gemini-3.8-flash-high",
-  antigravityEffort: "high",
   anydocEnabled: true,
   anydocBinary: "anydoc",
   autoApprove: true,
@@ -223,8 +207,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 };
 
 /**
- * Retrieve (and initialize if missing) the EngineConfig for a given engine ID,
- * keeping legacy top-level fields synchronized.
+ * Retrieve (and initialize if missing) the EngineConfig for a given engine ID.
  */
 export function getEngineConfig(
   settings: PluginSettings,
@@ -245,25 +228,6 @@ export function getEngineConfig(
 }
 
 /**
- * Synchronize legacy flat fields from `settings.engines` so existing data.json
- * consumers and legacy getters remain consistent.
- */
-export function syncSettingsFields(settings: PluginSettings): void {
-  const agy = getEngineConfig(settings, "antigravity");
-  const oc = getEngineConfig(settings, "opencode");
-
-  settings.antigravityBinary = agy.binary || DEFAULT_SETTINGS.antigravityBinary;
-  settings.antigravityModel = agy.model || DEFAULT_SETTINGS.antigravityModel;
-  settings.antigravityEffort =
-    (agy.options.effort as ReasoningEffort) ||
-    DEFAULT_SETTINGS.antigravityEffort;
-
-  settings.binaryPath = oc.binary || DEFAULT_SETTINGS.binaryPath;
-  settings.model = oc.model;
-  settings.agent = oc.options.agent ?? "";
-}
-
-/**
  * Migrate raw data loaded from Obsidian's `data.json` into the structured
  * multi-engine `PluginSettings` and `HistoryMap`.
  */
@@ -271,7 +235,17 @@ export function migrateSettings(
   raw: Record<string, unknown> | null | undefined
 ): { settings: PluginSettings; histories: HistoryMap } {
   const data = raw ?? {};
-  const { histories, engines: rawEngines, ...rest } = data as {
+  const {
+    histories,
+    engines: rawEngines,
+    binaryPath,
+    model,
+    agent,
+    antigravityBinary,
+    antigravityModel,
+    antigravityEffort,
+    ...rest
+  } = data as {
     histories?: HistoryMap;
     engines?: Record<string, Partial<EngineConfig>>;
   } & Record<string, unknown>;
@@ -289,33 +263,24 @@ export function migrateSettings(
   );
 
   // 1. Apply legacy top-level fields if present in raw data
-  if (
-    typeof rest.antigravityBinary === "string" &&
-    rest.antigravityBinary.trim()
-  ) {
-    base.engines.antigravity.binary = rest.antigravityBinary.trim();
+  if (typeof antigravityBinary === "string" && antigravityBinary.trim()) {
+    base.engines.antigravity.binary = antigravityBinary.trim();
   }
-  if (
-    typeof rest.antigravityModel === "string" &&
-    rest.antigravityModel.trim()
-  ) {
-    base.engines.antigravity.model = rest.antigravityModel.trim();
+  if (typeof antigravityModel === "string" && antigravityModel.trim()) {
+    base.engines.antigravity.model = antigravityModel.trim();
   }
-  if (
-    typeof rest.antigravityEffort === "string" &&
-    rest.antigravityEffort.trim()
-  ) {
-    base.engines.antigravity.options.effort = rest.antigravityEffort.trim();
+  if (typeof antigravityEffort === "string" && antigravityEffort.trim()) {
+    base.engines.antigravity.options.effort = antigravityEffort.trim();
   }
 
-  if (typeof rest.binaryPath === "string" && rest.binaryPath.trim()) {
-    base.engines.opencode.binary = rest.binaryPath.trim();
+  if (typeof binaryPath === "string" && binaryPath.trim()) {
+    base.engines.opencode.binary = binaryPath.trim();
   }
-  if (typeof rest.model === "string") {
-    base.engines.opencode.model = rest.model.trim();
+  if (typeof model === "string") {
+    base.engines.opencode.model = model.trim();
   }
-  if (typeof rest.agent === "string") {
-    base.engines.opencode.options.agent = rest.agent.trim();
+  if (typeof agent === "string") {
+    base.engines.opencode.options.agent = agent.trim();
   }
 
   // 2. Apply structured `engines` map if present (overrides legacy fields)
@@ -344,7 +309,6 @@ export function migrateSettings(
     }
   }
 
-  syncSettingsFields(base);
   return {
     settings: base,
     histories: histories && typeof histories === "object" ? histories : {},

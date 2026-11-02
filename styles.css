@@ -22,7 +22,6 @@
 .opencode-steps,
 .opencode-reasoning-content,
 .opencode-step-io,
-.opencode-status,
 .opencode-context-hint {
   user-select: text;
   -webkit-user-select: text;
@@ -624,14 +623,6 @@
 }
 
 /* ====== Status / Live Activity / Questions / Stats ====== */
-
-.opencode-status {
-  font-size: var(--font-smaller);
-  color: var(--text-muted);
-  opacity: 0.8;
-  font-style: italic;
-  max-width: 88%;
-}
 
 .opencode-activity-bar {
   display: inline-flex;

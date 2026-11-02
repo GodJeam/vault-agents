@@ -1,6 +1,6 @@
 import { App, SuggestModal, setIcon } from "obsidian";
 import type { TFile } from "obsidian";
-import type OpencodePlugin from "../main";
+import type VaultAgentsPlugin from "../main";
 import type { EngineType } from "../core/types";
 import { substitute } from "../i18n";
 
@@ -9,7 +9,7 @@ export class FileSuggestModal extends SuggestModal<TFile> {
 
   constructor(
     app: App,
-    private plugin: OpencodePlugin,
+    private plugin: VaultAgentsPlugin,
     private onPick: (file: TFile) => void
   ) {
     super(app);
@@ -61,7 +61,7 @@ export interface AgentItem {
 export class AgentSuggestModal extends SuggestModal<AgentItem> {
   constructor(
     app: App,
-    private plugin: OpencodePlugin,
+    private plugin: VaultAgentsPlugin,
     private items: AgentItem[],
     private onPick: (item: AgentItem) => void
   ) {
@@ -159,7 +159,7 @@ export interface ModelItem {
 export class ModelSuggestModal extends SuggestModal<ModelItem> {
   constructor(
     app: App,
-    private plugin: OpencodePlugin,
+    private plugin: VaultAgentsPlugin,
     private items: ModelItem[],
     private activeEngine: EngineType,
     private onPick: (item: ModelItem) => void

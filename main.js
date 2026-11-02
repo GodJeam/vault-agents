@@ -21,7 +21,7 @@ var __toCommonJS = (mod) =>
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
-  default: () => OpencodePlugin
+  default: () => VaultAgentsPlugin
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian10 = require("obsidian");
@@ -114,14 +114,9 @@ var IT = {
     "Allegato saltato: il file è più grande di $1 MB e non è stato " +
     "possibile convertirlo, quindi non è stato allegato.",
   "Test connection": "Testa connessione",
-  "Run 'opencode --version' to verify the binary is reachable.":
-    "Esegue 'opencode --version' per verificare che il binario sia " +
-    "raggiungibile.",
   "Test": "Test",
   "Testing...": "Test in corso...",
-  "Opencode found:": "Opencode trovato:",
   "Error:": "Errore:",
-  "(default from opencode)": "(default di opencode)",
   "(custom)": "(personalizzato)",
   // --- main commands ---
   "New Vault Agents chat": "Nuova chat Vault Agents",
@@ -214,7 +209,6 @@ var IT = {
   "Generating session summary...": "Generazione riassunto della sessione...",
   "The session summary could not be generated.":
     "Riassunto della sessione non riuscito.",
-  "Starting...": "In avvio...",
   "Details": "Dettagli",
   "Reasoning": "Ragionamento",
   "Tool": "Strumento",
@@ -310,12 +304,9 @@ var IT = {
     "al tuo abbonamento Google AI Pro senza alcuna API key.",
   "Antigravity CLI (Google AI Pro)": "Antigravity CLI (Google AI Pro)",
   "OpenCode CLI": "OpenCode CLI",
-  "Antigravity settings (Google AI Pro)":
-    "Impostazioni Antigravity (Google AI Pro)",
   "OpenCode settings": "Impostazioni OpenCode",
   "General settings": "Impostazioni generali",
   "Document conversion": "Conversione documenti",
-  "Antigravity binary path": "Percorso binario Antigravity",
   ["Command or full path to the agy executable. Default is 'agy' or '~/" +
     ".local/bin/agy'."]:
     "Comando o percorso completo dell'eseguibile agy. Il default è 'agy' o " +
@@ -341,14 +332,10 @@ var IT = {
   "High": "Alto",
   "Extra high": "Extra alto",
   "Max": "Massimo",
-  "Antigravity found:": "Antigravity trovato:",
   "$1 settings": "Impostazioni $1",
   "$1 found:": "$1 trovato:",
   "Run '$1 --version' to verify the binary is reachable.":
     "Esegue '$1 --version' per verificare che il binario sia raggiungibile.",
-  "Run 'agy --version' to verify the binary is reachable.":
-    "Esegue 'agy --version' per verificare che il binario sia " +
-    "raggiungibile.",
   "Hermes Agent CLI (Nous Research)": "Hermes Agent CLI (Nous Research)",
   "Pi Coding Agent CLI": "Pi Coding Agent CLI",
   ["Command or full path to the hermes executable. Default is 'hermes' " +
@@ -399,12 +386,6 @@ var IT = {
     "per inserirli rapidamente nel compositore.",
   "Included with $1 ($0.00)": "Incluso con $1 ($0.00)",
   "Included ($0.00)": "Incluso ($0.00)",
-  "Search models... (e.g. gemini, claude, flash, deepseek)":
-    "Cerca modelli... (es. gemini, claude, flash, deepseek)",
-  "Search or type a custom model ID... (e.g. sonnet, gpt-5, gemini)":
-    "Cerca o digita un ID modello personalizzato... (es. sonnet, gpt-5, " +
-    "gemini)",
-  "Custom model ID": "ID modello personalizzato",
   ["Type any exact model ID or alias manually. Leave empty to use the " +
     "CLI's own configured default model."]:
     "Digita manualmente qualsiasi ID modello o alias esatto. Lascia vuoto " +
@@ -451,7 +432,6 @@ var IT = {
   "Writing response...": "Scrittura della risposta...",
   "Running: $1": "In esecuzione: $1",
   "Waiting for your answer...": "In attesa della tua risposta...",
-  "Working...": "Elaborazione in corso...",
   "Agent question": "Domanda dall'agente",
   "Select one or more options": "Seleziona una o più opzioni",
   "Select an option": "Seleziona un'opzione",
@@ -3455,7 +3435,6 @@ var BaseCliRunner = class {
         (0, import_path.join)(home, ".opencode", "bin"),
         (0, import_path.join)(home, ".gemini", "antigravity-cli", "bin"),
         (0, import_path.join)(home, ".hermes", "bin"),
-        (0, import_path.join)(home, ".claude", "local"),
         "/usr/local/bin",
         "/usr/bin"
       ];
@@ -3664,7 +3643,6 @@ var BaseCliRunner = class {
       (0, import_path.join)((0, import_os.homedir)(), ".hermes", "bin", bin),
       (0, import_path.join)((0, import_os.homedir)(), ".hermes",
         "hermes-agent", ".hermes", "bin", bin),
-      (0, import_path.join)((0, import_os.homedir)(), ".claude", "local", bin),
       `/usr/local/bin/${bin}`,
       `/usr/bin/${bin}`
     ];
@@ -3912,9 +3890,9 @@ ${content}
         !m.includes("nano")) {
       return 105e4;
     }
-    if (m.includes("gpt-5") || m.includes("codex")) return 256e3;
+    if (m.includes("gpt-5")) return 256e3;
     if (m.includes("gpt-4.1")) return 1047576;
-    if (m.includes("o3") || m.includes("o4") || m.includes("gpt-4")) {
+    if (m.includes("gpt-4")) {
       return 2e5;
     }
     if (m.includes("glm-5.3") || m.includes("glm-5.2") &&
@@ -4344,12 +4322,11 @@ var AntigravityRunner = class extends BaseCliRunner {
     if (sid && !sid.startsWith("ses_")) {
       args.push("--conversation", sid);
     }
-    const model = cfg.model || s.antigravityModel ||
-      ANTIGRAVITY_DESCRIPTOR.defaultModel;
+    const model = cfg.model || ANTIGRAVITY_DESCRIPTOR.defaultModel;
     if (model) {
       args.push("--model", model);
     }
-    const effort = cfg.options.effort || s.antigravityEffort;
+    const effort = cfg.options.effort;
     const modelEncodesEffort = /-(low|medium|high|xhigh|max)$/i.test(
       model || ""
     );
@@ -4567,12 +4544,6 @@ var DEFAULT_SETTINGS = {
   language: "en",
   engine: "antigravity",
   engines: createDefaultEnginesMap(),
-  binaryPath: "opencode",
-  model: "opencode-go/deepseek-v4.1-flash",
-  agent: "",
-  antigravityBinary: "agy",
-  antigravityModel: "gemini-3.8-flash-high",
-  antigravityEffort: "high",
   anydocEnabled: true,
   anydocBinary: "anydoc",
   autoApprove: true,
@@ -4601,20 +4572,19 @@ function getEngineConfig(settings, engineId) {
   }
   return settings.engines[engineId];
 }
-function syncSettingsFields(settings) {
-  const agy = getEngineConfig(settings, "antigravity");
-  const oc = getEngineConfig(settings, "opencode");
-  settings.antigravityBinary = agy.binary || DEFAULT_SETTINGS.antigravityBinary;
-  settings.antigravityModel = agy.model || DEFAULT_SETTINGS.antigravityModel;
-  settings.antigravityEffort = agy.options.effort ||
-    DEFAULT_SETTINGS.antigravityEffort;
-  settings.binaryPath = oc.binary || DEFAULT_SETTINGS.binaryPath;
-  settings.model = oc.model;
-  settings.agent = oc.options.agent ?? "";
-}
 function migrateSettings(raw) {
   const data = raw ?? {};
-  const { histories, engines: rawEngines, ...rest } = data;
+  const {
+    histories,
+    engines: rawEngines,
+    binaryPath,
+    model,
+    agent,
+    antigravityBinary,
+    antigravityModel,
+    antigravityEffort,
+    ...rest
+  } = data;
   const base = Object.assign(
     {},
     DEFAULT_SETTINGS,
@@ -4626,26 +4596,23 @@ function migrateSettings(raw) {
     },
     rest
   );
-  if (typeof rest.antigravityBinary === "string" &&
-    rest.antigravityBinary.trim()) {
-    base.engines.antigravity.binary = rest.antigravityBinary.trim();
+  if (typeof antigravityBinary === "string" && antigravityBinary.trim()) {
+    base.engines.antigravity.binary = antigravityBinary.trim();
   }
-  if (typeof rest.antigravityModel === "string" &&
-    rest.antigravityModel.trim()) {
-    base.engines.antigravity.model = rest.antigravityModel.trim();
+  if (typeof antigravityModel === "string" && antigravityModel.trim()) {
+    base.engines.antigravity.model = antigravityModel.trim();
   }
-  if (typeof rest.antigravityEffort === "string" &&
-    rest.antigravityEffort.trim()) {
-    base.engines.antigravity.options.effort = rest.antigravityEffort.trim();
+  if (typeof antigravityEffort === "string" && antigravityEffort.trim()) {
+    base.engines.antigravity.options.effort = antigravityEffort.trim();
   }
-  if (typeof rest.binaryPath === "string" && rest.binaryPath.trim()) {
-    base.engines.opencode.binary = rest.binaryPath.trim();
+  if (typeof binaryPath === "string" && binaryPath.trim()) {
+    base.engines.opencode.binary = binaryPath.trim();
   }
-  if (typeof rest.model === "string") {
-    base.engines.opencode.model = rest.model.trim();
+  if (typeof model === "string") {
+    base.engines.opencode.model = model.trim();
   }
-  if (typeof rest.agent === "string") {
-    base.engines.opencode.options.agent = rest.agent.trim();
+  if (typeof agent === "string") {
+    base.engines.opencode.options.agent = agent.trim();
   }
   if (rawEngines && typeof rawEngines === "object") {
     for (const [id, cfg] of Object.entries(rawEngines)) {
@@ -4667,7 +4634,6 @@ function migrateSettings(raw) {
       };
     }
   }
-  syncSettingsFields(base);
   return {
     settings: base,
     histories: histories && typeof histories === "object" ? histories : {}
@@ -5060,9 +5026,9 @@ var OpencodeRunner = class extends BaseCliRunner {
     if (sid && /^ses/.test(sid)) {
       args.push("--session", sid);
     }
-    const model = cfg.model || s.model || DEFAULT_SETTINGS.model;
+    const model = cfg.model || DEFAULT_ENGINE_CONFIGS.opencode.model;
     args.push("--model", model);
-    const agent = cfg.options.agent ?? s.agent;
+    const agent = cfg.options.agent ?? "";
     if (agent) args.push("--agent", agent);
     if (s.autoApprove) args.push("--auto");
     if (s.showThinking) args.push("--thinking");
@@ -6661,7 +6627,7 @@ var VaultAgentsSettingTab = class extends import_obsidian9.PluginSettingTab {
 };
 
 // src/main.ts
-var OpencodePlugin = class extends import_obsidian10.Plugin {
+var VaultAgentsPlugin = class extends import_obsidian10.Plugin {
   settings;
   histories = {};
   registry;
@@ -6831,7 +6797,6 @@ var OpencodePlugin = class extends import_obsidian10.Plugin {
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null;
-      syncSettingsFields(this.settings);
       void this.saveData({ ...this.settings, histories: this.histories });
     }, 500);
   }
@@ -6840,7 +6805,6 @@ var OpencodePlugin = class extends import_obsidian10.Plugin {
       window.clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
-    syncSettingsFields(this.settings);
     await this.saveData({ ...this.settings, histories: this.histories });
   }
   getHistory(sessionId) {

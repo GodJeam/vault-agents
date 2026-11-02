@@ -11,13 +11,12 @@ import type { AgentProvider, RunnerHost } from "./core/provider";
 import {
   getEngineConfig,
   migrateSettings,
-  syncSettingsFields,
   type EngineConfig,
   type HistoryMap,
   type HistoryMessage,
-  type OpencodeSettings,
+  type PluginSettings,
 } from "./core/types";
-import { OpencodeSettingTab } from "./features/settings/settingsTab";
+import { VaultAgentsSettingTab } from "./features/settings/settingsTab";
 import { translate } from "./i18n";
 
 export type {
@@ -27,8 +26,8 @@ export type {
   HistoryMap,
 } from "./core/types";
 
-export default class OpencodePlugin extends Plugin implements RunnerHost {
-  settings!: OpencodeSettings;
+export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
+  settings!: PluginSettings;
   histories: HistoryMap = {};
   registry!: ProviderRegistry;
   opencodeRunner!: OpencodeRunner;
@@ -167,7 +166,7 @@ export default class OpencodePlugin extends Plugin implements RunnerHost {
       },
     });
 
-    this.addSettingTab(new OpencodeSettingTab(this.app, this));
+    this.addSettingTab(new VaultAgentsSettingTab(this.app, this));
   }
 
   // Translate a UI string according to the selected language.
@@ -219,7 +218,6 @@ export default class OpencodePlugin extends Plugin implements RunnerHost {
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null;
-      syncSettingsFields(this.settings);
       void this.saveData({ ...this.settings, histories: this.histories });
     }, 500);
   }
@@ -229,7 +227,6 @@ export default class OpencodePlugin extends Plugin implements RunnerHost {
       window.clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
-    syncSettingsFields(this.settings);
     await this.saveData({ ...this.settings, histories: this.histories });
   }
 

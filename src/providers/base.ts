@@ -127,7 +127,6 @@ export abstract class BaseCliRunner {
         join(home, ".opencode", "bin"),
         join(home, ".gemini", "antigravity-cli", "bin"),
         join(home, ".hermes", "bin"),
-        join(home, ".claude", "local"),
         "/usr/local/bin",
         "/usr/bin",
       ];
@@ -377,7 +376,6 @@ export abstract class BaseCliRunner {
       join(homedir(), ".gemini", "antigravity-cli", "bin", bin),
       join(homedir(), ".hermes", "bin", bin),
       join(homedir(), ".hermes", "hermes-agent", ".hermes", "bin", bin),
-      join(homedir(), ".claude", "local", bin),
       `/usr/local/bin/${bin}`,
       `/usr/bin/${bin}`,
     ];
@@ -663,9 +661,9 @@ export abstract class BaseCliRunner {
     ) {
       return 1_050_000;
     }
-    if (m.includes("gpt-5") || m.includes("codex")) return 256_000;
+    if (m.includes("gpt-5")) return 256_000;
     if (m.includes("gpt-4.1")) return 1_047_576;
-    if (m.includes("o3") || m.includes("o4") || m.includes("gpt-4")) {
+    if (m.includes("gpt-4")) {
       return 200_000;
     }
     if (

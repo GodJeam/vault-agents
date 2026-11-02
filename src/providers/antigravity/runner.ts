@@ -279,8 +279,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       args.push("--conversation", sid);
     }
 
-    const model =
-      cfg.model || s.antigravityModel || ANTIGRAVITY_DESCRIPTOR.defaultModel;
+    const model = cfg.model || ANTIGRAVITY_DESCRIPTOR.defaultModel;
     if (model) {
       args.push("--model", model);
     }
@@ -288,7 +287,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     // Antigravity model ids already encode the reasoning effort (e.g.
     // "gemini-3.8-flash-low"); passing --effort as well makes the CLI reject
     // the combination. Only send --effort for models without an effort suffix.
-    const effort = cfg.options.effort || s.antigravityEffort;
+    const effort = cfg.options.effort;
     const modelEncodesEffort = /-(low|medium|high|xhigh|max)$/i.test(
       model || ""
     );

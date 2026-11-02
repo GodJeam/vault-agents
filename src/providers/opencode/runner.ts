@@ -14,7 +14,7 @@ import type {
   UsageStats,
   UsageWindow,
 } from "../../core/types";
-import { DEFAULT_SETTINGS } from "../../core/types";
+import { DEFAULT_ENGINE_CONFIGS } from "../../core/types";
 import { substitute } from "../../i18n";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
 import type {
@@ -483,10 +483,10 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       args.push("--session", sid);
     }
 
-    const model = cfg.model || s.model || DEFAULT_SETTINGS.model;
+    const model = cfg.model || DEFAULT_ENGINE_CONFIGS.opencode.model;
     args.push("--model", model);
 
-    const agent = cfg.options.agent ?? s.agent;
+    const agent = cfg.options.agent ?? "";
     if (agent) args.push("--agent", agent);
     if (s.autoApprove) args.push("--auto");
     if (s.showThinking) args.push("--thinking");

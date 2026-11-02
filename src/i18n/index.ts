@@ -100,14 +100,9 @@ const IT: Record<string, string> = {
     "Allegato saltato: il file è più grande di $1 MB e non è stato " +
     "possibile convertirlo, quindi non è stato allegato.",
   "Test connection": "Testa connessione",
-  "Run 'opencode --version' to verify the binary is reachable.":
-    "Esegue 'opencode --version' per verificare che il binario sia " +
-    "raggiungibile.",
   "Test": "Test",
   "Testing...": "Test in corso...",
-  "Opencode found:": "Opencode trovato:",
   "Error:": "Errore:",
-  "(default from opencode)": "(default di opencode)",
   "(custom)": "(personalizzato)",
 
   // --- main commands ---
@@ -210,7 +205,6 @@ const IT: Record<string, string> = {
   "Generating session summary...": "Generazione riassunto della sessione...",
   "The session summary could not be generated.":
     "Riassunto della sessione non riuscito.",
-  "Starting...": "In avvio...",
   "Details": "Dettagli",
   "Reasoning": "Ragionamento",
   "Tool": "Strumento",
@@ -318,12 +312,9 @@ const IT: Record<string, string> = {
     "direttamente al tuo abbonamento Google AI Pro senza alcuna API key.",
   "Antigravity CLI (Google AI Pro)": "Antigravity CLI (Google AI Pro)",
   "OpenCode CLI": "OpenCode CLI",
-  "Antigravity settings (Google AI Pro)":
-    "Impostazioni Antigravity (Google AI Pro)",
   "OpenCode settings": "Impostazioni OpenCode",
   "General settings": "Impostazioni generali",
   "Document conversion": "Conversione documenti",
-  "Antigravity binary path": "Percorso binario Antigravity",
   [
     "Command or full path to the agy executable. Default is 'agy' or " +
       "'~/.local/bin/agy'."
@@ -357,13 +348,10 @@ const IT: Record<string, string> = {
   "High": "Alto",
   "Extra high": "Extra alto",
   "Max": "Massimo",
-  "Antigravity found:": "Antigravity trovato:",
   "$1 settings": "Impostazioni $1",
   "$1 found:": "$1 trovato:",
   "Run '$1 --version' to verify the binary is reachable.":
     "Esegue '$1 --version' per verificare che il binario sia raggiungibile.",
-  "Run 'agy --version' to verify the binary is reachable.":
-    "Esegue 'agy --version' per verificare che il binario sia raggiungibile.",
   "Hermes Agent CLI (Nous Research)": "Hermes Agent CLI (Nous Research)",
   "Pi Coding Agent CLI": "Pi Coding Agent CLI",
   [
@@ -429,11 +417,6 @@ const IT: Record<string, string> = {
     "per inserirli rapidamente nel compositore.",
   "Included with $1 ($0.00)": "Incluso con $1 ($0.00)",
   "Included ($0.00)": "Incluso ($0.00)",
-  "Search models... (e.g. gemini, claude, flash, deepseek)":
-    "Cerca modelli... (es. gemini, claude, flash, deepseek)",
-  "Search or type a custom model ID... (e.g. sonnet, gpt-5, gemini)":
-    "Cerca o digita un ID modello personalizzato... (es. sonnet, gpt-5, gemini)",
-  "Custom model ID": "ID modello personalizzato",
   [
     "Type any exact model ID or alias manually. Leave empty to use " +
       "the CLI's own configured default model."
@@ -487,7 +470,6 @@ const IT: Record<string, string> = {
   "Writing response...": "Scrittura della risposta...",
   "Running: $1": "In esecuzione: $1",
   "Waiting for your answer...": "In attesa della tua risposta...",
-  "Working...": "Elaborazione in corso...",
   "Agent question": "Domanda dall'agente",
   "Select one or more options": "Seleziona una o più opzioni",
   "Select an option": "Seleziona un'opzione",

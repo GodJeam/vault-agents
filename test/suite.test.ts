@@ -23,7 +23,7 @@ import { formatQuestionAnswers } from "../src/features/chat/questionCard";
 import { translate } from "../src/i18n";
 
 function createMockHost(
-  customSettings?: Partial<PluginSettings>,
+  customSettings?: Partial<PluginSettings> & Record<string, unknown>,
   histories: HistoryMap = {}
 ): RunnerHost {
   const { settings } = migrateSettings(customSettings ?? {});
