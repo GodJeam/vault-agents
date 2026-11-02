@@ -715,3 +715,107 @@ test("Mock CLI Simulator executes end-to-end with runners", async () => {
   assert.ok(piModels.length > 0);
 });
 
+test("execCli enforces timeout and terminates hanging processes", async () => {
+  const host = createMockHost();
+  const runner = new HermesRunner(host) as unknown as {
+    execCli: (
+      bin: string,
+      args: string[],
+      cwd?: string,
+      env?: NodeJS.ProcessEnv,
+      timeoutMs?: number
+    ) => Promise<string>;
+  };
+
+  await assert.rejects(
+    () =>
+      runner.execCli(
+        process.execPath,
+        ["-e", "setTimeout(() => {}, 10000)"],
+        undefined,
+        undefined,
+        150
+      ),
+    /timed out after 150ms/
+  );
+});
+
+test("sqlEscape, parseHermesConfigModels, and context limit estimation work accurately", async () => {
+  const host = createMockHost();
+  const hermes = new HermesRunner(host);
+  const agy = new AntigravityRunner(host);
+
+  assert.equal(hermes.sqlEscape("O'Reilly's Note"), "O''Reilly''s Note");
+
+  const parsedModels = hermes.parseHermesConfigModels(
+    [
+      "model:",
+      "  provider: opencode-go",
+      "  default: deepseek-v4.1-flash",
+      "default_model: fallback-model",
+    ].join("\n")
+  );
+  assert.deepEqual(parsedModels, ["deepseek-v4.1-flash", "fallback-model"]);
+
+  assert.equal(
+    await agy.getModelContextLimit("gemini-3.8-flash-high"),
+    1_048_576
+  );
+  assert.equal(
+    await agy.getModelContextLimit("claude-opus-5-5-high"),
+    1_000_000
+  );
+  assert.equal(
+    await agy.getModelContextLimit("claude-sonnet-4"),
+    200_000
+  );
+  assert.equal(
+    await agy.getModelContextLimit("deepseek-v4.1-flash"),
+    1_000_000
+  );
+  assert.equal(await agy.getModelContextLimit("grok-4.7"), 500_000);
+});
+
+test("spawnJsonlStream decodes multi-byte UTF-8 split across chunks and calls onDone once", async () => {
+  const host = createMockHost();
+  const runner = new HermesRunner(host) as unknown as {
+    spawnJsonlStream: (
+      bin: string,
+      args: string[],
+      cwd: string | undefined,
+      onLine: (line: string) => void,
+      cb: StreamCallbacks
+    ) => { abort: () => void };
+  };
+
+  const lines: string[] = [];
+  const col = createCollector();
+  // Write a 4-byte emoji (🚀 = F0 9F 9A 80) split across two separate stdout writes
+  const script = [
+    "const b = Buffer.from(JSON.stringify({ text: '🚀 Ciao' }) + '\\n', 'utf8');",
+    "process.stdout.write(b.subarray(0, 11));",
+    "setTimeout(() => process.stdout.write(b.subarray(11)), 20);",
+  ].join(" ");
+
+  await new Promise<void>((resolve) => {
+    runner.spawnJsonlStream(
+      process.execPath,
+      ["-e", script],
+      undefined,
+      (line) => lines.push(line),
+      {
+        ...col.cb,
+        onDone: (code) => {
+          col.dones.push(code);
+          resolve();
+        },
+      }
+    );
+  });
+
+  assert.equal(col.dones.length, 1);
+  assert.equal(col.dones[0], 0);
+  assert.equal(lines.length, 1);
+  assert.equal(JSON.parse(lines[0]).text, "🚀 Ciao");
+});
+
