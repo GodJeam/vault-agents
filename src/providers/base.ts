@@ -138,14 +138,26 @@ export abstract class BaseCliRunner {
       }
       env.PATH = parts.join(":");
     }
+    let spawnBin = bin;
+    let spawnArgs = args;
+    let useShell = false;
+    if (isWin && /\.(cmd|bat)$/i.test(bin)) {
+      const nodeShim = this.resolveCmdNodeScript(bin);
+      if (nodeShim) {
+        spawnBin = nodeShim.nodeBin;
+        spawnArgs = [nodeShim.scriptPath, ...args];
+      } else {
+        useShell = true;
+      }
+    }
     const options: SpawnOptions = {
       cwd,
-      shell: isWin && (bin.endsWith(".cmd") || bin.endsWith(".bat")),
+      shell: useShell,
       windowsHide: true,
       env,
       stdio: ["ignore", "pipe", "pipe"],
     };
-    const child = spawn(bin, args, options);
+    const child = spawn(spawnBin, spawnArgs, options);
     this.trackProc(child);
     return child;
   }
@@ -187,10 +199,17 @@ export abstract class BaseCliRunner {
     cb: StreamCallbacks
   ): RunHandle {
     const child = this.spawnBinary(bin, args, cwd);
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
 
     let buffer = "";
-    child.stdout?.on("data", (d: Buffer) => {
-      buffer += d.toString();
+    child.stdout?.on("data", (chunk: string | Buffer) => {
+      buffer += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      if (buffer.length > MAX_STREAM_LINE_BYTES) {
+        buffer = "";
+        cb.onError("Stream line exceeded maximum buffer size");
+        return;
+      }
       let idx: number;
       while ((idx = buffer.indexOf("\n")) >= 0) {
         const line = buffer.slice(0, idx).trim();
@@ -215,13 +234,23 @@ export abstract class BaseCliRunner {
       }
     });
 
-    child.stderr?.on("data", (d: Buffer) => {
-      cb.onRaw?.(d.toString());
+    child.stderr?.on("data", (chunk: string | Buffer) => {
+      cb.onRaw?.(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
     });
 
-    child.on("error", (e) => cb.onError(e.message));
+    let doneCalled = false;
+    const finishOnce = (code: number) => {
+      if (doneCalled) return;
+      doneCalled = true;
+      cb.onDone(code);
+    };
+
+    child.on("error", (e) => {
+      cb.onError(e.message);
+      finishOnce(-1);
+    });
     child.on("close", (code) => {
-      cb.onDone(code ?? -1);
+      finishOnce(code ?? -1);
     });
 
     return {
@@ -236,16 +265,47 @@ export abstract class BaseCliRunner {
     bin: string,
     args: string[],
     cwd?: string,
-    extraEnv?: NodeJS.ProcessEnv
+    extraEnv?: NodeJS.ProcessEnv,
+    timeoutMs = 30_000
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = this.spawnBinary(bin, args, cwd, extraEnv);
+      child.stdout?.setEncoding("utf8");
+      child.stderr?.setEncoding("utf8");
       let out = "";
       let err = "";
-      child.stdout?.on("data", (d: Buffer) => (out += d.toString()));
-      child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
-      child.on("error", (e) => reject(e));
+      let settled = false;
+
+      const timer =
+        timeoutMs > 0
+          ? setTimeout(() => {
+              if (settled) return;
+              settled = true;
+              this.killProc(child, true);
+              reject(new Error(`CLI command timed out after ${timeoutMs}ms`));
+            }, timeoutMs)
+          : null;
+
+      const cleanupTimer = () => {
+        if (timer !== null) clearTimeout(timer);
+      };
+
+      child.stdout?.on("data", (d: string | Buffer) => {
+        out += typeof d === "string" ? d : d.toString("utf8");
+      });
+      child.stderr?.on("data", (d: string | Buffer) => {
+        err += typeof d === "string" ? d : d.toString("utf8");
+      });
+      child.on("error", (e) => {
+        if (settled) return;
+        settled = true;
+        cleanupTimer();
+        reject(e);
+      });
       child.on("close", (code) => {
+        if (settled) return;
+        settled = true;
+        cleanupTimer();
         if (code === 0) resolve(out);
         else {
           reject(new Error(err.trim() || out.trim() || `exit code ${code}`));
@@ -345,6 +405,33 @@ export abstract class BaseCliRunner {
       if (m) {
         const target = m[1].replace(/%dp0%/gi, dir).replace(/%base%/gi, dir);
         if (existsSync(target)) return target;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }
+
+  private resolveCmdNodeScript(
+    shimPath: string
+  ): { nodeBin: string; scriptPath: string } | null {
+    try {
+      if (!existsSync(shimPath)) return null;
+      const content = readFileSync(shimPath, "utf8");
+      const dir = dirname(shimPath);
+      const scriptMatch = content.match(
+        /"(?:%~?dp0%|%dp0%\\?)([^"]+\.(?:c?js|mjs))"/i
+      );
+      if (scriptMatch && scriptMatch[1]) {
+        const rel = scriptMatch[1].replace(/^[/\\]+/, "");
+        const scriptPath = join(dir, rel);
+        if (existsSync(scriptPath)) {
+          const localNode = join(dir, "node.exe");
+          return {
+            nodeBin: existsSync(localNode) ? localNode : "node",
+            scriptPath,
+          };
+        }
       }
     } catch {
       // ignore

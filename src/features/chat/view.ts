@@ -1170,6 +1170,7 @@ export class ChatView extends ItemView {
       (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer),
       this.assistantIcon()
     );
+    this.activeBubble?.dispose();
     this.activeBubble = bubble;
     this.scrollToBottom();
     return bubble;

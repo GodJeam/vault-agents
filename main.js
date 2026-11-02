@@ -3181,6 +3181,7 @@ ${this.context.content}
       (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer),
       this.assistantIcon()
     );
+    this.activeBubble?.dispose();
     this.activeBubble = bubble;
     this.scrollToBottom();
     return bubble;
@@ -3465,14 +3466,26 @@ var BaseCliRunner = class {
       }
       env.PATH = parts.join(":");
     }
+    let spawnBin = bin;
+    let spawnArgs = args;
+    let useShell = false;
+    if (isWin && /\.(cmd|bat)$/i.test(bin)) {
+      const nodeShim = this.resolveCmdNodeScript(bin);
+      if (nodeShim) {
+        spawnBin = nodeShim.nodeBin;
+        spawnArgs = [nodeShim.scriptPath, ...args];
+      } else {
+        useShell = true;
+      }
+    }
     const options = {
       cwd,
-      shell: isWin && (bin.endsWith(".cmd") || bin.endsWith(".bat")),
+      shell: useShell,
       windowsHide: true,
       env,
       stdio: ["ignore", "pipe", "pipe"]
     };
-    const child = (0, import_child_process.spawn)(bin, args, options);
+    const child = (0, import_child_process.spawn)(spawnBin, spawnArgs, options);
     this.trackProc(child);
     return child;
   }
@@ -3501,9 +3514,16 @@ var BaseCliRunner = class {
    */
   spawnJsonlStream(bin, args, cwd, onLine, cb) {
     const child = this.spawnBinary(bin, args, cwd);
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
     let buffer = "";
-    child.stdout?.on("data", (d) => {
-      buffer += d.toString();
+    child.stdout?.on("data", (chunk) => {
+      buffer += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      if (buffer.length > MAX_STREAM_LINE_BYTES) {
+        buffer = "";
+        cb.onError("Stream line exceeded maximum buffer size");
+        return;
+      }
       let idx;
       while ((idx = buffer.indexOf("\n")) >= 0) {
         const line = buffer.slice(0, idx).trim();
@@ -3526,12 +3546,21 @@ var BaseCliRunner = class {
         }
       }
     });
-    child.stderr?.on("data", (d) => {
-      cb.onRaw?.(d.toString());
+    child.stderr?.on("data", (chunk) => {
+      cb.onRaw?.(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
     });
-    child.on("error", (e) => cb.onError(e.message));
+    let doneCalled = false;
+    const finishOnce = (code) => {
+      if (doneCalled) return;
+      doneCalled = true;
+      cb.onDone(code);
+    };
+    child.on("error", (e) => {
+      cb.onError(e.message);
+      finishOnce(-1);
+    });
     child.on("close", (code) => {
-      cb.onDone(code ?? -1);
+      finishOnce(code ?? -1);
     });
     return {
       abort: () => this.killProc(child, true)
@@ -3540,15 +3569,39 @@ var BaseCliRunner = class {
   /**
    * Execute a CLI binary via promise, returning standard output
    */
-  execCli(bin, args, cwd, extraEnv) {
+  execCli(bin, args, cwd, extraEnv, timeoutMs = 3e4) {
     return new Promise((resolve, reject) => {
       const child = this.spawnBinary(bin, args, cwd, extraEnv);
+      child.stdout?.setEncoding("utf8");
+      child.stderr?.setEncoding("utf8");
       let out = "";
       let err = "";
-      child.stdout?.on("data", (d) => out += d.toString());
-      child.stderr?.on("data", (d) => err += d.toString());
-      child.on("error", (e) => reject(e));
+      let settled = false;
+      const timer = timeoutMs > 0 ? setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        this.killProc(child, true);
+        reject(new Error(`CLI command timed out after ${timeoutMs}ms`));
+      }, timeoutMs) : null;
+      const cleanupTimer = () => {
+        if (timer !== null) clearTimeout(timer);
+      };
+      child.stdout?.on("data", (d) => {
+        out += typeof d === "string" ? d : d.toString("utf8");
+      });
+      child.stderr?.on("data", (d) => {
+        err += typeof d === "string" ? d : d.toString("utf8");
+      });
+      child.on("error", (e) => {
+        if (settled) return;
+        settled = true;
+        cleanupTimer();
+        reject(e);
+      });
       child.on("close", (code) => {
+        if (settled) return;
+        settled = true;
+        cleanupTimer();
         if (code === 0) resolve(out);
         else {
           reject(new Error(err.trim() || out.trim() || `exit code ${code}`));
@@ -3639,6 +3692,29 @@ var BaseCliRunner = class {
       if (m) {
         const target = m[1].replace(/%dp0%/gi, dir).replace(/%base%/gi, dir);
         if ((0, import_fs.existsSync)(target)) return target;
+      }
+    } catch {
+    }
+    return null;
+  }
+  resolveCmdNodeScript(shimPath) {
+    try {
+      if (!(0, import_fs.existsSync)(shimPath)) return null;
+      const content = (0, import_fs.readFileSync)(shimPath, "utf8");
+      const dir = (0, import_path.dirname)(shimPath);
+      const scriptMatch = content.match(
+        /"(?:%~?dp0%|%dp0%\\?)([^"]+\.(?:c?js|mjs))"/i
+      );
+      if (scriptMatch && scriptMatch[1]) {
+        const rel = scriptMatch[1].replace(/^[/\\]+/, "");
+        const scriptPath = (0, import_path.join)(dir, rel);
+        if ((0, import_fs.existsSync)(scriptPath)) {
+          const localNode = (0, import_path.join)(dir, "node.exe");
+          return {
+            nodeBin: (0, import_fs.existsSync)(localNode) ? localNode : "node",
+            scriptPath
+          };
+        }
       }
     } catch {
     }
@@ -4887,6 +4963,7 @@ var OpencodeRunner = class extends BaseCliRunner {
   async pruneOversizedParts(force = false, ignoreAge = false) {
     const s = this.plugin.settings;
     if (!s.dbAutoCleanup && !force) return;
+    if (!force && this.activeProcs.size > 0) return;
     const dbPath = await this.getDbPath();
     if (!dbPath) return;
     const maxBytes = Math.max(1, s.dbCleanupMaxMB || 5) * 1024 * 1024;
@@ -4899,7 +4976,8 @@ var OpencodeRunner = class extends BaseCliRunner {
     ].filter(Boolean).join(" ");
     try {
       await this.execSqlite(dbPath, q);
-    } catch {
+    } catch (e) {
+      console.debug("[vault-agents] pruneOversizedParts skipped:", e);
     }
   }
   async getDbPath() {

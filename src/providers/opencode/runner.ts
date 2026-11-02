@@ -386,6 +386,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   async pruneOversizedParts(force = false, ignoreAge = false): Promise<void> {
     const s = this.plugin.settings;
     if (!s.dbAutoCleanup && !force) return;
+    if (!force && this.activeProcs.size > 0) return;
     const dbPath = await this.getDbPath();
     if (!dbPath) return;
     const maxBytes = Math.max(1, s.dbCleanupMaxMB || 5) * 1024 * 1024;
@@ -400,8 +401,8 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       .join(" ");
     try {
       await this.execSqlite(dbPath, q);
-    } catch {
-      // Best effort
+    } catch (e) {
+      console.debug("[vault-agents] pruneOversizedParts skipped:", e);
     }
   }
 
