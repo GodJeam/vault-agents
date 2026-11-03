@@ -26,7 +26,7 @@ function lastTimestamp(messages: HistoryMessage[]): number {
 
 function serializedSize(messages: HistoryMessage[]): number {
   try {
-    return JSON.stringify(messages).length;
+    return new TextEncoder().encode(JSON.stringify(messages)).length;
   } catch {
     return 0;
   }
