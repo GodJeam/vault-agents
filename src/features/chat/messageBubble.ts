@@ -64,6 +64,44 @@ export function renderErrorBubble(
   row.createDiv({ cls: "opencode-bubble", text: msg });
 }
 
+export function renderPermissionBubble(
+  container: HTMLElement,
+  msg: string,
+  t: (s: string) => string,
+  onEnable: () => void,
+  onRetry: () => void,
+  onCopy: (text: string) => void
+): void {
+  const row = container.createDiv({
+    cls:
+      "opencode-message opencode-message--error " +
+      "opencode-message--permission",
+  });
+  metaWithCopy(
+    row,
+    t("Permission needed"),
+    () => msg,
+    onCopy,
+    t("Copy text"),
+    "shield-alert"
+  );
+  row.createDiv({ cls: "opencode-bubble", text: msg });
+
+  const actions = row.createDiv({ cls: "opencode-permission-actions" });
+  const enableBtn = actions.createEl("button", {
+    cls: "opencode-permission-btn is-cta",
+    attr: { type: "button" },
+    text: t("Enable auto-approve"),
+  });
+  enableBtn.addEventListener("click", () => onEnable());
+  const retryBtn = actions.createEl("button", {
+    cls: "opencode-permission-btn",
+    attr: { type: "button" },
+    text: t("Retry"),
+  });
+  retryBtn.addEventListener("click", () => onRetry());
+}
+
 export class AssistantBubble {
   private reasoningEl: HTMLDetailsElement;
   private reasoningContent: HTMLElement;

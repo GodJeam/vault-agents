@@ -331,6 +331,33 @@
   color: var(--text-error);
   border-bottom-left-radius: 4px;
 }
+.opencode-permission-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.opencode-permission-btn {
+  font-size: var(--font-smaller);
+  padding: 4px 12px;
+  cursor: pointer;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+}
+.opencode-permission-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+.opencode-permission-btn.is-cta {
+  background: var(--interactive-accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+.opencode-permission-btn.is-cta:hover {
+  background: var(--interactive-accent-hover);
+}
 
 .opencode-bubble--assistant :is(h1, h2, h3, h4, h5, h6) {
   margin: 0.4em 0 0.2em;

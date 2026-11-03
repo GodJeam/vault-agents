@@ -15,6 +15,7 @@ import {
 } from "../src/core/types";
 import type { RunnerHost } from "../src/core/provider";
 import { ProviderRegistry } from "../src/core/registry";
+import { isPermissionError } from "../src/core/permissionError";
 import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
 import { HermesRunner } from "../src/providers/hermes/runner";
@@ -118,6 +119,19 @@ test("DEFAULT_SETTINGS ships secure defaults", () => {
   assert.equal(migrateSettings({}).settings.autoApprove, false);
   // ...while an explicit user choice is preserved.
   assert.equal(migrateSettings({ autoApprove: true }).settings.autoApprove, true);
+});
+
+test("isPermissionError detects actionable permission failures only", () => {
+  assert.equal(isPermissionError("permission denied"), true);
+  assert.equal(isPermissionError("Permission required to run this tool"), true);
+  assert.equal(isPermissionError("This tool requires approval"), true);
+  assert.equal(isPermissionError("auto-approve is disabled"), true);
+  assert.equal(isPermissionError("access denied"), true);
+  assert.equal(isPermissionError("command blocked by policy"), true);
+  assert.equal(isPermissionError("denied by user"), true);
+  assert.equal(isPermissionError("network timeout"), false);
+  assert.equal(isPermissionError("model not found"), false);
+  assert.equal(isPermissionError(""), false);
 });
 
 test("Runners only pass auto-approve flags when explicitly enabled", () => {

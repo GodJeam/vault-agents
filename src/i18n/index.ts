@@ -173,6 +173,38 @@ const IT: Record<string, string> = {
     "cronologia salvata in Obsidian.",
   "Delete": "Elimina",
   "Cancel": "Annulla",
+  "Enable": "Attiva",
+  "Permission needed": "Permesso necessario",
+  "Retry": "Riprova",
+  "Enable auto-approve": "Attiva auto-approve",
+  "Enable auto-approve?": "Attivare auto-approve?",
+  [
+    "With auto-approve enabled the agent can run shell commands and " +
+      "edit files without asking for confirmation. Enable it only for " +
+      "vaults and notes you trust."
+  ]:
+    "Con auto-approve attivo l'agente può eseguire comandi shell e " +
+    "modificare file senza chiedere conferma. Attivalo solo su vault e " +
+    "note di cui ti fidi.",
+  "Auto-approve enabled.": "Auto-approve attivato.",
+  "Auto-approve disabled.": "Auto-approve disattivato.",
+  "Auto-approve On: the agent can run tools and edit files without asking":
+    "Auto-approve attivo: l'agente può eseguire strumenti e modificare " +
+    "file senza chiedere",
+  "Auto-approve Off: the agent may stop when a tool needs permission":
+    "Auto-approve disattivato: l'agente potrebbe fermarsi quando uno " +
+    "strumento richiede un permesso",
+  "The agent stopped because it needs permission to continue.":
+    "L'agente si è fermato perché ha bisogno di un permesso per " +
+    "continuare.",
+  [
+    "Auto-approve is off: the agent may stop when it needs to edit " +
+      "files or run commands. Enable it from the shield icon or in " +
+      "Settings."
+  ]:
+    "Auto-approve è disattivato: l'agente potrebbe fermarsi quando deve " +
+    "modificare file o eseguire comandi. Attivalo dall'icona scudo o " +
+    "nelle impostazioni.",
   "Context:": "Contesto:",
   "last update $1s ago": "ultimo aggiornamento $1s fa",
   "Possibly stuck": "Possibilmente bloccato",

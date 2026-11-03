@@ -27,8 +27,10 @@ import {
   AssistantBubble,
   renderUserBubble,
   renderErrorBubble,
+  renderPermissionBubble,
   metaWithCopy,
 } from "./messageBubble";
+import { isPermissionError } from "../../core/permissionError";
 import { SuggestPopup } from "./suggestPopup";
 import { AttachmentManager } from "./attachmentManager";
 import {
@@ -75,6 +77,9 @@ export class ChatView extends ItemView {
   private contextRunInput = 0;
   private activityTimer: number | null = null;
   private activeBubble: AssistantBubble | null = null;
+  private autoApproveBtn!: HTMLButtonElement;
+  private autoApproveHintShown = false;
+  private lastRun: { prompt: string; fileAttachments: string[] } | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: VaultAgentsPlugin) {
     super(leaf);
@@ -262,6 +267,14 @@ export class ChatView extends ItemView {
       new StatsModal(this.app, this.plugin, this.sessionEngine()).open()
     );
 
+    this.autoApproveBtn = this.contextBar.createEl("button", {
+      cls: "opencode-icon-btn",
+    });
+    this.autoApproveBtn.addEventListener("click", () =>
+      this.toggleAutoApprove()
+    );
+    this.updateAutoApproveBtn();
+
     const attachBtn = this.contextBar.createEl("button", {
       cls: "opencode-add-note-btn",
     });
@@ -380,6 +393,85 @@ export class ChatView extends ItemView {
       this.contextLabelEl.hide();
       this.contextClearBtn.addClass("hidden");
     }
+  }
+
+  private updateAutoApproveBtn(): void {
+    if (!this.autoApproveBtn) return;
+    const on = this.plugin.settings.autoApprove;
+    this.autoApproveBtn.empty();
+    setIcon(this.autoApproveBtn, on ? "shield-check" : "shield-off");
+    this.autoApproveBtn.toggleClass("is-active", on);
+    this.autoApproveBtn.setAttribute(
+      "title",
+      on
+        ? this.plugin.t(
+            "Auto-approve On: the agent can run tools and edit files " +
+              "without asking"
+          )
+        : this.plugin.t(
+            "Auto-approve Off: the agent may stop when a tool needs " +
+              "permission"
+          )
+    );
+  }
+
+  private async setAutoApprove(value: boolean): Promise<void> {
+    this.plugin.settings.autoApprove = value;
+    await this.plugin.saveSettings();
+    this.updateAutoApproveBtn();
+    new Notice(
+      value
+        ? this.plugin.t("Auto-approve enabled.")
+        : this.plugin.t("Auto-approve disabled.")
+    );
+  }
+
+  private toggleAutoApprove(): void {
+    if (this.plugin.settings.autoApprove) {
+      void this.setAutoApprove(false);
+      return;
+    }
+    this.confirmEnableAutoApprove();
+  }
+
+  private confirmEnableAutoApprove(onEnabled?: () => void): void {
+    new ConfirmModal(
+      this.app,
+      this.plugin,
+      this.plugin.t("Enable auto-approve?"),
+      this.plugin.t(
+        "With auto-approve enabled the agent can run shell commands and " +
+          "edit files without asking for confirmation. Enable it only for " +
+          "vaults and notes you trust."
+      ),
+      this.plugin.t("Enable"),
+      () => {
+        void this.setAutoApprove(true).then(() => onEnabled?.());
+      }
+    ).open();
+  }
+
+  private renderPermissionError(detail: string): void {
+    const message =
+      detail.trim() ||
+      this.plugin.t(
+        "The agent stopped because it needs permission to continue."
+      );
+    renderPermissionBubble(
+      this.messagesEl,
+      message,
+      (s) => this.plugin.t(s),
+      () => this.confirmEnableAutoApprove(() => this.retryLastRun()),
+      () => this.retryLastRun(),
+      (text) => this.copyText(text)
+    );
+    this.scrollToBottom();
+  }
+
+  private retryLastRun(): void {
+    if (this.running || !this.lastRun) return;
+    const { prompt, fileAttachments } = this.lastRun;
+    this.doRun(prompt, [...fileAttachments]);
   }
 
   private async populateSessionSelect(): Promise<void> {
@@ -943,6 +1035,17 @@ export class ChatView extends ItemView {
     const raw = this.inputEl.value.trim();
     if (!raw || this.running || this.dispatching) return;
 
+    if (!this.plugin.settings.autoApprove && !this.autoApproveHintShown) {
+      this.autoApproveHintShown = true;
+      new Notice(
+        this.plugin.t(
+          "Auto-approve is off: the agent may stop when it needs to edit " +
+            "files or run commands. Enable it from the shield icon or in " +
+            "Settings."
+        )
+      );
+    }
+
     let prompt = raw;
     const ctxLabel = this.context?.label;
     if (this.context) {
@@ -980,6 +1083,7 @@ export class ChatView extends ItemView {
   }
 
   private doRun(prompt: string, fileAttachments: string[]): void {
+    this.lastRun = { prompt, fileAttachments: [...fileAttachments] };
     const bubble = this.addAssistantMessage();
     let currentActivity = this.plugin.t("Connecting to agent...");
     bubble.setActivity(currentActivity);
@@ -1205,6 +1309,10 @@ export class ChatView extends ItemView {
   }
 
   private handleStreamError(err: string): void {
+    if (!this.plugin.settings.autoApprove && isPermissionError(err)) {
+      this.renderPermissionError(err);
+      return;
+    }
     const isImageError =
       /does not support image/i.test(err) ||
       /multimodal/i.test(err) ||
@@ -1245,6 +1353,10 @@ export class ChatView extends ItemView {
   private handleProcessFailure(code: number): void {
     if (this.hadStreamError) return;
     const detail = this.lastStderr.trim().replace(/\s+/g, " ").slice(0, 300);
+    if (!this.plugin.settings.autoApprove && isPermissionError(detail)) {
+      this.renderPermissionError(detail);
+      return;
+    }
     const exitKey =
       "The agent process exited with code $1. Check the binary path " +
       "and the model in the settings.";
