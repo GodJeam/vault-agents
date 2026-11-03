@@ -32,6 +32,7 @@ import {
 } from "./messageBubble";
 import { isPermissionError } from "../../core/permissionError";
 import { redact } from "../../core/redact";
+import { neutralizeRemoteMarkdown } from "./sanitize";
 import { SuggestPopup } from "./suggestPopup";
 import { AttachmentManager } from "./attachmentManager";
 import {
@@ -1427,7 +1428,13 @@ export class ChatView extends ItemView {
           cls: "opencode-bubble opencode-bubble--assistant",
         });
         if (rec.text.length <= 30000) {
-          MarkdownRenderer.render(this.app, rec.text, bubble, "", this);
+          MarkdownRenderer.render(
+            this.app,
+            neutralizeRemoteMarkdown(rec.text),
+            bubble,
+            this.app.workspace.getActiveFile()?.path ?? "",
+            this
+          );
         } else {
           bubble.textContent = rec.text;
         }

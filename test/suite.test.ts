@@ -20,6 +20,7 @@ import { ProviderRegistry } from "../src/core/registry";
 import { isPermissionError } from "../src/core/permissionError";
 import { redact } from "../src/core/redact";
 import { pruneHistoryMap } from "../src/core/history";
+import { neutralizeRemoteMarkdown } from "../src/features/chat/sanitize";
 import { buildAnydocArgs, ensurePrivateTempDir, restrictFilePermissions } from "../src/providers/base";
 import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
@@ -262,6 +263,31 @@ test("buildAnydocArgs only requests hosted OCR when enabled", () => {
     buildAnydocArgs("/tmp/in.pdf", "/tmp/out.md", true),
     ["/tmp/in.pdf", "--ocr", "hosted", "-o", "/tmp/out.md"]
   );
+});
+
+test("neutralizeRemoteMarkdown blocks remote media but keeps links", () => {
+  const markdown = [
+    "remote ![a](https://evil.example/a.png)",
+    "proto ![b](//evil.example/b.png)",
+    'title ![c](https://evil.example/c.png "cap")',
+    "angle ![d](<https://evil.example/d.png>)",
+    "local ![ok](attachments/local.png)",
+    '<img src="https://evil.example/x.png" alt="x">',
+    '<video src="https://evil.example/v.mp4"></video>',
+    '<audio src="https://evil.example/a.mp3"></audio>',
+    '<div style="background: url(https://evil.example/bg.png)">x</div>',
+    '<video poster="https://evil.example/p.png"></video>',
+    "[ref]: https://evil.example/r.png",
+    "![r][ref]",
+    "[normal link](https://example.com/page)",
+  ].join("\n");
+
+  const out = neutralizeRemoteMarkdown(markdown);
+  assert.equal(/evil\.example/.test(out), false);
+  assert.equal(out.includes("<img"), false);
+  assert.equal(out.includes('src="https://evil'), false);
+  assert.ok(out.includes("![ok](attachments/local.png)"));
+  assert.ok(out.includes("[normal link](https://example.com/page)"));
 });
 
 test("temp conversion directory and files are private", async (t) => {

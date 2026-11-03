@@ -2,6 +2,7 @@ import { App, Component, MarkdownRenderer, setIcon } from "obsidian";
 import type { AgentQuestion, FinishInfo, StepInfo } from "../../core/types";
 import { StepManager } from "./stepWidget";
 import { renderQuestionCard } from "./questionCard";
+import { neutralizeRemoteMarkdown } from "./sanitize";
 
 export function metaWithCopy(
   row: HTMLElement,
@@ -275,9 +276,9 @@ export class AssistantBubble {
     if (this.rawText.trim()) {
       MarkdownRenderer.render(
         this.app,
-        this.rawText,
+        neutralizeRemoteMarkdown(this.rawText),
         this.contentEl,
-        "",
+        this.app.workspace.getActiveFile()?.path ?? "",
         this.component
       );
     }
@@ -383,9 +384,9 @@ export class AssistantBubble {
       if (this.rawText.length <= 30000) {
         MarkdownRenderer.render(
           this.app,
-          this.rawText,
+          neutralizeRemoteMarkdown(this.rawText),
           this.contentEl,
-          "",
+          this.app.workspace.getActiveFile()?.path ?? "",
           this.component
         );
       } else {
