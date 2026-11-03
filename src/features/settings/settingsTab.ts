@@ -336,6 +336,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.anydocEnabled = value;
             await this.plugin.saveSettings();
+            this.display();
           })
       );
 
@@ -357,27 +358,39 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           })
       );
 
+    new Setting(containerEl)
+      .setName(t("Send documents to hosted OCR"))
+      .setDesc(
+        t(
+          "Upload scanned documents to the external Firecrawl Parse " +
+            "service. Only enable this if you accept that the document " +
+            "contents leave your machine."
+        )
+      )
+      .setDisabled(!this.plugin.settings.anydocEnabled)
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.anydocHostedOcr)
+          .setDisabled(!this.plugin.settings.anydocEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.anydocHostedOcr = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
     if (activeDesc.supportsDbCleanup && activeProvider.pruneOversizedParts) {
       containerEl.createEl("h3", { text: t("Database self-cleanup") });
 
-      new Setting(containerEl)
-        .setName(t("Enable automatic cleanup"))
-        .setDesc(
-          t(
-            "Periodically remove large file attachments from the opencode " +
-              "database (opencode.db), which would otherwise bloat it. Only " +
-              "file attachments older than the minimum age and larger than " +
-              "the max size are removed; conversation text is never touched."
-          )
-        )
-        .addToggle((toggle) =>
-          toggle
-            .setValue(this.plugin.settings.dbAutoCleanup)
-            .onChange(async (value) => {
-              this.plugin.settings.dbAutoCleanup = value;
-              await this.plugin.saveSettings();
-            })
-        );
+      containerEl.createEl("p", {
+        text: t(
+          "Automatic cleanup on startup is disabled. Use the button below " +
+            "to remove oversized file attachments from the OpenCode " +
+            "database. Only attachments older than the minimum age and " +
+            "larger than the max size are removed; conversation text is " +
+            "never touched."
+        ),
+        cls: "setting-item-description",
+      });
 
       new Setting(containerEl)
         .setName(t("Max part size (MB)"))

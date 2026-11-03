@@ -16,6 +16,7 @@ import {
 import type { RunnerHost } from "../src/core/provider";
 import { ProviderRegistry } from "../src/core/registry";
 import { isPermissionError } from "../src/core/permissionError";
+import { buildAnydocArgs } from "../src/providers/base";
 import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
 import { HermesRunner } from "../src/providers/hermes/runner";
@@ -174,6 +175,29 @@ test("Runners only pass auto-approve flags when explicitly enabled", () => {
       .includes("--yolo"),
     true
   );
+});
+
+test("buildAnydocArgs only requests hosted OCR when enabled", () => {
+  assert.deepEqual(
+    buildAnydocArgs("/tmp/in.pdf", "/tmp/out.md", false),
+    ["/tmp/in.pdf", "-o", "/tmp/out.md"]
+  );
+  assert.deepEqual(
+    buildAnydocArgs("/tmp/in.pdf", "/tmp/out.md", true),
+    ["/tmp/in.pdf", "--ocr", "hosted", "-o", "/tmp/out.md"]
+  );
+});
+
+test("CLI spawning never enables a shell and DB cleanup is not automatic", () => {
+  const baseSrc = readFileSync(
+    join(process.cwd(), "src/providers/base.ts"),
+    "utf-8"
+  );
+  assert.equal(/\bshell:\s*true\b/.test(baseSrc), false);
+  assert.equal(/\buseShell\b/.test(baseSrc), false);
+
+  const mainSrc = readFileSync(join(process.cwd(), "src/main.ts"), "utf-8");
+  assert.equal(/pruneOversizedParts\?\.\(\)/.test(mainSrc), false);
 });
 
 test("ProviderRegistry resolves session-specific provider cleanly", () => {

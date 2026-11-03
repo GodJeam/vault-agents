@@ -31,6 +31,21 @@ export const BINARY_EXT_REGEX = new RegExp(
   "i"
 );
 
+/**
+ * Build the anydoc CLI arguments. Hosted OCR uploads the document to the
+ * external Firecrawl Parse service, so it must stay opt-in.
+ */
+export function buildAnydocArgs(
+  input: string,
+  output: string,
+  hostedOcr: boolean
+): string[] {
+  const args = [input];
+  if (hostedOcr) args.push("--ocr", "hosted");
+  args.push("-o", output);
+  return args;
+}
+
 export abstract class BaseCliRunner {
   abstract readonly descriptor: ProviderDescriptor;
   protected plugin: RunnerHost;
@@ -139,19 +154,19 @@ export abstract class BaseCliRunner {
     }
     let spawnBin = bin;
     let spawnArgs = args;
-    let useShell = false;
     if (isWin && /\.(cmd|bat)$/i.test(bin)) {
       const nodeShim = this.resolveCmdNodeScript(bin);
       if (nodeShim) {
         spawnBin = nodeShim.nodeBin;
         spawnArgs = [nodeShim.scriptPath, ...args];
-      } else {
-        useShell = true;
       }
+      // No shell fallback: enabling one would let prompt and attachment
+      // arguments be interpreted by cmd.exe (command injection). An
+      // unresolvable .cmd/.bat launcher surfaces as a spawn error instead.
     }
     const options: SpawnOptions = {
       cwd,
-      shell: useShell,
+      shell: false,
       windowsHide: true,
       env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -159,6 +174,28 @@ export abstract class BaseCliRunner {
     const child = spawn(spawnBin, spawnArgs, options);
     this.trackProc(child);
     return child;
+  }
+
+  /**
+   * Human-readable spawn failure, with a Windows hint when a `.cmd`/`.bat`
+   * launcher could not be resolved without a shell.
+   */
+  protected spawnErrorMessage(e: NodeJS.ErrnoException): string {
+    const message = e.message || String(e);
+    if (
+      process.platform === "win32" &&
+      (e.code === "EINVAL" || e.code === "ENOENT")
+    ) {
+      return (
+        message +
+        " — " +
+        this.plugin.t(
+          "Windows .cmd/.bat launchers cannot be run safely; use the " +
+            "native .exe or install the Node CLI."
+        )
+      );
+    }
+    return message;
   }
 
   /**
@@ -244,8 +281,8 @@ export abstract class BaseCliRunner {
       cb.onDone(code);
     };
 
-    child.on("error", (e) => {
-      cb.onError(e.message);
+    child.on("error", (e: NodeJS.ErrnoException) => {
+      cb.onError(this.spawnErrorMessage(e));
       finishOnce(-1);
     });
     child.on("close", (code) => {
@@ -295,11 +332,11 @@ export abstract class BaseCliRunner {
       child.stderr?.on("data", (d: string | Buffer) => {
         err += typeof d === "string" ? d : d.toString("utf8");
       });
-      child.on("error", (e) => {
+      child.on("error", (e: NodeJS.ErrnoException) => {
         if (settled) return;
         settled = true;
         cleanupTimer();
-        reject(e);
+        reject(new Error(this.spawnErrorMessage(e)));
       });
       child.on("close", (code) => {
         if (settled) return;
@@ -851,16 +888,19 @@ export abstract class BaseCliRunner {
     );
     try {
       await new Promise<void>((resolve, reject) => {
-        const child = this.spawnBinary(bin, [
-          cleanInput,
-          "--ocr",
-          "hosted",
-          "-o",
-          outPath,
-        ]);
+        const child = this.spawnBinary(
+          bin,
+          buildAnydocArgs(
+            cleanInput,
+            outPath,
+            this.plugin.settings.anydocHostedOcr
+          )
+        );
         let err = "";
         child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
-        child.on("error", (e) => reject(e));
+        child.on("error", (e: NodeJS.ErrnoException) =>
+          reject(new Error(this.spawnErrorMessage(e)))
+        );
         child.on("close", (code) => {
           if (code === 0) resolve();
           else {

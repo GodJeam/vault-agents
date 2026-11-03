@@ -68,10 +68,9 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     this.registry.register(new HermesRunner(this));
     this.registry.register(new PiRunner(this));
 
-    // Best-effort database cleanup on load for any provider that supports it
-    for (const provider of this.registry.getAll()) {
-      void provider.pruneOversizedParts?.();
-    }
+    // Database cleanup is intentionally NOT run on load: it mutates the
+    // OpenCode SQLite database and could remove data still in use. It is
+    // available on demand from the settings tab.
     const t = this.t.bind(this);
 
     this.registerView(CHAT_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
@@ -265,5 +264,10 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
 
   async saveSettings(): Promise<void> {
     await this.flushSave();
+    for (const leaf of this.app.workspace.getLeavesOfType(CHAT_VIEW_TYPE)) {
+      if (leaf.view instanceof ChatView) {
+        leaf.view.refreshSettings();
+      }
+    }
   }
 }

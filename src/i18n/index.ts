@@ -25,6 +25,34 @@ const IT: Record<string, string> = {
     "Comando o percorso completo dell'eseguibile anydoc " +
     "(npm install -g @firecrawl/anydoc).",
   "anydoc conversion failed": "Conversione anydoc fallita",
+  "Send documents to hosted OCR": "Invia i documenti a OCR hosted",
+  [
+    "Upload scanned documents to the external Firecrawl Parse " +
+      "service. Only enable this if you accept that the document " +
+      "contents leave your machine."
+  ]:
+    "Carica i documenti scansionati sul servizio esterno Firecrawl " +
+    "Parse. Attivalo solo se accetti che il contenuto dei documenti " +
+    "lasci la tua macchina.",
+  [
+    "Windows .cmd/.bat launchers cannot be run safely; use the " +
+      "native .exe or install the Node CLI."
+  ]:
+    "I launcher Windows .cmd/.bat non possono essere eseguiti in " +
+    "sicurezza; usa l'eseguibile nativo .exe o installa la versione " +
+    "Node del CLI.",
+  [
+    "Automatic cleanup on startup is disabled. Use the button below " +
+      "to remove oversized file attachments from the OpenCode " +
+      "database. Only attachments older than the minimum age and " +
+      "larger than the max size are removed; conversation text is " +
+      "never touched."
+  ]:
+    "La pulizia automatica all'avvio è disattivata. Usa il pulsante qui " +
+    "sotto per rimuovere gli allegati troppo grandi dal database di " +
+    "OpenCode. Vengono rimossi solo gli allegati più vecchi dell'età " +
+    "minima e più grandi della dimensione massima; il testo delle " +
+    "conversazioni non viene mai toccato.",
   [
     "Command or full path to the opencode executable. Usually 'opencode' " +
       "is enough if it is on your PATH."

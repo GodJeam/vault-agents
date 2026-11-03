@@ -1,4 +1,5 @@
 import { isAbsolute, join } from "path";
+import { copyFile } from "fs/promises";
 import type {
   AgentProvider,
   ProviderDescriptor,
@@ -403,6 +404,11 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     ]
       .filter(Boolean)
       .join(" ");
+    try {
+      await copyFile(dbPath, dbPath + ".bak");
+    } catch (e) {
+      console.debug("[vault-agents] could not back up opencode.db:", e);
+    }
     try {
       await this.execSqlite(dbPath, q);
     } catch (e) {

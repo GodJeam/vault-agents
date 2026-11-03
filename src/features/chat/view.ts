@@ -395,6 +395,10 @@ export class ChatView extends ItemView {
     }
   }
 
+  refreshSettings(): void {
+    this.updateAutoApproveBtn();
+  }
+
   private updateAutoApproveBtn(): void {
     if (!this.autoApproveBtn) return;
     const on = this.plugin.settings.autoApprove;
