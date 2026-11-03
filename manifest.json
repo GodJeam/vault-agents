@@ -1,7 +1,7 @@
 {
   "id": "vault-agents",
   "name": "Vault Agents",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "minAppVersion": "1.5.0",
   "description": "Multi-agent AI orchestrator: connect local CLI agents (Antigravity, OpenCode, Hermes, Pi) directly to your vault.",
   "author": "GodJeam",
