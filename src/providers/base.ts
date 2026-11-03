@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "child_process";
 import { createHash } from "crypto";
 import { existsSync, readFileSync, statSync } from "fs";
-import { copyFile, mkdir, readdir, stat, unlink } from "fs/promises";
+import { copyFile, chmod, mkdir, readdir, stat, unlink } from "fs/promises";
 import { basename, dirname, extname, isAbsolute, join } from "path";
 import { homedir, tmpdir } from "os";
 import { redact } from "../core/redact";
@@ -45,6 +45,20 @@ export function buildAnydocArgs(
   if (hostedOcr) args.push("--ocr", "hosted");
   args.push("-o", output);
   return args;
+}
+
+/**
+ * Create the conversion cache directory with owner-only permissions. The
+ * directory may already exist with looser permissions from older versions.
+ */
+export async function ensurePrivateTempDir(dir: string): Promise<void> {
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  await chmod(dir, 0o700).catch(() => {});
+}
+
+/** Restrict a converted file to its owner (best effort on non-POSIX systems). */
+export async function restrictFilePermissions(path: string): Promise<void> {
+  await chmod(path, 0o600).catch(() => {});
 }
 
 export abstract class BaseCliRunner {
@@ -877,12 +891,16 @@ export abstract class BaseCliRunner {
       .digest("hex")
       .slice(0, 16);
     const dir = join(tmpdir(), "vault-agents-anydoc");
-    await mkdir(dir, { recursive: true });
+    await ensurePrivateTempDir(dir);
+    await this.cleanupTempFiles(dir);
     const outPath = join(dir, hash + ".md");
 
     try {
       const [src, out] = await Promise.all([stat(absPath), stat(outPath)]);
-      if (out.mtimeMs >= src.mtimeMs) return outPath;
+      if (out.mtimeMs >= src.mtimeMs) {
+        await restrictFilePermissions(outPath);
+        return outPath;
+      }
     } catch {
       // Not yet cached
     }
@@ -890,7 +908,7 @@ export abstract class BaseCliRunner {
     const ext = extname(absPath) || ".pdf";
     const cleanInput = join(dir, "in-" + hash + ext);
     await copyFile(absPath, cleanInput);
-    await this.cleanupTempFiles(dir);
+    await restrictFilePermissions(cleanInput);
 
     const bin = this.resolveBinaryPath(
       this.plugin.settings.anydocBinary || "anydoc"
@@ -922,6 +940,7 @@ export abstract class BaseCliRunner {
       await unlink(cleanInput).catch(() => {});
     }
 
+    await restrictFilePermissions(outPath);
     return outPath;
   }
 

@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   DEFAULT_SETTINGS,
@@ -18,7 +20,7 @@ import { ProviderRegistry } from "../src/core/registry";
 import { isPermissionError } from "../src/core/permissionError";
 import { redact } from "../src/core/redact";
 import { pruneHistoryMap } from "../src/core/history";
-import { buildAnydocArgs } from "../src/providers/base";
+import { buildAnydocArgs, ensurePrivateTempDir, restrictFilePermissions } from "../src/providers/base";
 import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
 import { HermesRunner } from "../src/providers/hermes/runner";
@@ -260,6 +262,28 @@ test("buildAnydocArgs only requests hosted OCR when enabled", () => {
     buildAnydocArgs("/tmp/in.pdf", "/tmp/out.md", true),
     ["/tmp/in.pdf", "--ocr", "hosted", "-o", "/tmp/out.md"]
   );
+});
+
+test("temp conversion directory and files are private", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("POSIX permissions only");
+    return;
+  }
+  const root = await mkdtemp(join(tmpdir(), "vault-agents-perm-"));
+  try {
+    const dir = join(root, "cache");
+    // Simulate a cache directory created by an older version with loose perms.
+    await mkdir(dir, { recursive: true, mode: 0o755 });
+    await ensurePrivateTempDir(dir);
+    assert.equal((await stat(dir)).mode & 0o777, 0o700);
+
+    const file = join(dir, "converted.md");
+    await writeFile(file, "# converted");
+    await restrictFilePermissions(file);
+    assert.equal((await stat(file)).mode & 0o777, 0o600);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("CLI spawning never enables a shell and DB cleanup is not automatic", () => {
