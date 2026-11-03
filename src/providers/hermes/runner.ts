@@ -521,7 +521,6 @@ print(json.dumps({"models": models}))
     const sid = req.sessionId !== undefined ? req.sessionId : s.sessionId;
     if (sid) {
       args.push("--resume", sid);
-      return args;
     }
 
     if (s.autoApprove) {

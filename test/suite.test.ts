@@ -21,14 +21,20 @@ import { isPermissionError } from "../src/core/permissionError";
 import { redact } from "../src/core/redact";
 import { pruneHistoryMap } from "../src/core/history";
 import { neutralizeRemoteMarkdown } from "../src/features/chat/sanitize";
-import { buildAnydocArgs, ensurePrivateTempDir, restrictFilePermissions } from "../src/providers/base";
+import {
+  buildAnydocArgs,
+  chooseAttachmentMode,
+  ensurePrivateTempDir,
+  parseSqliteChanges,
+  restrictFilePermissions,
+} from "../src/providers/base";
 import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
 import { HermesRunner } from "../src/providers/hermes/runner";
 import { PiRunner } from "../src/providers/pi/runner";
 import { formatToolAction } from "../src/features/chat/stepWidget";
 import { formatQuestionAnswers } from "../src/features/chat/questionCard";
-import { translate } from "../src/i18n";
+import { substitute, translate } from "../src/i18n";
 
 function createMockHost(
   customSettings?: Partial<PluginSettings> & Record<string, unknown>,
@@ -252,6 +258,20 @@ test("Runners only pass auto-approve flags when explicitly enabled", () => {
       .includes("--yolo"),
     true
   );
+});
+
+test("substitute leaves $0 untouched and replaces numbered placeholders", () => {
+  assert.equal(substitute("$1 ($0.00)", "X"), "X ($0.00)");
+  assert.equal(substitute("$1 and $2", "a", "b"), "a and b");
+});
+
+test("attachment budget and sqlite changes helpers behave correctly", () => {
+  assert.equal(chooseAttachmentMode(100, 1000, 1000), "inline");
+  assert.equal(chooseAttachmentMode(1001, 1000, 1000), "path");
+  assert.equal(chooseAttachmentMode(100, 1000, 50), "path");
+  assert.equal(parseSqliteChanges("0\n1\n"), 1);
+  assert.equal(parseSqliteChanges("0"), 0);
+  assert.equal(parseSqliteChanges(""), 0);
 });
 
 test("buildAnydocArgs only requests hosted OCR when enabled", () => {
@@ -891,7 +911,8 @@ test("HermesRunner parses sample-stream.ndjson and builds CLI args", () => {
   assert.equal(newArgs[newArgs.indexOf("--provider") + 1], "custom");
   assert.equal(newArgs[newArgs.indexOf("--reasoning") + 1], "medium");
 
-  // On resume, Hermes refuses creation overrides (--yolo, --model, --provider, --reasoning)
+  // Resume forwards the same per-run overrides; Hermes accepts them on
+  // resumed sessions (CLI args win over the stored session config).
   const resumeArgs = runner.buildArgs({
     prompt: "Inspect repo",
     fileAttachments: [],
@@ -900,10 +921,10 @@ test("HermesRunner parses sample-stream.ndjson and builds CLI args", () => {
   assert.equal(resumeArgs[0], "chat");
   assert.ok(resumeArgs.includes("--format"));
   assert.equal(resumeArgs[resumeArgs.indexOf("--resume") + 1], "hermes-sess-001");
-  assert.equal(resumeArgs.includes("--yolo"), false);
-  assert.equal(resumeArgs.includes("--model"), false);
-  assert.equal(resumeArgs.includes("--provider"), false);
-  assert.equal(resumeArgs.includes("--reasoning"), false);
+  assert.equal(resumeArgs.includes("--yolo"), true);
+  assert.equal(resumeArgs[resumeArgs.indexOf("--model") + 1], "deepseek-v4.1-flash");
+  assert.equal(resumeArgs[resumeArgs.indexOf("--provider") + 1], "custom");
+  assert.equal(resumeArgs[resumeArgs.indexOf("--reasoning") + 1], "medium");
 
   const fixturePath = join(
     process.cwd(),

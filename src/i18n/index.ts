@@ -572,7 +572,7 @@ export function substitute(
   template: string,
   ...args: (string | number)[]
 ): string {
-  return template.replace(/\$(\d+)/g, (_, n) =>
+  return template.replace(/\$([1-9]\d*)/g, (_, n) =>
     String(args[Number(n) - 1] ?? "")
   );
 }

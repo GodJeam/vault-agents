@@ -26,6 +26,30 @@ export const MAX_STREAM_LINE_BYTES = 20_000_000;
  */
 export const MAX_INLINE_ATTACHMENT_BYTES = 256 * 1024;
 
+/**
+ * Total budget for text attachments inlined into a single prompt. Keeping the
+ * sum well below OS ARG_MAX avoids `spawn E2BIG` when many files are attached.
+ */
+export const MAX_TOTAL_INLINE_ATTACHMENT_BYTES = 512 * 1024;
+
+export function chooseAttachmentMode(
+  size: number,
+  inlineLimit: number,
+  remainingBudget: number
+): "inline" | "path" {
+  return size <= inlineLimit && size <= remainingBudget ? "inline" : "path";
+}
+
+/**
+ * Parse the trailing `changes()` value printed by sqlite3 after an UPDATE.
+ */
+export function parseSqliteChanges(output: string): number {
+  const lines = output.trim().split(/\r?\n/).filter(Boolean);
+  const last = lines[lines.length - 1] ?? "";
+  const value = parseInt(last.trim(), 10);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
 export const BINARY_EXT_REGEX = new RegExp(
   "\\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|" +
     "7z|rar|bin|exe|dmg|iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$",
@@ -539,6 +563,7 @@ export abstract class BaseCliRunner {
   ): string {
     const s = this.plugin.settings;
     let finalPrompt = prompt;
+    let inlineBudget = MAX_TOTAL_INLINE_ATTACHMENT_BYTES;
     const maxInlineBytes = Math.min(
       MAX_INLINE_ATTACHMENT_BYTES,
       Math.max(1, s.maxAttachMB || 20) * 1024 * 1024
@@ -548,22 +573,25 @@ export abstract class BaseCliRunner {
       const fullPath = !isAbsolute(p) && cwd ? join(cwd, p) : p;
       if (BINARY_EXT_REGEX.test(fullPath)) {
         finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
-      } else {
-        try {
-          const st = statSync(fullPath);
-          if (st.size > maxInlineBytes) {
-            finalPrompt =
-              `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
-          } else {
-            const content = readFileSync(fullPath, "utf-8");
-            const filename = basename(fullPath);
-            finalPrompt =
-              `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
-          }
-        } catch {
+        continue;
+      }
+      try {
+        const st = statSync(fullPath);
+        if (
+          chooseAttachmentMode(st.size, maxInlineBytes, inlineBudget) === "path"
+        ) {
           finalPrompt =
             `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+          continue;
         }
+        const content = readFileSync(fullPath, "utf-8");
+        inlineBudget -= st.size;
+        const filename = basename(fullPath);
+        finalPrompt =
+          `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
+      } catch {
+        finalPrompt =
+          `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
       }
     }
     return finalPrompt;
