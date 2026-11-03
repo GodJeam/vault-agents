@@ -130,6 +130,8 @@ export interface PluginSettings {
   // Shared settings
   anydocEnabled: boolean;
   anydocBinary: string;
+  /** Send scanned documents to the hosted Firecrawl Parse OCR service. */
+  anydocHostedOcr: boolean;
   autoApprove: boolean;
   showThinking: boolean;
   showToolIO: boolean;
@@ -191,16 +193,17 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   language: "en",
   engine: "antigravity",
   engines: createDefaultEnginesMap(),
-  anydocEnabled: true,
+  anydocEnabled: false,
   anydocBinary: "anydoc",
-  autoApprove: true,
+  anydocHostedOcr: false,
+  autoApprove: false,
   showThinking: false,
   showToolIO: true,
   sessionId: "",
   sessionEngines: {},
   pinned: [],
   prompts: [],
-  dbAutoCleanup: true,
+  dbAutoCleanup: false,
   dbCleanupMaxMB: 5,
   dbCleanupAgeDays: 7,
   maxAttachMB: 20,

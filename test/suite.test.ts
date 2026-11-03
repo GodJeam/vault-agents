@@ -3,6 +3,7 @@ import * as assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  DEFAULT_SETTINGS,
   getEngineConfig,
   migrateSettings,
   type AgentQuestion,
@@ -105,6 +106,60 @@ test("migrateSettings migrates legacy flat fields into engines map", () => {
   assert.equal(settings.engines.antigravity.model, "claude-opus-5-5-high");
   assert.equal(settings.engines.antigravity.options.effort, "max");
   assert.equal(histories.ses_1.length, 1);
+});
+
+test("DEFAULT_SETTINGS ships secure defaults", () => {
+  assert.equal(DEFAULT_SETTINGS.autoApprove, false);
+  assert.equal(DEFAULT_SETTINGS.anydocEnabled, false);
+  assert.equal(DEFAULT_SETTINGS.anydocHostedOcr, false);
+  assert.equal(DEFAULT_SETTINGS.dbAutoCleanup, false);
+
+  // A missing setting must fall back to the secure default...
+  assert.equal(migrateSettings({}).settings.autoApprove, false);
+  // ...while an explicit user choice is preserved.
+  assert.equal(migrateSettings({ autoApprove: true }).settings.autoApprove, true);
+});
+
+test("Runners only pass auto-approve flags when explicitly enabled", () => {
+  const safeHost = createMockHost({ autoApprove: false });
+  const safeOc = new OpencodeRunner(safeHost).buildArgs({
+    prompt: "Hello",
+    fileAttachments: [],
+  });
+  assert.equal(safeOc.includes("--auto"), false);
+
+  const safeAgy = new AntigravityRunner(safeHost).buildArgs({
+    prompt: "Hello",
+    fileAttachments: [],
+  });
+  assert.equal(safeAgy.includes("--dangerously-skip-permissions"), false);
+
+  const safeHermes = new HermesRunner(safeHost).buildArgs({
+    prompt: "Hello",
+    fileAttachments: [],
+    sessionId: "",
+  });
+  assert.equal(safeHermes.includes("--yolo"), false);
+
+  const autoHost = createMockHost({ autoApprove: true });
+  assert.equal(
+    new OpencodeRunner(autoHost)
+      .buildArgs({ prompt: "Hello", fileAttachments: [] })
+      .includes("--auto"),
+    true
+  );
+  assert.equal(
+    new AntigravityRunner(autoHost)
+      .buildArgs({ prompt: "Hello", fileAttachments: [] })
+      .includes("--dangerously-skip-permissions"),
+    true
+  );
+  assert.equal(
+    new HermesRunner(autoHost)
+      .buildArgs({ prompt: "Hello", fileAttachments: [], sessionId: "" })
+      .includes("--yolo"),
+    true
+  );
 });
 
 test("ProviderRegistry resolves session-specific provider cleanly", () => {
