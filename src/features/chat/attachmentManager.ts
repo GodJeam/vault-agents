@@ -3,6 +3,7 @@ import { stat } from "fs/promises";
 import type VaultAgentsPlugin from "../../main";
 import type { AgentProvider } from "../../core/provider";
 import { substitute } from "../../i18n";
+import { redact } from "../../core/redact";
 import { FileSuggestModal } from "../../shared/modals";
 import type { AttachmentItem } from "./types";
 
@@ -57,7 +58,7 @@ export class AttachmentManager {
         if (!abs) return a.path;
         return await runner.convertDocument(abs);
       } catch (e) {
-        const errMsg = (e as Error).message;
+        const errMsg = redact((e as Error).message);
         const failLabel = this.plugin.t("anydoc conversion failed");
         new Notice(`${failLabel}: ${a.label} (${errMsg})`);
         const maxMB = this.plugin.settings.maxAttachMB || 20;

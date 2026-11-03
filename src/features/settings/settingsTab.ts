@@ -14,6 +14,7 @@ import {
 import { substitute, type Language } from "../../i18n";
 import type { EngineType } from "../../core/types";
 import type { AgentProvider } from "../../core/provider";
+import { redact } from "../../core/redact";
 
 export class VaultAgentsSettingTab extends PluginSettingTab {
   plugin: VaultAgentsPlugin;
@@ -207,7 +208,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
             const version = await activeProvider.getVersion();
             new Notice(`${foundPrefix} ${version}`);
           } catch (e) {
-            new Notice(`${t("Error:")} ${(e as Error).message}`);
+            new Notice(`${t("Error:")} ${redact((e as Error).message)}`);
           } finally {
             btn.setDisabled(false);
             btn.setButtonText(t("Test"));
@@ -463,7 +464,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
               await activeProvider.pruneOversizedParts?.(true, true);
               new Notice(t("Cleanup done."));
             } catch (e) {
-              new Notice(`${t("Error:")} ${(e as Error).message}`);
+              new Notice(`${t("Error:")} ${redact((e as Error).message)}`);
             } finally {
               btn.setDisabled(false);
               btn.setButtonText(t("Cleanup"));

@@ -4,6 +4,7 @@ import { existsSync, readFileSync, statSync } from "fs";
 import { copyFile, mkdir, readdir, stat, unlink } from "fs/promises";
 import { basename, dirname, extname, isAbsolute, join } from "path";
 import { homedir, tmpdir } from "os";
+import { redact } from "../core/redact";
 import type { ProviderDescriptor, RunnerHost } from "../core/provider";
 import type {
   AgentQuestion,
@@ -181,7 +182,7 @@ export abstract class BaseCliRunner {
    * launcher could not be resolved without a shell.
    */
   protected spawnErrorMessage(e: NodeJS.ErrnoException): string {
-    const message = e.message || String(e);
+    const message = redact(e.message || String(e));
     if (
       process.platform === "win32" &&
       (e.code === "EINVAL" || e.code === "ENOENT")
@@ -254,7 +255,10 @@ export abstract class BaseCliRunner {
         try {
           onLine(line);
         } catch (e) {
-          console.error("[vault-agents] error handling stream event:", e);
+          console.error(
+            "[vault-agents] error handling stream event:",
+            redact(e)
+          );
         }
       }
     });
@@ -265,7 +269,10 @@ export abstract class BaseCliRunner {
         try {
           onLine(remaining);
         } catch (e) {
-          console.error("[vault-agents] error handling final stream event:", e);
+          console.error(
+            "[vault-agents] error handling final stream event:",
+            redact(e)
+          );
         }
       }
     });
@@ -344,7 +351,9 @@ export abstract class BaseCliRunner {
         cleanupTimer();
         if (code === 0) resolve(out);
         else {
-          reject(new Error(err.trim() || out.trim() || `exit code ${code}`));
+          reject(
+            new Error(redact(err.trim() || out.trim() || `exit code ${code}`))
+          );
         }
       });
     });
@@ -904,7 +913,7 @@ export abstract class BaseCliRunner {
         child.on("close", (code) => {
           if (code === 0) resolve();
           else {
-            const detail = err.trim().slice(0, 200);
+            const detail = redact(err.trim().slice(0, 200));
             reject(new Error(`anydoc exited with code ${code}: ${detail}`));
           }
         });

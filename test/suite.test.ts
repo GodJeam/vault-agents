@@ -16,6 +16,7 @@ import {
 import type { RunnerHost } from "../src/core/provider";
 import { ProviderRegistry } from "../src/core/registry";
 import { isPermissionError } from "../src/core/permissionError";
+import { redact } from "../src/core/redact";
 import { buildAnydocArgs } from "../src/providers/base";
 import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
@@ -133,6 +134,36 @@ test("isPermissionError detects actionable permission failures only", () => {
   assert.equal(isPermissionError("network timeout"), false);
   assert.equal(isPermissionError("model not found"), false);
   assert.equal(isPermissionError(""), false);
+});
+
+test("redact masks known credentials without touching normal text", () => {
+  assert.equal(
+    redact("request failed with sk-1234567890abcdef"),
+    "request failed with sk-[REDACTED]"
+  );
+  assert.equal(
+    redact("Authorization: Bearer abcdefgh12345"),
+    "Authorization: Bearer [REDACTED]"
+  );
+  assert.equal(redact("api_key=supersecret123"), "api_key=[REDACTED]");
+  assert.equal(redact("password: hunter2!"), "password: [REDACTED]");
+  assert.equal(
+    redact("ghp_abcdefghijklmnopqrstuvwxyz0123456789"),
+    "gh*_[REDACTED]"
+  );
+  assert.equal(
+    redact("https://user:pass123@example.com/x"),
+    "https://user:[REDACTED]@example.com/x"
+  );
+  // Normal prose must survive untouched.
+  assert.equal(redact("token usage: 500"), "token usage: 500");
+  assert.equal(redact("network timeout"), "network timeout");
+  assert.equal(
+    redact(new Error("failed with sk-1234567890abcdef")).includes(
+      "sk-[REDACTED]"
+    ),
+    true
+  );
 });
 
 test("Runners only pass auto-approve flags when explicitly enabled", () => {

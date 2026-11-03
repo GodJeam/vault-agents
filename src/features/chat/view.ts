@@ -31,6 +31,7 @@ import {
   metaWithCopy,
 } from "./messageBubble";
 import { isPermissionError } from "../../core/permissionError";
+import { redact } from "../../core/redact";
 import { SuggestPopup } from "./suggestPopup";
 import { AttachmentManager } from "./attachmentManager";
 import {
@@ -331,7 +332,7 @@ export class ChatView extends ItemView {
           new Notice(this.plugin.t("Session renamed."));
         })
         .catch((e) =>
-          new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`)
+          new Notice(`${this.plugin.t("Error:")} ${redact((e as Error).message)}`)
         );
     }).open();
   }
@@ -375,7 +376,7 @@ export class ChatView extends ItemView {
             new Notice(this.plugin.t("Session deleted."));
           })
           .catch((e) =>
-            new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`)
+            new Notice(`${this.plugin.t("Error:")} ${redact((e as Error).message)}`)
           );
       }
     ).open();
@@ -457,7 +458,7 @@ export class ChatView extends ItemView {
 
   private renderPermissionError(detail: string): void {
     const message =
-      detail.trim() ||
+      redact(detail.trim()) ||
       this.plugin.t(
         "The agent stopped because it needs permission to continue."
       );
@@ -595,7 +596,7 @@ export class ChatView extends ItemView {
         this.contextLimit = await runner.getModelContextLimit(activeMod);
       }
     } catch (e) {
-      console.error("[vault-agents] refreshContext error:", e);
+      console.error("[vault-agents] refreshContext error:", redact(e));
     }
     this.updateContextUsage();
   }
@@ -889,7 +890,7 @@ export class ChatView extends ItemView {
         }
       ).open();
     } catch (e) {
-      new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`);
+      new Notice(`${this.plugin.t("Error:")} ${redact((e as Error).message)}`);
     }
   }
 
@@ -1082,7 +1083,7 @@ export class ChatView extends ItemView {
       this.doRun(prompt, filePaths);
     } catch (e) {
       this.dispatching = false;
-      new Notice(`${this.plugin.t("Error:")} ${(e as Error).message}`);
+      new Notice(`${this.plugin.t("Error:")} ${redact((e as Error).message)}`);
     }
   }
 
@@ -1300,7 +1301,7 @@ export class ChatView extends ItemView {
   private addErrorBubble(msg: string): void {
     renderErrorBubble(
       this.messagesEl,
-      msg,
+      redact(msg),
       (s) => this.plugin.t(s),
       (t) => this.copyText(t)
     );
@@ -1356,8 +1357,9 @@ export class ChatView extends ItemView {
 
   private handleProcessFailure(code: number): void {
     if (this.hadStreamError) return;
-    const detail = this.lastStderr.trim().replace(/\s+/g, " ").slice(0, 300);
-    if (!this.plugin.settings.autoApprove && isPermissionError(detail)) {
+    const rawDetail = this.lastStderr.trim().replace(/\s+/g, " ").slice(0, 300);
+    const detail = redact(rawDetail);
+    if (!this.plugin.settings.autoApprove && isPermissionError(rawDetail)) {
       this.renderPermissionError(detail);
       return;
     }

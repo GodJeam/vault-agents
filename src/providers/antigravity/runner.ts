@@ -15,6 +15,7 @@ import type {
   UsageStats,
 } from "../../core/types";
 import { substitute } from "../../i18n";
+import { redact } from "../../core/redact";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
 import type { AntigravityEvent } from "./types";
 
@@ -113,7 +114,10 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
         return models;
       }
     } catch (e) {
-      console.warn("[vault-agents] Failed to fetch agy models dynamically:", e);
+      console.warn(
+        "[vault-agents] Failed to fetch agy models dynamically:",
+        redact(e)
+      );
     }
 
     // Default fallback models for Antigravity (Google AI Pro)
@@ -219,7 +223,10 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
         ].join(" ");
         await this.execSqlite(dbPath, query);
       } catch (e) {
-        console.debug("[vault-agents] Antigravity renameSession failed:", e);
+        console.debug(
+          "[vault-agents] Antigravity renameSession failed:",
+          redact(e)
+        );
       }
     }
   }
@@ -235,7 +242,10 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
         ].join(" ");
         await this.execSqlite(dbPath, query);
       } catch (e) {
-        console.debug("[vault-agents] Antigravity deleteSession failed:", e);
+        console.debug(
+          "[vault-agents] Antigravity deleteSession failed:",
+          redact(e)
+        );
       }
     }
   }

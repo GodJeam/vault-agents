@@ -1,5 +1,6 @@
 import { isAbsolute, join } from "path";
 import { copyFile } from "fs/promises";
+import { redact } from "../../core/redact";
 import type {
   AgentProvider,
   ProviderDescriptor,
@@ -407,12 +408,15 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     try {
       await copyFile(dbPath, dbPath + ".bak");
     } catch (e) {
-      console.debug("[vault-agents] could not back up opencode.db:", e);
+      console.debug(
+        "[vault-agents] could not back up opencode.db:",
+        redact(e)
+      );
     }
     try {
       await this.execSqlite(dbPath, q);
     } catch (e) {
-      console.debug("[vault-agents] pruneOversizedParts skipped:", e);
+      console.debug("[vault-agents] pruneOversizedParts skipped:", redact(e));
     }
   }
 
