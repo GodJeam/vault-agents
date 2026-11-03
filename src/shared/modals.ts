@@ -2,6 +2,7 @@ import { App, Modal, Notice, Setting } from "obsidian";
 import type VaultAgentsPlugin from "../main";
 import type { UsageWindow, EngineType } from "../core/types";
 import { substitute } from "../i18n";
+import { redact } from "../core/redact";
 
 export {
   FileSuggestModal,
@@ -89,7 +90,7 @@ export class StatsModal extends Modal {
         this.renderWindow(contentEl, t("Last month"), s.month);
       })
       .catch((e) => {
-        status.setText(`${t("Error:")} ${(e as Error).message}`);
+        status.setText(`${t("Error:")} ${redact((e as Error).message)}`);
       });
   }
 

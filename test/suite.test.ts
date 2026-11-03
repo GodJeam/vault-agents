@@ -1,8 +1,11 @@
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  DEFAULT_SETTINGS,
   getEngineConfig,
   migrateSettings,
   type AgentQuestion,
@@ -14,13 +17,24 @@ import {
 } from "../src/core/types";
 import type { RunnerHost } from "../src/core/provider";
 import { ProviderRegistry } from "../src/core/registry";
+import { isPermissionError } from "../src/core/permissionError";
+import { redact } from "../src/core/redact";
+import { pruneHistoryMap } from "../src/core/history";
+import { neutralizeRemoteMarkdown } from "../src/features/chat/sanitize";
+import {
+  buildAnydocArgs,
+  chooseAttachmentMode,
+  ensurePrivateTempDir,
+  parseSqliteChanges,
+  restrictFilePermissions,
+} from "../src/providers/base";
 import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
 import { HermesRunner } from "../src/providers/hermes/runner";
 import { PiRunner } from "../src/providers/pi/runner";
 import { formatToolAction } from "../src/features/chat/stepWidget";
 import { formatQuestionAnswers } from "../src/features/chat/questionCard";
-import { translate } from "../src/i18n";
+import { substitute, translate } from "../src/i18n";
 
 function createMockHost(
   customSettings?: Partial<PluginSettings> & Record<string, unknown>,
@@ -105,6 +119,319 @@ test("migrateSettings migrates legacy flat fields into engines map", () => {
   assert.equal(settings.engines.antigravity.model, "claude-opus-5-5-high");
   assert.equal(settings.engines.antigravity.options.effort, "max");
   assert.equal(histories.ses_1.length, 1);
+});
+
+test("DEFAULT_SETTINGS ships secure defaults", () => {
+  assert.equal(DEFAULT_SETTINGS.autoApprove, false);
+  assert.equal(DEFAULT_SETTINGS.anydocEnabled, false);
+  assert.equal(DEFAULT_SETTINGS.anydocHostedOcr, false);
+  assert.equal(DEFAULT_SETTINGS.dbAutoCleanup, false);
+  assert.equal(DEFAULT_SETTINGS.saveHistory, true);
+  assert.equal(DEFAULT_SETTINGS.historyMaxSessions, 50);
+  assert.equal(DEFAULT_SETTINGS.historyMaxBytes, 5_000_000);
+
+  // A missing setting must fall back to the secure default...
+  assert.equal(migrateSettings({}).settings.autoApprove, false);
+  // ...while an explicit user choice is preserved.
+  assert.equal(migrateSettings({ autoApprove: true }).settings.autoApprove, true);
+});
+
+test("pruneHistoryMap keeps active/pinned sessions and enforces limits", () => {
+  const entry = (text: string, timestamp: number) => [
+    { role: "user" as const, text, timestamp },
+  ];
+  const histories: HistoryMap = {
+    active: entry("a", 10),
+    pinned: entry("b", 20),
+    older: entry("c", 30),
+    newest: entry("d", 40),
+  };
+
+  const pruned = pruneHistoryMap(histories, {
+    maxSessions: 3,
+    maxBytes: 0,
+    keepIds: ["active", "pinned"],
+  });
+  assert.deepEqual(Object.keys(pruned).sort(), [
+    "active",
+    "newest",
+    "pinned",
+  ]);
+
+  // keepIds survive even when they alone exceed the configured limits.
+  const keepOnly = pruneHistoryMap(histories, {
+    maxSessions: 1,
+    maxBytes: 1,
+    keepIds: ["active", "pinned"],
+  });
+  assert.deepEqual(Object.keys(keepOnly).sort(), ["active", "pinned"]);
+
+  // Byte limit drops sessions that do not fit.
+  const tiny = pruneHistoryMap(histories, {
+    maxSessions: 10,
+    maxBytes: 1,
+    keepIds: [],
+  });
+  assert.deepEqual(tiny, {});
+});
+
+test("isPermissionError detects actionable permission failures only", () => {
+  assert.equal(isPermissionError("permission denied"), true);
+  assert.equal(isPermissionError("Permission required to run this tool"), true);
+  assert.equal(isPermissionError("This tool requires approval"), true);
+  assert.equal(isPermissionError("auto-approve is disabled"), true);
+  assert.equal(isPermissionError("access denied"), true);
+  assert.equal(isPermissionError("command blocked by policy"), true);
+  assert.equal(isPermissionError("denied by user"), true);
+  assert.equal(isPermissionError("network timeout"), false);
+  assert.equal(isPermissionError("model not found"), false);
+  assert.equal(isPermissionError(""), false);
+});
+
+test("redact masks known credentials without touching normal text", () => {
+  assert.equal(
+    redact("request failed with sk-1234567890abcdef"),
+    "request failed with sk-[REDACTED]"
+  );
+  assert.equal(
+    redact("Authorization: Bearer abcdefgh12345"),
+    "Authorization: Bearer [REDACTED]"
+  );
+  assert.equal(redact("api_key=supersecret123"), "api_key=[REDACTED]");
+  assert.equal(redact("password: hunter2!"), "password: [REDACTED]");
+  assert.equal(
+    redact("ghp_abcdefghijklmnopqrstuvwxyz0123456789"),
+    "gh*_[REDACTED]"
+  );
+  assert.equal(
+    redact("https://user:pass123@example.com/x"),
+    "https://user:[REDACTED]@example.com/x"
+  );
+  // Normal prose must survive untouched.
+  assert.equal(redact("token usage: 500"), "token usage: 500");
+  assert.equal(redact("network timeout"), "network timeout");
+  assert.equal(
+    redact(new Error("failed with sk-1234567890abcdef")).includes(
+      "sk-[REDACTED]"
+    ),
+    true
+  );
+});
+
+test("Runners only pass auto-approve flags when explicitly enabled", () => {
+  const safeHost = createMockHost({ autoApprove: false });
+  const safeOc = new OpencodeRunner(safeHost).buildArgs({
+    prompt: "Hello",
+    fileAttachments: [],
+  });
+  assert.equal(safeOc.includes("--auto"), false);
+
+  const safeAgy = new AntigravityRunner(safeHost).buildArgs({
+    prompt: "Hello",
+    fileAttachments: [],
+  });
+  assert.equal(safeAgy.includes("--dangerously-skip-permissions"), false);
+
+  const safeHermes = new HermesRunner(safeHost).buildArgs({
+    prompt: "Hello",
+    fileAttachments: [],
+    sessionId: "",
+  });
+  assert.equal(safeHermes.includes("--yolo"), false);
+
+  const autoHost = createMockHost({ autoApprove: true });
+  assert.equal(
+    new OpencodeRunner(autoHost)
+      .buildArgs({ prompt: "Hello", fileAttachments: [] })
+      .includes("--auto"),
+    true
+  );
+  assert.equal(
+    new AntigravityRunner(autoHost)
+      .buildArgs({ prompt: "Hello", fileAttachments: [] })
+      .includes("--dangerously-skip-permissions"),
+    true
+  );
+  assert.equal(
+    new HermesRunner(autoHost)
+      .buildArgs({ prompt: "Hello", fileAttachments: [], sessionId: "" })
+      .includes("--yolo"),
+    true
+  );
+});
+
+test("substitute leaves $0 untouched and replaces numbered placeholders", () => {
+  assert.equal(substitute("$1 ($0.00)", "X"), "X ($0.00)");
+  assert.equal(substitute("$1 and $2", "a", "b"), "a and b");
+});
+
+test("attachment budget and sqlite changes helpers behave correctly", () => {
+  assert.equal(chooseAttachmentMode(100, 1000, 1000), "inline");
+  assert.equal(chooseAttachmentMode(1001, 1000, 1000), "path");
+  assert.equal(chooseAttachmentMode(100, 1000, 50), "path");
+  assert.equal(parseSqliteChanges("0\n1\n"), 1);
+  assert.equal(parseSqliteChanges("0"), 0);
+  assert.equal(parseSqliteChanges(""), 0);
+});
+
+test("buildAnydocArgs only requests hosted OCR when enabled", () => {
+  assert.deepEqual(
+    buildAnydocArgs("/tmp/in.pdf", "/tmp/out.md", false),
+    ["/tmp/in.pdf", "-o", "/tmp/out.md"]
+  );
+  assert.deepEqual(
+    buildAnydocArgs("/tmp/in.pdf", "/tmp/out.md", true),
+    ["/tmp/in.pdf", "--ocr", "hosted", "-o", "/tmp/out.md"]
+  );
+});
+
+test("neutralizeRemoteMarkdown blocks remote media but keeps links", () => {
+  const markdown = [
+    "remote ![a](https://evil.example/a.png)",
+    "proto ![b](//evil.example/b.png)",
+    'title ![c](https://evil.example/c.png "cap")',
+    "angle ![d](<https://evil.example/d.png>)",
+    "local ![ok](attachments/local.png)",
+    '<img src="https://evil.example/x.png" alt="x">',
+    '<video src="https://evil.example/v.mp4"></video>',
+    '<audio src="https://evil.example/a.mp3"></audio>',
+    '<div style="background: url(https://evil.example/bg.png)">x</div>',
+    '<video poster="https://evil.example/p.png"></video>',
+    "[ref]: https://evil.example/r.png",
+    "![r][ref]",
+    "[normal link](https://example.com/page)",
+  ].join("\n");
+
+  const out = neutralizeRemoteMarkdown(markdown);
+  assert.equal(/evil\.example/.test(out), false);
+  assert.equal(out.includes("<img"), false);
+  assert.equal(out.includes('src="https://evil'), false);
+  assert.ok(out.includes("![ok](attachments/local.png)"));
+  assert.ok(out.includes("[normal link](https://example.com/page)"));
+});
+
+test("temp conversion directory and files are private", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("POSIX permissions only");
+    return;
+  }
+  const root = await mkdtemp(join(tmpdir(), "vault-agents-perm-"));
+  try {
+    const dir = join(root, "cache");
+    // Simulate a cache directory created by an older version with loose perms.
+    await mkdir(dir, { recursive: true, mode: 0o755 });
+    await ensurePrivateTempDir(dir);
+    assert.equal((await stat(dir)).mode & 0o777, 0o700);
+
+    const file = join(dir, "converted.md");
+    await writeFile(file, "# converted");
+    await restrictFilePermissions(file);
+    assert.equal((await stat(file)).mode & 0o777, 0o600);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("CLI spawning never enables a shell and DB cleanup is not automatic", () => {
+  const baseSrc = readFileSync(
+    join(process.cwd(), "src/providers/base.ts"),
+    "utf-8"
+  );
+  assert.equal(/\bshell:\s*true\b/.test(baseSrc), false);
+  assert.equal(/\buseShell\b/.test(baseSrc), false);
+
+  const mainSrc = readFileSync(join(process.cwd(), "src/main.ts"), "utf-8");
+  assert.equal(/pruneOversizedParts\?\.\(\)/.test(mainSrc), false);
+});
+
+test("migrateSettings rejects malformed untrusted data", () => {
+  const { settings, histories } = migrateSettings({
+    language: "de",
+    engine: {},
+    autoApprove: "yes",
+    anydocEnabled: 1,
+    anydocBinary: "   ",
+    anydocHostedOcr: "true",
+    sessionId: 123,
+    sessionEngines: { ses_1: "opencode", ses_2: 42, ses_3: "" },
+    pinned: ["a", "a", 3, " b "],
+    prompts: [
+      { name: "ok", text: "hello" },
+      { name: "", text: "x" },
+      { name: "bad", text: 5 },
+      null,
+    ],
+    dbCleanupMaxMB: -5,
+    dbCleanupAgeDays: 9999,
+    maxAttachMB: 1e9,
+    historyMaxSessions: 0,
+    historyMaxBytes: -1,
+    engines: {
+      opencode: {
+        binary: 42,
+        model: 7,
+        options: { agent: "build", bad: 5 },
+      },
+      unknown: "x",
+    },
+    histories: {
+      ses_1: [
+        { role: "user", text: "hi", timestamp: "yesterday" },
+        { role: "system", text: "nope" },
+        {
+          role: "assistant",
+          text: "ok",
+          tokens: { input: 10, output: "x", cache: { read: 5 } },
+          cost: "free",
+        },
+        "junk",
+      ],
+      ses_bad: "nope",
+      ses_empty: [],
+    },
+  } as unknown as Record<string, unknown>);
+
+  assert.equal(settings.language, "en");
+  assert.equal(settings.engine, "antigravity");
+  assert.equal(settings.autoApprove, false);
+  assert.equal(settings.anydocEnabled, false);
+  assert.equal(settings.anydocBinary, "anydoc");
+  assert.equal(settings.anydocHostedOcr, false);
+  assert.equal(settings.sessionId, "");
+  assert.deepEqual(settings.sessionEngines, {
+    ses_1: "opencode",
+    ses_3: "",
+  });
+  assert.deepEqual(settings.pinned, ["a", "b"]);
+  assert.equal(settings.prompts.length, 1);
+  assert.equal(settings.prompts[0].name, "ok");
+  assert.equal(settings.dbCleanupMaxMB, 1);
+  assert.equal(settings.dbCleanupAgeDays, 365);
+  assert.equal(settings.maxAttachMB, 500);
+  assert.equal(settings.historyMaxSessions, 1);
+  assert.equal(settings.historyMaxBytes, 1_048_576);
+  assert.equal(settings.engines.opencode.binary, "opencode");
+  assert.equal(
+    settings.engines.opencode.model,
+    "opencode-go/deepseek-v4.1-flash"
+  );
+  assert.equal(settings.engines.opencode.options.agent, "build");
+  assert.equal(settings.engines.opencode.options.bad, undefined);
+  assert.equal(settings.engines.unknown, undefined);
+
+  assert.equal(histories.ses_1.length, 2);
+  assert.equal(histories.ses_1[0].role, "user");
+  assert.equal(histories.ses_1[0].timestamp, undefined);
+  const assistant = histories.ses_1[1];
+  assert.equal(assistant.role, "assistant");
+  if (assistant.role === "assistant") {
+    assert.equal(assistant.tokens?.input, 10);
+    assert.equal(assistant.tokens?.output, undefined);
+    assert.equal(assistant.tokens?.cache?.read, 5);
+    assert.equal(assistant.cost, undefined);
+  }
+  assert.equal(histories.ses_bad, undefined);
+  assert.equal(histories.ses_empty, undefined);
 });
 
 test("ProviderRegistry resolves session-specific provider cleanly", () => {
@@ -584,7 +911,8 @@ test("HermesRunner parses sample-stream.ndjson and builds CLI args", () => {
   assert.equal(newArgs[newArgs.indexOf("--provider") + 1], "custom");
   assert.equal(newArgs[newArgs.indexOf("--reasoning") + 1], "medium");
 
-  // On resume, Hermes refuses creation overrides (--yolo, --model, --provider, --reasoning)
+  // Resume forwards the same per-run overrides; Hermes accepts them on
+  // resumed sessions (CLI args win over the stored session config).
   const resumeArgs = runner.buildArgs({
     prompt: "Inspect repo",
     fileAttachments: [],
@@ -593,10 +921,10 @@ test("HermesRunner parses sample-stream.ndjson and builds CLI args", () => {
   assert.equal(resumeArgs[0], "chat");
   assert.ok(resumeArgs.includes("--format"));
   assert.equal(resumeArgs[resumeArgs.indexOf("--resume") + 1], "hermes-sess-001");
-  assert.equal(resumeArgs.includes("--yolo"), false);
-  assert.equal(resumeArgs.includes("--model"), false);
-  assert.equal(resumeArgs.includes("--provider"), false);
-  assert.equal(resumeArgs.includes("--reasoning"), false);
+  assert.equal(resumeArgs.includes("--yolo"), true);
+  assert.equal(resumeArgs[resumeArgs.indexOf("--model") + 1], "deepseek-v4.1-flash");
+  assert.equal(resumeArgs[resumeArgs.indexOf("--provider") + 1], "custom");
+  assert.equal(resumeArgs[resumeArgs.indexOf("--reasoning") + 1], "medium");
 
   const fixturePath = join(
     process.cwd(),

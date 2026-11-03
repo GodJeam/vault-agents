@@ -8,6 +8,7 @@ import {
 } from "./providers";
 import { ProviderRegistry } from "./core/registry";
 import type { AgentProvider, RunnerHost } from "./core/provider";
+import { pruneHistoryMap } from "./core/history";
 import {
   getEngineConfig,
   migrateSettings,
@@ -68,10 +69,9 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     this.registry.register(new HermesRunner(this));
     this.registry.register(new PiRunner(this));
 
-    // Best-effort database cleanup on load for any provider that supports it
-    for (const provider of this.registry.getAll()) {
-      void provider.pruneOversizedParts?.();
-    }
+    // Database cleanup is intentionally NOT run on load: it mutates the
+    // OpenCode SQLite database and could remove data still in use. It is
+    // available on demand from the settings tab.
     const t = this.t.bind(this);
 
     this.registerView(CHAT_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
@@ -205,8 +205,8 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     return view;
   }
 
-  onunload(): void {
-    void this.flushSave();
+  async onunload(): Promise<void> {
+    await this.flushSave();
     if (this.registry) {
       for (const provider of this.registry.getAll()) {
         provider.killAll();
@@ -214,11 +214,53 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     }
   }
 
+  private collectKeepIds(): string[] {
+    const ids = new Set<string>();
+    if (this.settings.sessionId) ids.add(this.settings.sessionId);
+    for (const id of this.settings.pinned ?? []) {
+      if (id) ids.add(id);
+    }
+    for (const leaf of this.app.workspace.getLeavesOfType(CHAT_VIEW_TYPE)) {
+      if (leaf.view instanceof ChatView) {
+        const id = leaf.view.getSessionId();
+        if (id) ids.add(id);
+      }
+    }
+    return Array.from(ids);
+  }
+
+  private pruneHistories(): void {
+    const maxSessions = Math.max(
+      1,
+      Math.trunc(this.settings.historyMaxSessions) || 50
+    );
+    const maxBytes = Math.max(0, this.settings.historyMaxBytes);
+    const before = Object.keys(this.histories);
+    const pruned = pruneHistoryMap(this.histories, {
+      maxSessions,
+      maxBytes,
+      keepIds: this.collectKeepIds(),
+    });
+    const removed = before.filter((id) => !(id in pruned));
+    if (removed.length > 0 && this.settings.sessionEngines) {
+      for (const id of removed) delete this.settings.sessionEngines[id];
+    }
+    this.histories = pruned;
+  }
+
+  private buildSavePayload(): Record<string, unknown> {
+    this.pruneHistories();
+    return {
+      ...this.settings,
+      histories: this.settings.saveHistory ? this.histories : {},
+    };
+  }
+
   private scheduleSave(): void {
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null;
-      void this.saveData({ ...this.settings, histories: this.histories });
+      void this.saveData(this.buildSavePayload());
     }, 500);
   }
 
@@ -227,7 +269,7 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
       window.clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
-    await this.saveData({ ...this.settings, histories: this.histories });
+    await this.saveData(this.buildSavePayload());
   }
 
   getHistory(sessionId: string): HistoryMessage[] {
@@ -265,5 +307,10 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
 
   async saveSettings(): Promise<void> {
     await this.flushSave();
+    for (const leaf of this.app.workspace.getLeavesOfType(CHAT_VIEW_TYPE)) {
+      if (leaf.view instanceof ChatView) {
+        leaf.view.refreshSettings();
+      }
+    }
   }
 }

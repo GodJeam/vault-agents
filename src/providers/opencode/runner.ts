@@ -1,4 +1,6 @@
 import { isAbsolute, join } from "path";
+import { copyFile } from "fs/promises";
+import { redact } from "../../core/redact";
 import type {
   AgentProvider,
   ProviderDescriptor,
@@ -16,7 +18,7 @@ import type {
 } from "../../core/types";
 import { DEFAULT_ENGINE_CONFIGS } from "../../core/types";
 import { substitute } from "../../i18n";
-import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
+import { BaseCliRunner, MAX_STREAM_LINE_BYTES, parseSqliteChanges } from "../base";
 import type {
   OpencodeEvent,
   OpencodeModelInfo,
@@ -194,9 +196,9 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
         try {
           const query =
             `UPDATE ${table} SET title = '${safeTitle}' ` +
-            `WHERE id = '${safeId}'`;
-          await this.execSqlite(dbPath, query);
-          updatedDb = true;
+            `WHERE id = '${safeId}'; SELECT changes();`;
+          const out = await this.execSqlite(dbPath, query);
+          if (parseSqliteChanges(out) > 0) updatedDb = true;
         } catch {
           // Ignore if table doesn't exist
         }
@@ -404,9 +406,17 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       .filter(Boolean)
       .join(" ");
     try {
+      await copyFile(dbPath, dbPath + ".bak");
+    } catch (e) {
+      console.debug(
+        "[vault-agents] could not back up opencode.db:",
+        redact(e)
+      );
+    }
+    try {
       await this.execSqlite(dbPath, q);
     } catch (e) {
-      console.debug("[vault-agents] pruneOversizedParts skipped:", e);
+      console.debug("[vault-agents] pruneOversizedParts skipped:", redact(e));
     }
   }
 

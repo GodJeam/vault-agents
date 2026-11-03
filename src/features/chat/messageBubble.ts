@@ -2,6 +2,7 @@ import { App, Component, MarkdownRenderer, setIcon } from "obsidian";
 import type { AgentQuestion, FinishInfo, StepInfo } from "../../core/types";
 import { StepManager } from "./stepWidget";
 import { renderQuestionCard } from "./questionCard";
+import { neutralizeRemoteMarkdown } from "./sanitize";
 
 export function metaWithCopy(
   row: HTMLElement,
@@ -62,6 +63,44 @@ export function renderErrorBubble(
     "alert-triangle"
   );
   row.createDiv({ cls: "opencode-bubble", text: msg });
+}
+
+export function renderPermissionBubble(
+  container: HTMLElement,
+  msg: string,
+  t: (s: string) => string,
+  onEnable: () => void,
+  onRetry: () => void,
+  onCopy: (text: string) => void
+): void {
+  const row = container.createDiv({
+    cls:
+      "opencode-message opencode-message--error " +
+      "opencode-message--permission",
+  });
+  metaWithCopy(
+    row,
+    t("Permission needed"),
+    () => msg,
+    onCopy,
+    t("Copy text"),
+    "shield-alert"
+  );
+  row.createDiv({ cls: "opencode-bubble", text: msg });
+
+  const actions = row.createDiv({ cls: "opencode-permission-actions" });
+  const enableBtn = actions.createEl("button", {
+    cls: "opencode-permission-btn is-cta",
+    attr: { type: "button" },
+    text: t("Enable auto-approve"),
+  });
+  enableBtn.addEventListener("click", () => onEnable());
+  const retryBtn = actions.createEl("button", {
+    cls: "opencode-permission-btn",
+    attr: { type: "button" },
+    text: t("Retry"),
+  });
+  retryBtn.addEventListener("click", () => onRetry());
 }
 
 export class AssistantBubble {
@@ -237,9 +276,9 @@ export class AssistantBubble {
     if (this.rawText.trim()) {
       MarkdownRenderer.render(
         this.app,
-        this.rawText,
+        neutralizeRemoteMarkdown(this.rawText),
         this.contentEl,
-        "",
+        this.app.workspace.getActiveFile()?.path ?? "",
         this.component
       );
     }
@@ -345,9 +384,9 @@ export class AssistantBubble {
       if (this.rawText.length <= 30000) {
         MarkdownRenderer.render(
           this.app,
-          this.rawText,
+          neutralizeRemoteMarkdown(this.rawText),
           this.contentEl,
-          "",
+          this.app.workspace.getActiveFile()?.path ?? "",
           this.component
         );
       } else {

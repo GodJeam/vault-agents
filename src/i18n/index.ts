@@ -25,6 +25,34 @@ const IT: Record<string, string> = {
     "Comando o percorso completo dell'eseguibile anydoc " +
     "(npm install -g @firecrawl/anydoc).",
   "anydoc conversion failed": "Conversione anydoc fallita",
+  "Send documents to hosted OCR": "Invia i documenti a OCR hosted",
+  [
+    "Upload scanned documents to the external Firecrawl Parse " +
+      "service. Only enable this if you accept that the document " +
+      "contents leave your machine."
+  ]:
+    "Carica i documenti scansionati sul servizio esterno Firecrawl " +
+    "Parse. Attivalo solo se accetti che il contenuto dei documenti " +
+    "lasci la tua macchina.",
+  [
+    "Windows .cmd/.bat launchers cannot be run safely; use the " +
+      "native .exe or install the Node CLI."
+  ]:
+    "I launcher Windows .cmd/.bat non possono essere eseguiti in " +
+    "sicurezza; usa l'eseguibile nativo .exe o installa la versione " +
+    "Node del CLI.",
+  [
+    "Automatic cleanup on startup is disabled. Use the button below " +
+      "to remove oversized file attachments from the OpenCode " +
+      "database. Only attachments older than the minimum age and " +
+      "larger than the max size are removed; conversation text is " +
+      "never touched."
+  ]:
+    "La pulizia automatica all'avvio è disattivata. Usa il pulsante qui " +
+    "sotto per rimuovere gli allegati troppo grandi dal database di " +
+    "OpenCode. Vengono rimossi solo gli allegati più vecchi dell'età " +
+    "minima e più grandi della dimensione massima; il testo delle " +
+    "conversazioni non viene mai toccato.",
   [
     "Command or full path to the opencode executable. Usually 'opencode' " +
       "is enough if it is on your PATH."
@@ -44,6 +72,27 @@ const IT: Record<string, string> = {
   "Reset": "Azzera",
   "Session reset: the next message will start from a new session.":
     "Sessione azzerata: il prossimo messaggio partirà da una nuova sessione.",
+  "Chat history": "Cronologia chat",
+  "Save chat history in the vault": "Salva la cronologia chat nel vault",
+  [
+    "Messages and reasoning are stored in plain text in this " +
+      "plugin's data.json. Disable to keep history only for the " +
+      "current session."
+  ]:
+    "Messaggi e ragionamento vengono salvati in chiaro nel data.json " +
+    "del plugin. Disattiva per tenere la cronologia solo per la sessione " +
+    "corrente.",
+  "Max saved sessions": "Numero massimo di sessioni salvate",
+  "Older sessions are removed when this limit is exceeded.":
+    "Le sessioni più vecchie vengono rimosse quando si supera questo " +
+    "limite.",
+  "Max history size (MB)": "Dimensione massima cronologia (MB)",
+  [
+    "Oldest sessions are dropped when the saved history grows " +
+      "beyond this size."
+  ]:
+    "Le sessioni più vecchie vengono scartate quando la cronologia " +
+    "salvata supera questa dimensione.",
   "Auto-approve permissions": "Auto-approve permessi",
   "Show reasoning": "Mostra ragionamento",
   "Show tool details": "Mostra dettagli degli strumenti",
@@ -173,6 +222,38 @@ const IT: Record<string, string> = {
     "cronologia salvata in Obsidian.",
   "Delete": "Elimina",
   "Cancel": "Annulla",
+  "Enable": "Attiva",
+  "Permission needed": "Permesso necessario",
+  "Retry": "Riprova",
+  "Enable auto-approve": "Attiva auto-approve",
+  "Enable auto-approve?": "Attivare auto-approve?",
+  [
+    "With auto-approve enabled the agent can run shell commands and " +
+      "edit files without asking for confirmation. Enable it only for " +
+      "vaults and notes you trust."
+  ]:
+    "Con auto-approve attivo l'agente può eseguire comandi shell e " +
+    "modificare file senza chiedere conferma. Attivalo solo su vault e " +
+    "note di cui ti fidi.",
+  "Auto-approve enabled.": "Auto-approve attivato.",
+  "Auto-approve disabled.": "Auto-approve disattivato.",
+  "Auto-approve On: the agent can run tools and edit files without asking":
+    "Auto-approve attivo: l'agente può eseguire strumenti e modificare " +
+    "file senza chiedere",
+  "Auto-approve Off: the agent may stop when a tool needs permission":
+    "Auto-approve disattivato: l'agente potrebbe fermarsi quando uno " +
+    "strumento richiede un permesso",
+  "The agent stopped because it needs permission to continue.":
+    "L'agente si è fermato perché ha bisogno di un permesso per " +
+    "continuare.",
+  [
+    "Auto-approve is off: the agent may stop when it needs to edit " +
+      "files or run commands. Enable it from the shield icon or in " +
+      "Settings."
+  ]:
+    "Auto-approve è disattivato: l'agente potrebbe fermarsi quando deve " +
+    "modificare file o eseguire comandi. Attivalo dall'icona scudo o " +
+    "nelle impostazioni.",
   "Context:": "Contesto:",
   "last update $1s ago": "ultimo aggiornamento $1s fa",
   "Possibly stuck": "Possibilmente bloccato",
@@ -491,7 +572,7 @@ export function substitute(
   template: string,
   ...args: (string | number)[]
 ): string {
-  return template.replace(/\$(\d+)/g, (_, n) =>
+  return template.replace(/\$([1-9]\d*)/g, (_, n) =>
     String(args[Number(n) - 1] ?? "")
   );
 }

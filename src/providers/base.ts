@@ -1,9 +1,10 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "child_process";
 import { createHash } from "crypto";
 import { existsSync, readFileSync, statSync } from "fs";
-import { copyFile, mkdir, readdir, stat, unlink } from "fs/promises";
+import { copyFile, chmod, mkdir, readdir, stat, unlink } from "fs/promises";
 import { basename, dirname, extname, isAbsolute, join } from "path";
 import { homedir, tmpdir } from "os";
+import { redact } from "../core/redact";
 import type { ProviderDescriptor, RunnerHost } from "../core/provider";
 import type {
   AgentQuestion,
@@ -25,11 +26,64 @@ export const MAX_STREAM_LINE_BYTES = 20_000_000;
  */
 export const MAX_INLINE_ATTACHMENT_BYTES = 256 * 1024;
 
+/**
+ * Total budget for text attachments inlined into a single prompt. Keeping the
+ * sum well below OS ARG_MAX avoids `spawn E2BIG` when many files are attached.
+ */
+export const MAX_TOTAL_INLINE_ATTACHMENT_BYTES = 512 * 1024;
+
+export function chooseAttachmentMode(
+  size: number,
+  inlineLimit: number,
+  remainingBudget: number
+): "inline" | "path" {
+  return size <= inlineLimit && size <= remainingBudget ? "inline" : "path";
+}
+
+/**
+ * Parse the trailing `changes()` value printed by sqlite3 after an UPDATE.
+ */
+export function parseSqliteChanges(output: string): number {
+  const lines = output.trim().split(/\r?\n/).filter(Boolean);
+  const last = lines[lines.length - 1] ?? "";
+  const value = parseInt(last.trim(), 10);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
 export const BINARY_EXT_REGEX = new RegExp(
   "\\.(png|jpe?g|gif|webp|bmp|svg|ico|pdf|zip|tar|gz|" +
     "7z|rar|bin|exe|dmg|iso|mp3|wav|ogg|mp4|mov|avi|mkv|wasm)$",
   "i"
 );
+
+/**
+ * Build the anydoc CLI arguments. Hosted OCR uploads the document to the
+ * external Firecrawl Parse service, so it must stay opt-in.
+ */
+export function buildAnydocArgs(
+  input: string,
+  output: string,
+  hostedOcr: boolean
+): string[] {
+  const args = [input];
+  if (hostedOcr) args.push("--ocr", "hosted");
+  args.push("-o", output);
+  return args;
+}
+
+/**
+ * Create the conversion cache directory with owner-only permissions. The
+ * directory may already exist with looser permissions from older versions.
+ */
+export async function ensurePrivateTempDir(dir: string): Promise<void> {
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  await chmod(dir, 0o700).catch(() => {});
+}
+
+/** Restrict a converted file to its owner (best effort on non-POSIX systems). */
+export async function restrictFilePermissions(path: string): Promise<void> {
+  await chmod(path, 0o600).catch(() => {});
+}
 
 export abstract class BaseCliRunner {
   abstract readonly descriptor: ProviderDescriptor;
@@ -139,19 +193,19 @@ export abstract class BaseCliRunner {
     }
     let spawnBin = bin;
     let spawnArgs = args;
-    let useShell = false;
     if (isWin && /\.(cmd|bat)$/i.test(bin)) {
       const nodeShim = this.resolveCmdNodeScript(bin);
       if (nodeShim) {
         spawnBin = nodeShim.nodeBin;
         spawnArgs = [nodeShim.scriptPath, ...args];
-      } else {
-        useShell = true;
       }
+      // No shell fallback: enabling one would let prompt and attachment
+      // arguments be interpreted by cmd.exe (command injection). An
+      // unresolvable .cmd/.bat launcher surfaces as a spawn error instead.
     }
     const options: SpawnOptions = {
       cwd,
-      shell: useShell,
+      shell: false,
       windowsHide: true,
       env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -159,6 +213,28 @@ export abstract class BaseCliRunner {
     const child = spawn(spawnBin, spawnArgs, options);
     this.trackProc(child);
     return child;
+  }
+
+  /**
+   * Human-readable spawn failure, with a Windows hint when a `.cmd`/`.bat`
+   * launcher could not be resolved without a shell.
+   */
+  protected spawnErrorMessage(e: NodeJS.ErrnoException): string {
+    const message = redact(e.message || String(e));
+    if (
+      process.platform === "win32" &&
+      (e.code === "EINVAL" || e.code === "ENOENT")
+    ) {
+      return (
+        message +
+        " — " +
+        this.plugin.t(
+          "Windows .cmd/.bat launchers cannot be run safely; use the " +
+            "native .exe or install the Node CLI."
+        )
+      );
+    }
+    return message;
   }
 
   /**
@@ -217,7 +293,10 @@ export abstract class BaseCliRunner {
         try {
           onLine(line);
         } catch (e) {
-          console.error("[vault-agents] error handling stream event:", e);
+          console.error(
+            "[vault-agents] error handling stream event:",
+            redact(e)
+          );
         }
       }
     });
@@ -228,7 +307,10 @@ export abstract class BaseCliRunner {
         try {
           onLine(remaining);
         } catch (e) {
-          console.error("[vault-agents] error handling final stream event:", e);
+          console.error(
+            "[vault-agents] error handling final stream event:",
+            redact(e)
+          );
         }
       }
     });
@@ -244,8 +326,8 @@ export abstract class BaseCliRunner {
       cb.onDone(code);
     };
 
-    child.on("error", (e) => {
-      cb.onError(e.message);
+    child.on("error", (e: NodeJS.ErrnoException) => {
+      cb.onError(this.spawnErrorMessage(e));
       finishOnce(-1);
     });
     child.on("close", (code) => {
@@ -295,11 +377,11 @@ export abstract class BaseCliRunner {
       child.stderr?.on("data", (d: string | Buffer) => {
         err += typeof d === "string" ? d : d.toString("utf8");
       });
-      child.on("error", (e) => {
+      child.on("error", (e: NodeJS.ErrnoException) => {
         if (settled) return;
         settled = true;
         cleanupTimer();
-        reject(e);
+        reject(new Error(this.spawnErrorMessage(e)));
       });
       child.on("close", (code) => {
         if (settled) return;
@@ -307,7 +389,9 @@ export abstract class BaseCliRunner {
         cleanupTimer();
         if (code === 0) resolve(out);
         else {
-          reject(new Error(err.trim() || out.trim() || `exit code ${code}`));
+          reject(
+            new Error(redact(err.trim() || out.trim() || `exit code ${code}`))
+          );
         }
       });
     });
@@ -479,6 +563,7 @@ export abstract class BaseCliRunner {
   ): string {
     const s = this.plugin.settings;
     let finalPrompt = prompt;
+    let inlineBudget = MAX_TOTAL_INLINE_ATTACHMENT_BYTES;
     const maxInlineBytes = Math.min(
       MAX_INLINE_ATTACHMENT_BYTES,
       Math.max(1, s.maxAttachMB || 20) * 1024 * 1024
@@ -488,22 +573,25 @@ export abstract class BaseCliRunner {
       const fullPath = !isAbsolute(p) && cwd ? join(cwd, p) : p;
       if (BINARY_EXT_REGEX.test(fullPath)) {
         finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
-      } else {
-        try {
-          const st = statSync(fullPath);
-          if (st.size > maxInlineBytes) {
-            finalPrompt =
-              `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
-          } else {
-            const content = readFileSync(fullPath, "utf-8");
-            const filename = basename(fullPath);
-            finalPrompt =
-              `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
-          }
-        } catch {
+        continue;
+      }
+      try {
+        const st = statSync(fullPath);
+        if (
+          chooseAttachmentMode(st.size, maxInlineBytes, inlineBudget) === "path"
+        ) {
           finalPrompt =
             `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+          continue;
         }
+        const content = readFileSync(fullPath, "utf-8");
+        inlineBudget -= st.size;
+        const filename = basename(fullPath);
+        finalPrompt =
+          `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
+      } catch {
+        finalPrompt =
+          `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
       }
     }
     return finalPrompt;
@@ -831,12 +919,16 @@ export abstract class BaseCliRunner {
       .digest("hex")
       .slice(0, 16);
     const dir = join(tmpdir(), "vault-agents-anydoc");
-    await mkdir(dir, { recursive: true });
+    await ensurePrivateTempDir(dir);
+    await this.cleanupTempFiles(dir);
     const outPath = join(dir, hash + ".md");
 
     try {
       const [src, out] = await Promise.all([stat(absPath), stat(outPath)]);
-      if (out.mtimeMs >= src.mtimeMs) return outPath;
+      if (out.mtimeMs >= src.mtimeMs) {
+        await restrictFilePermissions(outPath);
+        return outPath;
+      }
     } catch {
       // Not yet cached
     }
@@ -844,27 +936,30 @@ export abstract class BaseCliRunner {
     const ext = extname(absPath) || ".pdf";
     const cleanInput = join(dir, "in-" + hash + ext);
     await copyFile(absPath, cleanInput);
-    await this.cleanupTempFiles(dir);
+    await restrictFilePermissions(cleanInput);
 
     const bin = this.resolveBinaryPath(
       this.plugin.settings.anydocBinary || "anydoc"
     );
     try {
       await new Promise<void>((resolve, reject) => {
-        const child = this.spawnBinary(bin, [
-          cleanInput,
-          "--ocr",
-          "hosted",
-          "-o",
-          outPath,
-        ]);
+        const child = this.spawnBinary(
+          bin,
+          buildAnydocArgs(
+            cleanInput,
+            outPath,
+            this.plugin.settings.anydocHostedOcr
+          )
+        );
         let err = "";
         child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
-        child.on("error", (e) => reject(e));
+        child.on("error", (e: NodeJS.ErrnoException) =>
+          reject(new Error(this.spawnErrorMessage(e)))
+        );
         child.on("close", (code) => {
           if (code === 0) resolve();
           else {
-            const detail = err.trim().slice(0, 200);
+            const detail = redact(err.trim().slice(0, 200));
             reject(new Error(`anydoc exited with code ${code}: ${detail}`));
           }
         });
@@ -873,6 +968,7 @@ export abstract class BaseCliRunner {
       await unlink(cleanInput).catch(() => {});
     }
 
+    await restrictFilePermissions(outPath);
     return outPath;
   }
 

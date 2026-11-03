@@ -6,6 +6,7 @@ import {
 } from "obsidian";
 import type VaultAgentsPlugin from "../../main";
 import {
+  ConfirmModal,
   ModelSuggestModal,
   PromptModal,
   type ModelItem,
@@ -13,6 +14,7 @@ import {
 import { substitute, type Language } from "../../i18n";
 import type { EngineType } from "../../core/types";
 import type { AgentProvider } from "../../core/provider";
+import { redact } from "../../core/redact";
 
 export class VaultAgentsSettingTab extends PluginSettingTab {
   plugin: VaultAgentsPlugin;
@@ -206,7 +208,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
             const version = await activeProvider.getVersion();
             new Notice(`${foundPrefix} ${version}`);
           } catch (e) {
-            new Notice(`${t("Error:")} ${(e as Error).message}`);
+            new Notice(`${t("Error:")} ${redact((e as Error).message)}`);
           } finally {
             btn.setDisabled(false);
             btn.setButtonText(t("Test"));
@@ -228,6 +230,27 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         toggle
           .setValue(this.plugin.settings.autoApprove)
           .onChange(async (value) => {
+            if (value && !this.plugin.settings.autoApprove) {
+              toggle.setValue(false);
+              new ConfirmModal(
+                this.app,
+                this.plugin,
+                t("Enable auto-approve?"),
+                t(
+                  "With auto-approve enabled the agent can run shell " +
+                    "commands and edit files without asking for " +
+                    "confirmation. Enable it only for vaults and notes you " +
+                    "trust."
+                ),
+                t("Enable"),
+                async () => {
+                  this.plugin.settings.autoApprove = true;
+                  await this.plugin.saveSettings();
+                  this.display();
+                }
+              ).open();
+              return;
+            }
             this.plugin.settings.autoApprove = value;
             await this.plugin.saveSettings();
           })
@@ -298,6 +321,65 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         })
       );
 
+    containerEl.createEl("h3", { text: t("Chat history") });
+
+    new Setting(containerEl)
+      .setName(t("Save chat history in the vault"))
+      .setDesc(
+        t(
+          "Messages and reasoning are stored in plain text in this " +
+            "plugin's data.json. Disable to keep history only for the " +
+            "current session."
+        )
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.saveHistory)
+          .onChange(async (value) => {
+            this.plugin.settings.saveHistory = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t("Max saved sessions"))
+      .setDesc(t("Older sessions are removed when this limit is exceeded."))
+      .addText((text) =>
+        text
+          .setPlaceholder("50")
+          .setValue(String(this.plugin.settings.historyMaxSessions))
+          .onChange(async (value) => {
+            const n = parseInt(value, 10);
+            const val = Number.isFinite(n) && n > 0 ? Math.min(n, 500) : 50;
+            this.plugin.settings.historyMaxSessions = val;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t("Max history size (MB)"))
+      .setDesc(
+        t(
+          "Oldest sessions are dropped when the saved history grows " +
+            "beyond this size."
+        )
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("5")
+          .setValue(
+            String(
+              Math.round(this.plugin.settings.historyMaxBytes / (1024 * 1024))
+            )
+          )
+          .onChange(async (value) => {
+            const n = parseInt(value, 10);
+            const mb = Number.isFinite(n) && n > 0 ? Math.min(n, 200) : 5;
+            this.plugin.settings.historyMaxBytes = mb * 1024 * 1024;
+            await this.plugin.saveSettings();
+          })
+      );
+
     containerEl.createEl("h3", { text: t("Document conversion") });
 
     new Setting(containerEl)
@@ -314,6 +396,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.anydocEnabled = value;
             await this.plugin.saveSettings();
+            this.display();
           })
       );
 
@@ -335,27 +418,39 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           })
       );
 
+    new Setting(containerEl)
+      .setName(t("Send documents to hosted OCR"))
+      .setDesc(
+        t(
+          "Upload scanned documents to the external Firecrawl Parse " +
+            "service. Only enable this if you accept that the document " +
+            "contents leave your machine."
+        )
+      )
+      .setDisabled(!this.plugin.settings.anydocEnabled)
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.anydocHostedOcr)
+          .setDisabled(!this.plugin.settings.anydocEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.anydocHostedOcr = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
     if (activeDesc.supportsDbCleanup && activeProvider.pruneOversizedParts) {
       containerEl.createEl("h3", { text: t("Database self-cleanup") });
 
-      new Setting(containerEl)
-        .setName(t("Enable automatic cleanup"))
-        .setDesc(
-          t(
-            "Periodically remove large file attachments from the opencode " +
-              "database (opencode.db), which would otherwise bloat it. Only " +
-              "file attachments older than the minimum age and larger than " +
-              "the max size are removed; conversation text is never touched."
-          )
-        )
-        .addToggle((toggle) =>
-          toggle
-            .setValue(this.plugin.settings.dbAutoCleanup)
-            .onChange(async (value) => {
-              this.plugin.settings.dbAutoCleanup = value;
-              await this.plugin.saveSettings();
-            })
-        );
+      containerEl.createEl("p", {
+        text: t(
+          "Automatic cleanup on startup is disabled. Use the button below " +
+            "to remove oversized file attachments from the OpenCode " +
+            "database. Only attachments older than the minimum age and " +
+            "larger than the max size are removed; conversation text is " +
+            "never touched."
+        ),
+        cls: "setting-item-description",
+      });
 
       new Setting(containerEl)
         .setName(t("Max part size (MB)"))
@@ -428,7 +523,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
               await activeProvider.pruneOversizedParts?.(true, true);
               new Notice(t("Cleanup done."));
             } catch (e) {
-              new Notice(`${t("Error:")} ${(e as Error).message}`);
+              new Notice(`${t("Error:")} ${redact((e as Error).message)}`);
             } finally {
               btn.setDisabled(false);
               btn.setButtonText(t("Cleanup"));
