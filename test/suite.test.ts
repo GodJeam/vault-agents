@@ -298,6 +298,96 @@ test("CLI spawning never enables a shell and DB cleanup is not automatic", () =>
   assert.equal(/pruneOversizedParts\?\.\(\)/.test(mainSrc), false);
 });
 
+test("migrateSettings rejects malformed untrusted data", () => {
+  const { settings, histories } = migrateSettings({
+    language: "de",
+    engine: {},
+    autoApprove: "yes",
+    anydocEnabled: 1,
+    anydocBinary: "   ",
+    anydocHostedOcr: "true",
+    sessionId: 123,
+    sessionEngines: { ses_1: "opencode", ses_2: 42, ses_3: "" },
+    pinned: ["a", "a", 3, " b "],
+    prompts: [
+      { name: "ok", text: "hello" },
+      { name: "", text: "x" },
+      { name: "bad", text: 5 },
+      null,
+    ],
+    dbCleanupMaxMB: -5,
+    dbCleanupAgeDays: 9999,
+    maxAttachMB: 1e9,
+    historyMaxSessions: 0,
+    historyMaxBytes: -1,
+    engines: {
+      opencode: {
+        binary: 42,
+        model: 7,
+        options: { agent: "build", bad: 5 },
+      },
+      unknown: "x",
+    },
+    histories: {
+      ses_1: [
+        { role: "user", text: "hi", timestamp: "yesterday" },
+        { role: "system", text: "nope" },
+        {
+          role: "assistant",
+          text: "ok",
+          tokens: { input: 10, output: "x", cache: { read: 5 } },
+          cost: "free",
+        },
+        "junk",
+      ],
+      ses_bad: "nope",
+      ses_empty: [],
+    },
+  } as unknown as Record<string, unknown>);
+
+  assert.equal(settings.language, "en");
+  assert.equal(settings.engine, "antigravity");
+  assert.equal(settings.autoApprove, false);
+  assert.equal(settings.anydocEnabled, false);
+  assert.equal(settings.anydocBinary, "anydoc");
+  assert.equal(settings.anydocHostedOcr, false);
+  assert.equal(settings.sessionId, "");
+  assert.deepEqual(settings.sessionEngines, {
+    ses_1: "opencode",
+    ses_3: "",
+  });
+  assert.deepEqual(settings.pinned, ["a", "b"]);
+  assert.equal(settings.prompts.length, 1);
+  assert.equal(settings.prompts[0].name, "ok");
+  assert.equal(settings.dbCleanupMaxMB, 1);
+  assert.equal(settings.dbCleanupAgeDays, 365);
+  assert.equal(settings.maxAttachMB, 500);
+  assert.equal(settings.historyMaxSessions, 1);
+  assert.equal(settings.historyMaxBytes, 1_048_576);
+  assert.equal(settings.engines.opencode.binary, "opencode");
+  assert.equal(
+    settings.engines.opencode.model,
+    "opencode-go/deepseek-v4.1-flash"
+  );
+  assert.equal(settings.engines.opencode.options.agent, "build");
+  assert.equal(settings.engines.opencode.options.bad, undefined);
+  assert.equal(settings.engines.unknown, undefined);
+
+  assert.equal(histories.ses_1.length, 2);
+  assert.equal(histories.ses_1[0].role, "user");
+  assert.equal(histories.ses_1[0].timestamp, undefined);
+  const assistant = histories.ses_1[1];
+  assert.equal(assistant.role, "assistant");
+  if (assistant.role === "assistant") {
+    assert.equal(assistant.tokens?.input, 10);
+    assert.equal(assistant.tokens?.output, undefined);
+    assert.equal(assistant.tokens?.cache?.read, 5);
+    assert.equal(assistant.cost, undefined);
+  }
+  assert.equal(histories.ses_bad, undefined);
+  assert.equal(histories.ses_empty, undefined);
+});
+
 test("ProviderRegistry resolves session-specific provider cleanly", () => {
   const host = createMockHost();
   const agy = new AntigravityRunner(host);
