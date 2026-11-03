@@ -321,6 +321,65 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         })
       );
 
+    containerEl.createEl("h3", { text: t("Chat history") });
+
+    new Setting(containerEl)
+      .setName(t("Save chat history in the vault"))
+      .setDesc(
+        t(
+          "Messages and reasoning are stored in plain text in this " +
+            "plugin's data.json. Disable to keep history only for the " +
+            "current session."
+        )
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.saveHistory)
+          .onChange(async (value) => {
+            this.plugin.settings.saveHistory = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t("Max saved sessions"))
+      .setDesc(t("Older sessions are removed when this limit is exceeded."))
+      .addText((text) =>
+        text
+          .setPlaceholder("50")
+          .setValue(String(this.plugin.settings.historyMaxSessions))
+          .onChange(async (value) => {
+            const n = parseInt(value, 10);
+            const val = Number.isFinite(n) && n > 0 ? Math.min(n, 500) : 50;
+            this.plugin.settings.historyMaxSessions = val;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t("Max history size (MB)"))
+      .setDesc(
+        t(
+          "Oldest sessions are dropped when the saved history grows " +
+            "beyond this size."
+        )
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("5")
+          .setValue(
+            String(
+              Math.round(this.plugin.settings.historyMaxBytes / (1024 * 1024))
+            )
+          )
+          .onChange(async (value) => {
+            const n = parseInt(value, 10);
+            const mb = Number.isFinite(n) && n > 0 ? Math.min(n, 200) : 5;
+            this.plugin.settings.historyMaxBytes = mb * 1024 * 1024;
+            await this.plugin.saveSettings();
+          })
+      );
+
     containerEl.createEl("h3", { text: t("Document conversion") });
 
     new Setting(containerEl)

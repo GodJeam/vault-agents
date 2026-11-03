@@ -17,6 +17,7 @@ import type { RunnerHost } from "../src/core/provider";
 import { ProviderRegistry } from "../src/core/registry";
 import { isPermissionError } from "../src/core/permissionError";
 import { redact } from "../src/core/redact";
+import { pruneHistoryMap } from "../src/core/history";
 import { buildAnydocArgs } from "../src/providers/base";
 import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
@@ -116,11 +117,53 @@ test("DEFAULT_SETTINGS ships secure defaults", () => {
   assert.equal(DEFAULT_SETTINGS.anydocEnabled, false);
   assert.equal(DEFAULT_SETTINGS.anydocHostedOcr, false);
   assert.equal(DEFAULT_SETTINGS.dbAutoCleanup, false);
+  assert.equal(DEFAULT_SETTINGS.saveHistory, true);
+  assert.equal(DEFAULT_SETTINGS.historyMaxSessions, 50);
+  assert.equal(DEFAULT_SETTINGS.historyMaxBytes, 5_000_000);
 
   // A missing setting must fall back to the secure default...
   assert.equal(migrateSettings({}).settings.autoApprove, false);
   // ...while an explicit user choice is preserved.
   assert.equal(migrateSettings({ autoApprove: true }).settings.autoApprove, true);
+});
+
+test("pruneHistoryMap keeps active/pinned sessions and enforces limits", () => {
+  const entry = (text: string, timestamp: number) => [
+    { role: "user" as const, text, timestamp },
+  ];
+  const histories: HistoryMap = {
+    active: entry("a", 10),
+    pinned: entry("b", 20),
+    older: entry("c", 30),
+    newest: entry("d", 40),
+  };
+
+  const pruned = pruneHistoryMap(histories, {
+    maxSessions: 3,
+    maxBytes: 0,
+    keepIds: ["active", "pinned"],
+  });
+  assert.deepEqual(Object.keys(pruned).sort(), [
+    "active",
+    "newest",
+    "pinned",
+  ]);
+
+  // keepIds survive even when they alone exceed the configured limits.
+  const keepOnly = pruneHistoryMap(histories, {
+    maxSessions: 1,
+    maxBytes: 1,
+    keepIds: ["active", "pinned"],
+  });
+  assert.deepEqual(Object.keys(keepOnly).sort(), ["active", "pinned"]);
+
+  // Byte limit drops sessions that do not fit.
+  const tiny = pruneHistoryMap(histories, {
+    maxSessions: 10,
+    maxBytes: 1,
+    keepIds: [],
+  });
+  assert.deepEqual(tiny, {});
 });
 
 test("isPermissionError detects actionable permission failures only", () => {

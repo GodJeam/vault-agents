@@ -139,6 +139,12 @@ export interface PluginSettings {
   sessionEngines?: Record<string, EngineType>;
   pinned: string[];
   prompts: PromptTemplate[];
+  /** Persist chat history in the plugin's data.json. */
+  saveHistory: boolean;
+  /** Maximum number of history sessions kept on disk. */
+  historyMaxSessions: number;
+  /** Maximum approximate size of the persisted history, in bytes. */
+  historyMaxBytes: number;
   dbAutoCleanup: boolean;
   dbCleanupMaxMB: number;
   dbCleanupAgeDays: number;
@@ -203,6 +209,9 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   sessionEngines: {},
   pinned: [],
   prompts: [],
+  saveHistory: true,
+  historyMaxSessions: 50,
+  historyMaxBytes: 5_000_000,
   dbAutoCleanup: false,
   dbCleanupMaxMB: 5,
   dbCleanupAgeDays: 7,

@@ -92,6 +92,11 @@ export class ChatView extends ItemView {
     return this.plugin.getRunnerForSession(this.viewSession);
   }
 
+  /** Session currently displayed in this chat view (for history retention). */
+  getSessionId(): string {
+    return this.viewSession;
+  }
+
   /** Engine for the shown session (falls back to the global engine). */
   private sessionEngine(): EngineType {
     const id = this.viewSession;

@@ -72,6 +72,27 @@ const IT: Record<string, string> = {
   "Reset": "Azzera",
   "Session reset: the next message will start from a new session.":
     "Sessione azzerata: il prossimo messaggio partirà da una nuova sessione.",
+  "Chat history": "Cronologia chat",
+  "Save chat history in the vault": "Salva la cronologia chat nel vault",
+  [
+    "Messages and reasoning are stored in plain text in this " +
+      "plugin's data.json. Disable to keep history only for the " +
+      "current session."
+  ]:
+    "Messaggi e ragionamento vengono salvati in chiaro nel data.json " +
+    "del plugin. Disattiva per tenere la cronologia solo per la sessione " +
+    "corrente.",
+  "Max saved sessions": "Numero massimo di sessioni salvate",
+  "Older sessions are removed when this limit is exceeded.":
+    "Le sessioni più vecchie vengono rimosse quando si supera questo " +
+    "limite.",
+  "Max history size (MB)": "Dimensione massima cronologia (MB)",
+  [
+    "Oldest sessions are dropped when the saved history grows " +
+      "beyond this size."
+  ]:
+    "Le sessioni più vecchie vengono scartate quando la cronologia " +
+    "salvata supera questa dimensione.",
   "Auto-approve permissions": "Auto-approve permessi",
   "Show reasoning": "Mostra ragionamento",
   "Show tool details": "Mostra dettagli degli strumenti",
