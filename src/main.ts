@@ -160,8 +160,7 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
       id: "reset-session",
       name: t("Reset the active session"),
       callback: async () => {
-        this.settings.sessionId = "";
-        await this.saveSettings();
+        await this.resetActiveSession();
         new Notice(t("Session reset."));
       },
     });
@@ -303,6 +302,16 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
   async deleteHistory(sessionId: string): Promise<void> {
     delete this.histories[sessionId];
     this.scheduleSave();
+  }
+
+  async resetActiveSession(): Promise<void> {
+    this.settings.sessionId = "";
+    for (const leaf of this.app.workspace.getLeavesOfType(CHAT_VIEW_TYPE)) {
+      if (leaf.view instanceof ChatView) {
+        leaf.view.startNewSession(true, false);
+      }
+    }
+    await this.saveSettings();
   }
 
   async saveSettings(): Promise<void> {

@@ -313,11 +313,11 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
       )
       .addButton((btn) =>
         btn.setButtonText(t("Reset")).onClick(async () => {
-          this.plugin.settings.sessionId = "";
-          await this.plugin.saveSettings();
+          await this.plugin.resetActiveSession();
           new Notice(
             t("Session reset: the next message will start from a new session.")
           );
+          this.display();
         })
       );
 

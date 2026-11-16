@@ -65,8 +65,11 @@ export class ChatView extends ItemView {
   private viewSession: string;
   private pendingUser: { text: string; contextLabel?: string } | null = null;
   private currentProc: RunHandle | null = null;
+  private runSeq = 0;
   private running = false;
   private dispatching = false;
+  private pendingQueuedAnswer: string | null = null;
+  private stopFallbackTimer: number | null = null;
   private context: TurnContext | null = null;
   private renderTimer: number | null = null;
   private hadStreamError = false;
@@ -166,8 +169,14 @@ export class ChatView extends ItemView {
   }
 
   onClose(): Promise<void> {
+    this.runSeq++;
+    this.pendingQueuedAnswer = null;
     this.currentProc?.abort();
     this.currentProc = null;
+    if (this.stopFallbackTimer !== null) {
+      clearTimeout(this.stopFallbackTimer);
+      this.stopFallbackTimer = null;
+    }
     if (this.activityTimer !== null) {
       clearInterval(this.activityTimer);
       this.activityTimer = null;
@@ -191,15 +200,18 @@ export class ChatView extends ItemView {
   }
 
   sendText(text: string): void {
-    if (this.inputEl) this.inputEl.value = text;
-    void this.send();
+    void this.dispatchPrompt(text);
   }
 
-  startNewSession(silent = false): void {
+  startNewSession(silent = false, persist = true): void {
+    if (this.running || this.dispatching) {
+      new Notice(this.plugin.t("There is already a request in progress."));
+      return;
+    }
     this.viewSession = "";
     this.plugin.settings.sessionId = "";
     this.attachmentManager?.clear();
-    void this.plugin.saveSettings();
+    if (persist) void this.plugin.saveSettings();
     void this.populateSessionSelect();
     this.loadHistoryForSession("");
     if (!silent) {
@@ -232,6 +244,11 @@ export class ChatView extends ItemView {
     });
     this.sessionSelect.addEventListener("change", () => {
       const v = this.sessionSelect.value;
+      if (this.running || this.dispatching) {
+        this.sessionSelect.value = this.viewSession || "";
+        new Notice(this.plugin.t("There is already a request in progress."));
+        return;
+      }
       if (v !== this.viewSession) {
         this.viewSession = v;
         this.plugin.settings.sessionId = v;
@@ -363,29 +380,32 @@ export class ChatView extends ItemView {
       confirmTpl.replace("$1", title),
       this.plugin.t("Delete"),
       () => {
-        this.getRunner()
-          .deleteSession(id)
-          .then(async () => {
-            await this.plugin.deleteHistory(id);
-            const pinned = this.plugin.settings.pinned ?? [];
-            const pi = pinned.indexOf(id);
-            if (pi >= 0) pinned.splice(pi, 1);
-            this.plugin.settings.pinned = pinned;
-            if (this.plugin.settings.sessionEngines) {
-              delete this.plugin.settings.sessionEngines[id];
-            }
-            if (this.viewSession === id) {
-              this.viewSession = "";
-              this.plugin.settings.sessionId = "";
-            }
-            await this.plugin.saveSettings();
-            await this.populateSessionSelect();
-            this.loadHistoryForSession(this.viewSession);
-            new Notice(this.plugin.t("Session deleted."));
-          })
-          .catch((e) =>
-            new Notice(`${this.plugin.t("Error:")} ${redact((e as Error).message)}`)
-          );
+        const runner = this.getRunner();
+        void (async () => {
+          try {
+            await runner.deleteSession(id);
+          } catch (e) {
+            new Notice(
+              `${this.plugin.t("Error:")} ${redact((e as Error).message)}`
+            );
+          }
+          await this.plugin.deleteHistory(id);
+          const pinned = this.plugin.settings.pinned ?? [];
+          const pi = pinned.indexOf(id);
+          if (pi >= 0) pinned.splice(pi, 1);
+          this.plugin.settings.pinned = pinned;
+          if (this.plugin.settings.sessionEngines) {
+            delete this.plugin.settings.sessionEngines[id];
+          }
+          if (this.viewSession === id) {
+            this.viewSession = "";
+            this.plugin.settings.sessionId = "";
+          }
+          await this.plugin.saveSettings();
+          await this.populateSessionSelect();
+          this.loadHistoryForSession(this.viewSession);
+          new Notice(this.plugin.t("Session deleted."));
+        })();
       }
     ).open();
   }
@@ -406,6 +426,11 @@ export class ChatView extends ItemView {
 
   refreshSettings(): void {
     this.updateAutoApproveBtn();
+    this.updateModelBtn();
+    this.updateStatsBar();
+    this.activeBubble?.setShowThinking(this.plugin.settings.showThinking);
+    this.contextLimit = 0;
+    void this.refreshContext();
   }
 
   private updateAutoApproveBtn(): void {
@@ -717,16 +742,26 @@ export class ChatView extends ItemView {
     this.stopBtn.addEventListener("click", () => {
       this.stoppedByUser = true;
       this.currentProc?.abort();
-      window.setTimeout(() => {
+      if (this.stopFallbackTimer !== null) {
+        clearTimeout(this.stopFallbackTimer);
+      }
+      this.stopFallbackTimer = window.setTimeout(() => {
+        this.stopFallbackTimer = null;
         if (!this.running) return;
+        this.runSeq++;
         this.currentProc?.abort();
+        this.currentProc = null;
         this.running = false;
         this.pendingUser = null;
         if (this.activityTimer !== null) {
           clearInterval(this.activityTimer);
           this.activityTimer = null;
         }
+        this.activeBubble?.finalize();
         this.setRunningUI(false);
+        const queued = this.pendingQueuedAnswer;
+        this.pendingQueuedAnswer = null;
+        if (queued) void this.dispatchPrompt(queued);
       }, 3000);
     });
   }
@@ -787,6 +822,10 @@ export class ChatView extends ItemView {
   }
 
   private openAgentList(): void {
+    if (this.running || this.dispatching) {
+      new Notice(this.plugin.t("There is already a request in progress."));
+      return;
+    }
     const activeEngine = this.sessionEngine();
     const providers = this.plugin.registry.getAll();
     const items: AgentItem[] = providers.map((p) => {
@@ -830,76 +869,77 @@ export class ChatView extends ItemView {
     const cur = this.activeModelFor(activeEngine);
     const provider = this.plugin.registry.resolveProvider(activeEngine);
 
+    let models: string[] = [];
     try {
-      const models = await provider.listModels();
-      const providerLabel =
-        provider.costNote || this.plugin.t(provider.descriptor.shortName);
-      const items: ModelItem[] = [];
-      const seen = new Set<string>();
-
-      if (!provider.descriptor.defaultModel) {
-        items.push({
-          id: "",
-          label: substitute(
-            this.plugin.t("(default from $1)"),
-            provider.descriptor.shortName
-          ),
-          engine: provider.id,
-          provider: providerLabel,
-          isActive: cur === "",
-          isDefault: true,
-        });
-        seen.add("");
-      }
-
-      if (cur && !seen.has(cur)) {
-        items.push({
-          id: cur,
-          engine: provider.id,
-          provider: providerLabel,
-          isActive: true,
-        });
-        seen.add(cur);
-      }
-
-      for (const m of models) {
-        if (seen.has(m)) continue;
-        seen.add(m);
-        items.push({
-          id: m,
-          engine: provider.id,
-          provider: providerLabel,
-          isActive: m === cur,
-        });
-      }
-
-      new ModelSuggestModal(
-        this.app,
-        this.plugin,
-        items,
-        activeEngine,
-        (item) => {
-          const cfg = this.plugin.getEngineConfig(activeEngine);
-          cfg.model = item.id;
-          if (this.viewSession) {
-            if (!this.plugin.settings.sessionEngines) {
-              this.plugin.settings.sessionEngines = {};
-            }
-            this.plugin.settings.sessionEngines[this.viewSession] = activeEngine;
-          }
-          void this.plugin.saveSettings();
-          this.updateModelBtn();
-          this.updateStatsBar();
-          this.contextLimit = 0;
-          void this.refreshContext();
-          const shownModel = item.label || item.id;
-          const setPrefix = this.plugin.t("Model set:");
-          new Notice(`${setPrefix} ${shownModel} (${item.provider})`);
-        }
-      ).open();
-    } catch (e) {
-      new Notice(`${this.plugin.t("Error:")} ${redact((e as Error).message)}`);
+      models = await provider.listModels();
+    } catch {
+      // Allow opening the modal so custom model IDs can still be entered
     }
+    const providerLabel =
+      provider.costNote || this.plugin.t(provider.descriptor.shortName);
+    const items: ModelItem[] = [];
+    const seen = new Set<string>();
+
+    if (!provider.descriptor.defaultModel) {
+      items.push({
+        id: "",
+        label: substitute(
+          this.plugin.t("(default from $1)"),
+          provider.descriptor.shortName
+        ),
+        engine: provider.id,
+        provider: providerLabel,
+        isActive: cur === "",
+        isDefault: true,
+      });
+      seen.add("");
+    }
+
+    if (cur && !seen.has(cur)) {
+      items.push({
+        id: cur,
+        engine: provider.id,
+        provider: providerLabel,
+        isActive: true,
+      });
+      seen.add(cur);
+    }
+
+    for (const m of models) {
+      if (seen.has(m)) continue;
+      seen.add(m);
+      items.push({
+        id: m,
+        engine: provider.id,
+        provider: providerLabel,
+        isActive: m === cur,
+      });
+    }
+
+    new ModelSuggestModal(
+      this.app,
+      this.plugin,
+      items,
+      activeEngine,
+      (item) => {
+        const cfg = this.plugin.getEngineConfig(activeEngine);
+        cfg.model = item.id;
+        if (this.viewSession) {
+          if (!this.plugin.settings.sessionEngines) {
+            this.plugin.settings.sessionEngines = {};
+          }
+          this.plugin.settings.sessionEngines[this.viewSession] = activeEngine;
+        }
+        void this.plugin.saveSettings();
+        this.updateModelBtn();
+        this.updateStatsBar();
+        this.contextLimit = 0;
+        void this.refreshContext();
+        const shownModel = item.label || item.id;
+        const setPrefix = this.plugin.t("Model set:");
+        new Notice(`${setPrefix} ${shownModel} (${item.provider})`);
+      }
+    ).open();
   }
 
   continueInNewSession(): void {
@@ -927,6 +967,8 @@ export class ChatView extends ItemView {
         "the work can continue in a new session without losing context."
     );
 
+    const mySeq = ++this.runSeq;
+    const isCurrent = () => this.runSeq === mySeq;
     const runner = this.getRunner();
     const proc = runner.runStream(
       {
@@ -936,6 +978,7 @@ export class ChatView extends ItemView {
       },
       {
         onSession: (id) => {
+          if (!isCurrent()) return;
           this.viewSession = id;
           this.plugin.settings.sessionId = id;
           if (!this.plugin.settings.sessionEngines) {
@@ -944,24 +987,40 @@ export class ChatView extends ItemView {
           this.plugin.settings.sessionEngines[id] = runner.id;
           void this.plugin.saveSettings();
         },
-        onActivity: (activity) => bubble.setActivity(activity),
-        onText: (text) => bubble.setText(text),
-        onReasoning: (text) => bubble.setReasoning(text),
-        onStep: (step) => bubble.addStep(step),
-        onQuestion: (questions) => bubble.addQuestions(questions),
-        onFinish: (info) => bubble.setFinish(info),
+        onActivity: (activity) => {
+          if (isCurrent()) bubble.setActivity(activity);
+        },
+        onText: (text) => {
+          if (isCurrent()) bubble.setText(text);
+        },
+        onReasoning: (text) => {
+          if (isCurrent()) bubble.setReasoning(text);
+        },
+        onStep: (step) => {
+          if (isCurrent()) bubble.addStep(step);
+        },
+        onQuestion: (questions) => {
+          if (isCurrent()) bubble.addQuestions(questions);
+        },
+        onFinish: (info) => {
+          if (isCurrent()) bubble.setFinish(info);
+        },
         onError: (err) => {
+          if (!isCurrent()) return;
           this.hadStreamError = true;
           this.addErrorBubble(err);
         },
         onRaw: (line) => {
-          this.lastStderr = line;
+          if (isCurrent()) this.lastStderr = line;
         },
         onDone: (code) => {
-          const isCurrent = this.currentProc === proc;
-          if (isCurrent) this.currentProc = null;
+          if (this.stopFallbackTimer !== null) {
+            clearTimeout(this.stopFallbackTimer);
+            this.stopFallbackTimer = null;
+          }
           bubble.finalize();
-          if (!isCurrent) return;
+          if (!isCurrent()) return;
+          if (this.currentProc === proc) this.currentProc = null;
           this.running = false;
           this.setRunningUI(false);
           const summary = bubble.getSnapshot().text.trim();
@@ -1047,6 +1106,13 @@ export class ChatView extends ItemView {
   private async send(): Promise<void> {
     const raw = this.inputEl.value.trim();
     if (!raw || this.running || this.dispatching) return;
+    this.inputEl.value = "";
+    await this.dispatchPrompt(raw);
+  }
+
+  private async dispatchPrompt(rawText: string): Promise<void> {
+    const raw = rawText.trim();
+    if (!raw || this.running || this.dispatching) return;
 
     if (!this.plugin.settings.autoApprove && !this.autoApproveHintShown) {
       this.autoApproveHintShown = true;
@@ -1069,7 +1135,6 @@ export class ChatView extends ItemView {
     }
 
     this.addUserMessage(raw, ctxLabel);
-    this.inputEl.value = "";
 
     this.pendingUser = { text: raw, contextLabel: ctxLabel };
     const currentSession = this.viewSession;
@@ -1133,6 +1198,8 @@ export class ChatView extends ItemView {
       }
     }, 2000);
 
+    const mySeq = ++this.runSeq;
+    const isCurrent = () => this.runSeq === mySeq;
     const runner = this.getRunner();
     const proc = runner.runStream(
       {
@@ -1142,6 +1209,7 @@ export class ChatView extends ItemView {
       },
       {
         onSession: (id) => {
+          if (!isCurrent()) return;
           lastEventTime = Date.now();
           const prev = this.viewSession;
           if (prev !== id) {
@@ -1164,27 +1232,32 @@ export class ChatView extends ItemView {
           }
         },
         onActivity: (activity) => {
+          if (!isCurrent()) return;
           lastEventTime = Date.now();
           currentActivity = activity;
           bubble.setActivity(activity);
         },
         onText: (text) => {
+          if (!isCurrent()) return;
           lastEventTime = Date.now();
           currentActivity = this.plugin.t("Writing response...");
           bubble.setActivity(currentActivity);
           bubble.setText(text);
         },
         onReasoning: (text) => {
+          if (!isCurrent()) return;
           lastEventTime = Date.now();
           currentActivity = this.plugin.t("Thinking...");
           bubble.setActivity(currentActivity);
           bubble.setReasoning(text);
         },
         onStep: (step) => {
+          if (!isCurrent()) return;
           lastEventTime = Date.now();
           bubble.addStep(step);
         },
         onQuestion: (questions) => {
+          if (!isCurrent()) return;
           lastEventTime = Date.now();
           hasQuestion = true;
           currentActivity = this.plugin.t("Waiting for your answer...");
@@ -1192,6 +1265,7 @@ export class ChatView extends ItemView {
           bubble.addQuestions(questions);
         },
         onFinish: (info) => {
+          if (!isCurrent()) return;
           lastEventTime = Date.now();
           bubble.setFinish(info);
           this.addStats(info);
@@ -1211,22 +1285,27 @@ export class ChatView extends ItemView {
           }
         },
         onError: (err) => {
+          if (!isCurrent()) return;
           lastEventTime = Date.now();
           this.hadStreamError = true;
           this.handleStreamError(err);
         },
         onRaw: (line) => {
+          if (!isCurrent()) return;
           this.lastStderr = line;
         },
         onDone: (code) => {
+          if (this.stopFallbackTimer !== null) {
+            clearTimeout(this.stopFallbackTimer);
+            this.stopFallbackTimer = null;
+          }
           if (this.activityTimer !== null) {
             clearInterval(this.activityTimer);
             this.activityTimer = null;
           }
-          const isCurrent = this.currentProc === proc;
-          if (isCurrent) this.currentProc = null;
           bubble.finalize();
-          if (!isCurrent) return;
+          if (!isCurrent()) return;
+          if (this.currentProc === proc) this.currentProc = null;
 
           this.running = false;
           this.setRunningUI(false);
@@ -1252,6 +1331,12 @@ export class ChatView extends ItemView {
           this.pendingUser = null;
           void this.populateSessionSelect();
           void this.refreshContext();
+
+          const queued = this.pendingQueuedAnswer;
+          this.pendingQueuedAnswer = null;
+          if (queued) {
+            void this.dispatchPrompt(queued);
+          }
         },
       }
     );
@@ -1298,13 +1383,11 @@ export class ChatView extends ItemView {
   private handleQuestionAnswer(formattedAnswer: string): void {
     if (!formattedAnswer.trim()) return;
     if (this.running) {
+      this.pendingQueuedAnswer = formattedAnswer;
       this.stoppedByUser = true;
       this.currentProc?.abort();
-      window.setTimeout(() => {
-        this.sendText(formattedAnswer);
-      }, 250);
     } else {
-      this.sendText(formattedAnswer);
+      void this.dispatchPrompt(formattedAnswer);
     }
   }
 
