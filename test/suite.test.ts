@@ -652,7 +652,7 @@ test("OpencodeRunner.buildArgs resolves relative fileAttachments", () => {
   });
   const firstFileIdx = args.indexOf("--file");
   assert.ok(firstFileIdx >= 0);
-  assert.equal(args[firstFileIdx + 1], "/mock/vault/Docs/Lecture 1.pdf");
+  assert.equal(args[firstFileIdx + 1], join("/mock/vault", "Docs/Lecture 1.pdf"));
   const secondFileIdx = args.indexOf("--file", firstFileIdx + 1);
   assert.ok(secondFileIdx >= 0);
   assert.equal(args[secondFileIdx + 1], "/tmp/already-abs.md");
@@ -1309,7 +1309,7 @@ test("PiRunner.buildArgs separates options from prompt with -- and spawnJsonlStr
   const args = pi.buildArgs({ prompt: "- leading dash", fileAttachments: ["a.md"] });
   const sepIdx = args.indexOf("--");
   assert.ok(sepIdx >= 0);
-  assert.equal(args[sepIdx + 1], "@/mock/vault/a.md");
+  assert.equal(args[sepIdx + 1], `@${join("/mock/vault", "a.md")}`);
   assert.equal(args[sepIdx + 2], "- leading dash");
 
   const runner = new HermesRunner(host) as unknown as {

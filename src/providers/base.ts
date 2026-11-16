@@ -236,6 +236,9 @@ export abstract class BaseCliRunner {
       // No shell fallback: enabling one would let prompt and attachment
       // arguments be interpreted by cmd.exe (command injection). An
       // unresolvable .cmd/.bat launcher surfaces as a spawn error instead.
+    } else if (isWin && /\.(m?js|cjs)$/i.test(bin)) {
+      spawnBin = this.findWindowsBinary("node.exe") ?? "node";
+      spawnArgs = [bin, ...args];
     }
     const options: SpawnOptions = {
       cwd,
@@ -560,6 +563,9 @@ export abstract class BaseCliRunner {
       return null;
     }
     if (hasPath) {
+      if (/\.(m?js|cjs)$/i.test(bin) && existsSync(bin)) {
+        return bin;
+      }
       if (/\.(cmd|bat)$/i.test(bin)) {
         const resolvedExe = this.resolveCmdShim(bin);
         if (resolvedExe) return resolvedExe;
