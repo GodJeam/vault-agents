@@ -16,13 +16,14 @@ import type {
 } from "../../core/types";
 import { substitute } from "../../i18n";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
+import { AGENT_ICON_IDS } from "../../shared/agentIcons";
 import type { HermesStreamEvent } from "./types";
 
 export const HERMES_DESCRIPTOR: ProviderDescriptor = {
   id: "hermes",
   displayName: "Hermes Agent CLI (Nous Research)",
   shortName: "Hermes",
-  icon: "zap",
+  icon: AGENT_ICON_IDS.hermes,
   defaultBinary: "hermes",
   defaultModel: "",
   binaryDesc:

@@ -36,6 +36,7 @@ import { HermesRunner } from "../src/providers/hermes/runner";
 import { PiRunner } from "../src/providers/pi/runner";
 import { formatToolAction } from "../src/features/chat/stepWidget";
 import { formatQuestionAnswers } from "../src/features/chat/questionCard";
+import { AGENT_ICON_IDS, AGENT_ICON_SVGS } from "../src/shared/agentIcons";
 import { substitute, translate } from "../src/i18n";
 
 function createMockHost(
@@ -1342,6 +1343,24 @@ test("PiRunner.buildArgs separates options from prompt with -- and spawnJsonlStr
   assert.match(col.errors[0], /exceeded maximum buffer size/);
   assert.equal(lines.length, 1);
   assert.equal(JSON.parse(lines[0]).text, "ok");
+});
+
+test("Official SVG agent icons are defined for all providers without outer <svg>", () => {
+  const host = createMockHost();
+  const runners = [
+    new AntigravityRunner(host),
+    new OpencodeRunner(host),
+    new HermesRunner(host),
+    new PiRunner(host),
+  ];
+  for (const r of runners) {
+    const iconId = r.descriptor.icon;
+    assert.ok(iconId && iconId in AGENT_ICON_SVGS, `missing icon SVG for ${r.id}`);
+    assert.equal(iconId, AGENT_ICON_IDS[r.id as keyof typeof AGENT_ICON_IDS]);
+    const svg = AGENT_ICON_SVGS[iconId];
+    assert.equal(svg.includes("<svg"), false);
+    assert.ok(svg.includes("<path"));
+  }
 });
 
 

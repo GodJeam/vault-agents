@@ -14,13 +14,14 @@ import type {
 } from "../../core/types";
 import { substitute } from "../../i18n";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
+import { AGENT_ICON_IDS } from "../../shared/agentIcons";
 import type { PiMessage, PiStreamEvent } from "./types";
 
 export const PI_DESCRIPTOR: ProviderDescriptor = {
   id: "pi",
   displayName: "Pi Coding Agent CLI",
   shortName: "Pi",
-  icon: "compass",
+  icon: AGENT_ICON_IDS.pi,
   defaultBinary: "pi",
   defaultModel: "",
   binaryDesc:

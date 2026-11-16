@@ -1104,8 +1104,9 @@
 }
 
 .opencode-chip-icon svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .opencode-chip-vendor {
@@ -1330,8 +1331,9 @@
 
 .opencode-agent-suggest-icon svg,
 .opencode-model-suggest-icon svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 
 .opencode-agent-suggest-name,

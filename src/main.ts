@@ -18,6 +18,7 @@ import {
   type PluginSettings,
 } from "./core/types";
 import { VaultAgentsSettingTab } from "./features/settings/settingsTab";
+import { registerAgentIcons } from "./shared/agentIcons";
 import { translate } from "./i18n";
 
 export type {
@@ -56,6 +57,7 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
   }
 
   async onload(): Promise<void> {
+    registerAgentIcons();
     const raw = (await this.loadData()) as Record<string, unknown> | null;
     const migrated = migrateSettings(raw);
     this.settings = migrated.settings;

@@ -19,6 +19,7 @@ import type {
 import { DEFAULT_ENGINE_CONFIGS } from "../../core/types";
 import { substitute } from "../../i18n";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES, parseSqliteChanges } from "../base";
+import { AGENT_ICON_IDS } from "../../shared/agentIcons";
 import type {
   OpencodeEvent,
   OpencodeModelInfo,
@@ -32,7 +33,7 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
   id: "opencode",
   displayName: "OpenCode CLI",
   shortName: "Opencode",
-  icon: "terminal-square",
+  icon: AGENT_ICON_IDS.opencode,
   defaultBinary: "opencode",
   defaultModel: "opencode-go/deepseek-v4.1-flash",
   binaryDesc:

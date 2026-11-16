@@ -17,6 +17,7 @@ import type {
 import { substitute } from "../../i18n";
 import { redact } from "../../core/redact";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
+import { AGENT_ICON_IDS } from "../../shared/agentIcons";
 import type { AntigravityEvent } from "./types";
 
 // Legacy Antigravity conversation ids are UUIDs, while OpenCode uses "ses_...",
@@ -29,7 +30,7 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   id: "antigravity",
   displayName: "Antigravity CLI (Google AI Pro)",
   shortName: "Antigravity",
-  icon: "sparkles",
+  icon: AGENT_ICON_IDS.antigravity,
   defaultBinary: "agy",
   defaultModel: "gemini-3.8-flash-high",
   binaryDesc:
