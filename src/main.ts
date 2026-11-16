@@ -10,6 +10,8 @@ import { ProviderRegistry } from "./core/registry";
 import type { AgentProvider, RunnerHost } from "./core/provider";
 import { pruneHistoryMap } from "./core/history";
 import {
+  MAX_HISTORY_MESSAGES,
+  MAX_HISTORY_TEXT,
   getEngineConfig,
   migrateSettings,
   type EngineConfig,
@@ -201,7 +203,7 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     await workspace.revealLeaf(leaf);
     const view = leaf.view as ChatView;
     if (resetSession && hadExistingChat) {
-      view.startNewSession(true);
+      this.scheduleSaveSettings();
     }
     return view;
   }
@@ -283,7 +285,9 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
   async appendHistory(sessionId: string, msg: HistoryMessage): Promise<void> {
     if (!sessionId) return;
     const cap = (s: string | undefined): string | undefined =>
-      s && s.length > 50000 ? s.slice(0, 50000) + "…" : s;
+      s && s.length > MAX_HISTORY_TEXT
+        ? s.slice(0, MAX_HISTORY_TEXT) + "…"
+        : s;
     const cloned: HistoryMessage =
       msg.role === "assistant"
         ? {
@@ -300,7 +304,9 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     if (!this.histories[sessionId]) this.histories[sessionId] = [];
     const arr = this.histories[sessionId];
     arr.push(cloned);
-    if (arr.length > 100) arr.splice(0, arr.length - 100);
+    if (arr.length > MAX_HISTORY_MESSAGES) {
+      arr.splice(0, arr.length - MAX_HISTORY_MESSAGES);
+    }
     this.scheduleSave();
   }
 
@@ -319,12 +325,21 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     await this.saveSettings();
   }
 
-  async saveSettings(): Promise<void> {
-    await this.flushSave();
+  private refreshOpenViews(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(CHAT_VIEW_TYPE)) {
       if (leaf.view instanceof ChatView) {
         leaf.view.refreshSettings();
       }
     }
+  }
+
+  scheduleSaveSettings(): void {
+    this.scheduleSave();
+    this.refreshOpenViews();
+  }
+
+  async saveSettings(): Promise<void> {
+    await this.flushSave();
+    this.refreshOpenViews();
   }
 }

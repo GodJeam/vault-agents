@@ -11,7 +11,7 @@ import {
 } from "../../shared/modals";
 import { openProviderModelPicker } from "../../shared/modelPicker";
 import { substitute, type Language } from "../../i18n";
-import type { EngineType } from "../../core/types";
+import { SETTING_BOUNDS, clampInt, type EngineType } from "../../core/types";
 import type { AgentProvider } from "../../core/provider";
 import { redact } from "../../core/redact";
 
@@ -99,9 +99,9 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         text
           .setPlaceholder(activeDesc.defaultBinary)
           .setValue(activeCfg.binary)
-          .onChange(async (value) => {
+          .onChange((value) => {
             activeCfg.binary = value.trim() || activeDesc.defaultBinary;
-            await this.plugin.saveSettings();
+            this.plugin.scheduleSaveSettings();
           })
       );
 
@@ -178,9 +178,9 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           text
             .setPlaceholder(opt.placeholder ? t(opt.placeholder) : "")
             .setValue(activeCfg.options[opt.key] ?? opt.default)
-            .onChange(async (value) => {
+            .onChange((value) => {
               activeCfg.options[opt.key] = value.trim();
-              await this.plugin.saveSettings();
+              this.plugin.scheduleSaveSettings();
             })
         );
       }
@@ -313,9 +313,9 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         text
           .setPlaceholder(t("(automatic)"))
           .setValue(this.plugin.settings.sessionId)
-          .onChange(async (value) => {
+          .onChange((value) => {
             this.plugin.settings.sessionId = value.trim();
-            await this.plugin.saveSettings();
+            this.plugin.scheduleSaveSettings();
           })
       );
 
@@ -360,17 +360,27 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName(t("Max saved sessions"))
       .setDesc(t("Older sessions are removed when this limit is exceeded."))
-      .addText((text) =>
+      .addText((text) => {
         text
           .setPlaceholder("50")
           .setValue(String(this.plugin.settings.historyMaxSessions))
-          .onChange(async (value) => {
-            const n = parseInt(value, 10);
-            const val = Number.isFinite(n) && n > 0 ? Math.min(n, 500) : 50;
-            this.plugin.settings.historyMaxSessions = val;
-            await this.plugin.saveSettings();
-          })
-      );
+          .onChange((value) => {
+            const trimmed = value.trim();
+            if (!trimmed) return;
+            const n = parseInt(trimmed, 10);
+            if (!Number.isFinite(n)) return;
+            this.plugin.settings.historyMaxSessions = clampInt(
+              n,
+              50,
+              SETTING_BOUNDS.historyMaxSessions.min,
+              SETTING_BOUNDS.historyMaxSessions.max
+            );
+            this.plugin.scheduleSaveSettings();
+          });
+        text.inputEl.addEventListener("blur", () => {
+          text.setValue(String(this.plugin.settings.historyMaxSessions));
+        });
+      });
 
     new Setting(containerEl)
       .setName(t("Max history size (MB)"))
@@ -380,21 +390,30 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
             "beyond this size."
         )
       )
-      .addText((text) =>
+      .addText((text) => {
+        const curMB = () =>
+          Math.round(this.plugin.settings.historyMaxBytes / (1024 * 1024));
         text
           .setPlaceholder("5")
-          .setValue(
-            String(
-              Math.round(this.plugin.settings.historyMaxBytes / (1024 * 1024))
-            )
-          )
-          .onChange(async (value) => {
-            const n = parseInt(value, 10);
-            const mb = Number.isFinite(n) && n > 0 ? Math.min(n, 200) : 5;
-            this.plugin.settings.historyMaxBytes = mb * 1024 * 1024;
-            await this.plugin.saveSettings();
-          })
-      );
+          .setValue(String(curMB()))
+          .onChange((value) => {
+            const trimmed = value.trim();
+            if (!trimmed) return;
+            const n = parseInt(trimmed, 10);
+            if (!Number.isFinite(n)) return;
+            const bytes = clampInt(
+              n * 1024 * 1024,
+              5 * 1024 * 1024,
+              SETTING_BOUNDS.historyMaxBytes.min,
+              SETTING_BOUNDS.historyMaxBytes.max
+            );
+            this.plugin.settings.historyMaxBytes = bytes;
+            this.plugin.scheduleSaveSettings();
+          });
+        text.inputEl.addEventListener("blur", () => {
+          text.setValue(String(curMB()));
+        });
+      });
 
     containerEl.createEl("h3", { text: t("Document conversion") });
 
@@ -428,9 +447,9 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         text
           .setPlaceholder("anydoc")
           .setValue(this.plugin.settings.anydocBinary)
-          .onChange(async (value) => {
+          .onChange((value) => {
             this.plugin.settings.anydocBinary = value.trim() || "anydoc";
-            await this.plugin.saveSettings();
+            this.plugin.scheduleSaveSettings();
           })
       );
 
@@ -454,6 +473,37 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           })
       );
 
+    new Setting(containerEl)
+      .setName(t("Max attachment size (MB)"))
+      .setDesc(
+        t(
+          "When anydoc fails to convert a document, files larger than this " +
+            "are not attached to the request, to avoid storing unusable " +
+            "copies in the database."
+        )
+      )
+      .addText((text) => {
+        text
+          .setPlaceholder("20")
+          .setValue(String(this.plugin.settings.maxAttachMB))
+          .onChange((value) => {
+            const trimmed = value.trim();
+            if (!trimmed) return;
+            const n = parseInt(trimmed, 10);
+            if (!Number.isFinite(n)) return;
+            this.plugin.settings.maxAttachMB = clampInt(
+              n,
+              20,
+              SETTING_BOUNDS.maxAttachMB.min,
+              SETTING_BOUNDS.maxAttachMB.max
+            );
+            this.plugin.scheduleSaveSettings();
+          });
+        text.inputEl.addEventListener("blur", () => {
+          text.setValue(String(this.plugin.settings.maxAttachMB));
+        });
+      });
+
     if (activeDesc.supportsDbCleanup && activeProvider.pruneOversizedParts) {
       containerEl.createEl("h3", { text: t("Database self-cleanup") });
 
@@ -473,17 +523,27 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         .setDesc(
           t("File attachments larger than this (in the database) are removed.")
         )
-        .addText((text) =>
+        .addText((text) => {
           text
             .setPlaceholder("5")
             .setValue(String(this.plugin.settings.dbCleanupMaxMB))
-            .onChange(async (value) => {
-              const n = parseInt(value, 10);
-              const val = Number.isFinite(n) && n > 0 ? n : 5;
-              this.plugin.settings.dbCleanupMaxMB = val;
-              await this.plugin.saveSettings();
-            })
-        );
+            .onChange((value) => {
+              const trimmed = value.trim();
+              if (!trimmed) return;
+              const n = parseInt(trimmed, 10);
+              if (!Number.isFinite(n)) return;
+              this.plugin.settings.dbCleanupMaxMB = clampInt(
+                n,
+                5,
+                SETTING_BOUNDS.dbCleanupMaxMB.min,
+                SETTING_BOUNDS.dbCleanupMaxMB.max
+              );
+              this.plugin.scheduleSaveSettings();
+            });
+          text.inputEl.addEventListener("blur", () => {
+            text.setValue(String(this.plugin.settings.dbCleanupMaxMB));
+          });
+        });
 
       new Setting(containerEl)
         .setName(t("Minimum age (days)"))
@@ -493,38 +553,27 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
               "so recent files stay available."
           )
         )
-        .addText((text) =>
+        .addText((text) => {
           text
             .setPlaceholder("7")
             .setValue(String(this.plugin.settings.dbCleanupAgeDays))
-            .onChange(async (value) => {
-              const n = parseInt(value, 10);
-              const val = Number.isFinite(n) && n >= 0 ? n : 7;
-              this.plugin.settings.dbCleanupAgeDays = val;
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName(t("Max attachment size (MB)"))
-        .setDesc(
-          t(
-            "When anydoc fails to convert a document, files larger than this " +
-              "are not attached to the request, to avoid storing unusable " +
-              "copies in the database."
-          )
-        )
-        .addText((text) =>
-          text
-            .setPlaceholder("20")
-            .setValue(String(this.plugin.settings.maxAttachMB))
-            .onChange(async (value) => {
-              const n = parseInt(value, 10);
-              const val = Number.isFinite(n) && n > 0 ? n : 20;
-              this.plugin.settings.maxAttachMB = val;
-              await this.plugin.saveSettings();
-            })
-        );
+            .onChange((value) => {
+              const trimmed = value.trim();
+              if (!trimmed) return;
+              const n = parseInt(trimmed, 10);
+              if (!Number.isFinite(n)) return;
+              this.plugin.settings.dbCleanupAgeDays = clampInt(
+                n,
+                7,
+                SETTING_BOUNDS.dbCleanupAgeDays.min,
+                SETTING_BOUNDS.dbCleanupAgeDays.max
+              );
+              this.plugin.scheduleSaveSettings();
+            });
+          text.inputEl.addEventListener("blur", () => {
+            text.setValue(String(this.plugin.settings.dbCleanupAgeDays));
+          });
+        });
 
       new Setting(containerEl)
         .setName(t("Run cleanup now"))

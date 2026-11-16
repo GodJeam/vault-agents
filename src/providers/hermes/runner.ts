@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "fs";
+import { readFile } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
 import type {
@@ -237,7 +238,7 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
     // This works universally for ANY provider the user authenticated in Hermes.
     const requestedProvider = this.getConfig().options.provider?.trim() || "";
     const pyScript = `
-import json, sys
+import concurrent.futures, json, sys
 from hermes_cli.config import load_config
 from hermes_cli.models import list_available_providers, cached_provider_model_ids, provider_model_ids
 
@@ -260,13 +261,22 @@ models = []
 if default_model:
     models.append(str(default_model).strip())
 
-for pid in providers:
+def fetch_prov(pid):
     try:
-        rows = provider_model_ids(pid, force_refresh=force) if force else (cached_provider_model_ids(pid) or provider_model_ids(pid))
-        for mid in (rows or []):
-            models.append(str(mid).strip())
+        return provider_model_ids(pid, force_refresh=force) if force else (cached_provider_model_ids(pid) or provider_model_ids(pid))
     except Exception:
-        pass
+        return []
+
+if providers:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(providers))) as pool:
+        futs = {pool.submit(fetch_prov, pid): pid for pid in providers}
+        for fut in futs:
+            try:
+                rows = fut.result(timeout=12)
+                for mid in (rows or []):
+                    models.append(str(mid).strip())
+            except Exception:
+                pass
 
 print(json.dumps({"models": models}))
 `;
@@ -294,10 +304,9 @@ print(json.dumps({"models": models}))
     try {
       const provCachePath = join(hermesHome, "provider_models_cache.json");
       if (existsSync(provCachePath)) {
-        const parsed = JSON.parse(readFileSync(provCachePath, "utf-8")) as Record<
-          string,
-          { models?: string[]; fallback?: boolean }
-        >;
+        const parsed = JSON.parse(
+          await readFile(provCachePath, "utf-8")
+        ) as Record<string, { models?: string[]; fallback?: boolean }>;
         const entries = Object.entries(parsed);
         entries.sort(([, a], [, b]) =>
           (a.fallback ? 1 : 0) - (b.fallback ? 1 : 0)
@@ -319,7 +328,7 @@ print(json.dumps({"models": models}))
       try {
         const catalogPath = join(hermesHome, "cache", "model_catalog.json");
         if (existsSync(catalogPath)) {
-          const parsed = JSON.parse(readFileSync(catalogPath, "utf-8")) as {
+          const parsed = JSON.parse(await readFile(catalogPath, "utf-8")) as {
             providers?: Record<
               string,
               { models?: Array<{ id?: string }> }

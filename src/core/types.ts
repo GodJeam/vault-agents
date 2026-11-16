@@ -244,8 +244,26 @@ export function getEngineConfig(
   return settings.engines[engineId];
 }
 
-const MAX_HISTORY_TEXT = 50_000;
-const MAX_HISTORY_MESSAGES = 100;
+export const MAX_HISTORY_TEXT = 50_000;
+export const MAX_HISTORY_MESSAGES = 100;
+
+export const SETTING_BOUNDS = {
+  dbCleanupMaxMB: { min: 1, max: 200 },
+  dbCleanupAgeDays: { min: 0, max: 365 },
+  maxAttachMB: { min: 1, max: 500 },
+  historyMaxSessions: { min: 1, max: 500 },
+  historyMaxBytes: { min: 1_048_576, max: 209_715_200 },
+} as const;
+
+export function clampInt(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(value)));
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -259,16 +277,6 @@ function trimmedString(value: unknown): string | undefined {
 
 function asBool(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
-}
-
-function clampInt(
-  value: unknown,
-  fallback: number,
-  min: number,
-  max: number
-): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return Math.min(max, Math.max(min, Math.trunc(value)));
 }
 
 function asStringRecord(value: unknown): Record<string, string> {
@@ -467,33 +475,33 @@ export function migrateSettings(
   base.dbCleanupMaxMB = clampInt(
     data.dbCleanupMaxMB,
     DEFAULT_SETTINGS.dbCleanupMaxMB,
-    1,
-    200
+    SETTING_BOUNDS.dbCleanupMaxMB.min,
+    SETTING_BOUNDS.dbCleanupMaxMB.max
   );
   base.dbCleanupAgeDays = clampInt(
     data.dbCleanupAgeDays,
     DEFAULT_SETTINGS.dbCleanupAgeDays,
-    0,
-    365
+    SETTING_BOUNDS.dbCleanupAgeDays.min,
+    SETTING_BOUNDS.dbCleanupAgeDays.max
   );
   base.maxAttachMB = clampInt(
     data.maxAttachMB,
     DEFAULT_SETTINGS.maxAttachMB,
-    1,
-    500
+    SETTING_BOUNDS.maxAttachMB.min,
+    SETTING_BOUNDS.maxAttachMB.max
   );
   base.saveHistory = asBool(data.saveHistory, DEFAULT_SETTINGS.saveHistory);
   base.historyMaxSessions = clampInt(
     data.historyMaxSessions,
     DEFAULT_SETTINGS.historyMaxSessions,
-    1,
-    500
+    SETTING_BOUNDS.historyMaxSessions.min,
+    SETTING_BOUNDS.historyMaxSessions.max
   );
   base.historyMaxBytes = clampInt(
     data.historyMaxBytes,
     DEFAULT_SETTINGS.historyMaxBytes,
-    1_048_576,
-    209_715_200
+    SETTING_BOUNDS.historyMaxBytes.min,
+    SETTING_BOUNDS.historyMaxBytes.max
   );
 
   // 1. Apply legacy top-level fields if present in raw data.
