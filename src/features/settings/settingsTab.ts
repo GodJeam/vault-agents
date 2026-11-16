@@ -6,8 +6,8 @@ import {
 } from "obsidian";
 import type VaultAgentsPlugin from "../../main";
 import {
-  ConfirmModal,
   PromptModal,
+  confirmAutoApproveModal,
 } from "../../shared/modals";
 import { openProviderModelPicker } from "../../shared/modelPicker";
 import { substitute, type Language } from "../../i18n";
@@ -231,23 +231,11 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             if (value && !this.plugin.settings.autoApprove) {
               toggle.setValue(false);
-              new ConfirmModal(
-                this.app,
-                this.plugin,
-                t("Enable auto-approve?"),
-                t(
-                  "With auto-approve enabled the agent can run shell " +
-                    "commands and edit files without asking for " +
-                    "confirmation. Enable it only for vaults and notes you " +
-                    "trust."
-                ),
-                t("Enable"),
-                async () => {
-                  this.plugin.settings.autoApprove = true;
-                  await this.plugin.saveSettings();
-                  this.display();
-                }
-              ).open();
+              confirmAutoApproveModal(this.app, this.plugin, async () => {
+                this.plugin.settings.autoApprove = true;
+                await this.plugin.saveSettings();
+                this.display();
+              });
               return;
             }
             this.plugin.settings.autoApprove = value;

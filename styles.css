@@ -286,7 +286,8 @@
   transition: opacity 0.15s ease;
 }
 
-.opencode-message:hover .opencode-meta .opencode-icon-btn {
+.opencode-message:hover .opencode-meta .opencode-icon-btn,
+.opencode-meta .opencode-icon-btn:focus-visible {
   opacity: 1;
 }
 
@@ -1004,6 +1005,7 @@
 .opencode-input {
   width: 100%;
   resize: none;
+  overflow-y: auto;
   min-height: 64px;
   max-height: 180px;
   font-family: inherit;

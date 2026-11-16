@@ -34,8 +34,6 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
   settings!: PluginSettings;
   histories: HistoryMap = {};
   registry!: ProviderRegistry;
-  opencodeRunner!: OpencodeRunner;
-  antigravityRunner!: AntigravityRunner;
   private saveTimer: number | null = null;
 
   getRunnerForSession(sessionId?: string): AgentProvider {
@@ -65,11 +63,9 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     this.settings = migrated.settings;
     this.histories = migrated.histories;
 
-    this.opencodeRunner = new OpencodeRunner(this);
-    this.antigravityRunner = new AntigravityRunner(this);
     this.registry = new ProviderRegistry();
-    this.registry.register(this.opencodeRunner);
-    this.registry.register(this.antigravityRunner);
+    this.registry.register(new OpencodeRunner(this));
+    this.registry.register(new AntigravityRunner(this));
     this.registry.register(new HermesRunner(this));
     this.registry.register(new PiRunner(this));
 

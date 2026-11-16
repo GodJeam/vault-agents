@@ -167,6 +167,26 @@ export class ConfirmModal extends Modal {
   }
 }
 
+export function confirmAutoApproveModal(
+  app: App,
+  plugin: VaultAgentsPlugin,
+  onConfirm: () => void
+): void {
+  const t = (s: string) => plugin.t(s);
+  new ConfirmModal(
+    app,
+    plugin,
+    t("Enable auto-approve?"),
+    t(
+      "With auto-approve enabled the agent can run shell commands and " +
+        "edit files without asking for confirmation. Enable it only for " +
+        "vaults and notes you trust."
+    ),
+    t("Enable"),
+    onConfirm
+  ).open();
+}
+
 export class PromptModal extends Modal {
   constructor(
     app: App,

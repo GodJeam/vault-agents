@@ -1,6 +1,5 @@
 import {
   ItemView,
-  MarkdownRenderer,
   Notice,
   WorkspaceLeaf,
   setIcon,
@@ -18,12 +17,14 @@ import {
   ConfirmModal,
   RenameModal,
   StatsModal,
+  confirmAutoApproveModal,
   type AgentItem,
 } from "../../shared/modals";
 import { openProviderModelPicker } from "../../shared/modelPicker";
 import type { TurnContext, SessionStats } from "./types";
 import {
   AssistantBubble,
+  renderHistoryAssistantRow,
   renderUserBubble,
   renderErrorBubble,
   renderPermissionBubble,
@@ -31,7 +32,6 @@ import {
 } from "./messageBubble";
 import { isPermissionError } from "../../core/permissionError";
 import { redact } from "../../core/redact";
-import { neutralizeRemoteMarkdown } from "./sanitize";
 import { SuggestPopup } from "./suggestPopup";
 import { AttachmentManager } from "./attachmentManager";
 import {
@@ -228,7 +228,11 @@ export class ChatView extends ItemView {
     });
     this.contextClearBtn = this.contextBar.createEl("button", {
       cls: "opencode-icon-btn hidden",
-      attr: { title: this.plugin.t("Remove the attached context") },
+      attr: {
+        type: "button",
+        title: this.plugin.t("Remove the attached context"),
+        "aria-label": this.plugin.t("Remove the attached context"),
+      },
     });
     setIcon(this.contextClearBtn, "x");
     this.contextClearBtn.addEventListener("click", () => {
@@ -240,6 +244,7 @@ export class ChatView extends ItemView {
 
     this.sessionSelect = this.contextBar.createEl("select", {
       cls: "opencode-session-select",
+      attr: { "aria-label": this.plugin.t("Session ID") },
     });
     this.sessionSelect.addEventListener("change", () => {
       const v = this.sessionSelect.value;
@@ -260,14 +265,22 @@ export class ChatView extends ItemView {
 
     this.pinBtn = this.contextBar.createEl("button", {
       cls: "opencode-icon-btn",
-      attr: { title: this.plugin.t("Pin/Unpin session") },
+      attr: {
+        type: "button",
+        title: this.plugin.t("Pin/Unpin session"),
+        "aria-label": this.plugin.t("Pin/Unpin session"),
+      },
     });
     setIcon(this.pinBtn, "pin");
     this.pinBtn.addEventListener("click", () => this.togglePin());
 
     this.renameBtn = this.contextBar.createEl("button", {
       cls: "opencode-icon-btn",
-      attr: { title: this.plugin.t("Rename session") },
+      attr: {
+        type: "button",
+        title: this.plugin.t("Rename session"),
+        "aria-label": this.plugin.t("Rename session"),
+      },
     });
     setIcon(this.renameBtn, "pencil");
     this.renameBtn.addEventListener("click", () =>
@@ -276,7 +289,11 @@ export class ChatView extends ItemView {
 
     this.deleteBtn = this.contextBar.createEl("button", {
       cls: "opencode-icon-btn",
-      attr: { title: this.plugin.t("Delete session") },
+      attr: {
+        type: "button",
+        title: this.plugin.t("Delete session"),
+        "aria-label": this.plugin.t("Delete session"),
+      },
     });
     setIcon(this.deleteBtn, "trash");
     this.deleteBtn.addEventListener("click", () =>
@@ -285,7 +302,11 @@ export class ChatView extends ItemView {
 
     const statsBtn = this.contextBar.createEl("button", {
       cls: "opencode-icon-btn",
-      attr: { title: this.plugin.t("Token and cost statistics") },
+      attr: {
+        type: "button",
+        title: this.plugin.t("Token and cost statistics"),
+        "aria-label": this.plugin.t("Token and cost statistics"),
+      },
     });
     setIcon(statsBtn, "bar-chart-3");
     statsBtn.addEventListener("click", () =>
@@ -294,6 +315,7 @@ export class ChatView extends ItemView {
 
     this.autoApproveBtn = this.contextBar.createEl("button", {
       cls: "opencode-icon-btn",
+      attr: { type: "button" },
     });
     this.autoApproveBtn.addEventListener("click", () =>
       this.toggleAutoApprove()
@@ -480,20 +502,9 @@ export class ChatView extends ItemView {
   }
 
   private confirmEnableAutoApprove(onEnabled?: () => void): void {
-    new ConfirmModal(
-      this.app,
-      this.plugin,
-      this.plugin.t("Enable auto-approve?"),
-      this.plugin.t(
-        "With auto-approve enabled the agent can run shell commands and " +
-          "edit files without asking for confirmation. Enable it only for " +
-          "vaults and notes you trust."
-      ),
-      this.plugin.t("Enable"),
-      () => {
-        void this.setAutoApprove(true).then(() => onEnabled?.());
-      }
-    ).open();
+    confirmAutoApproveModal(this.app, this.plugin, () => {
+      void this.setAutoApprove(true).then(() => onEnabled?.());
+    });
   }
 
   private renderPermissionError(detail: string): void {
@@ -711,9 +722,10 @@ export class ChatView extends ItemView {
         void this.send();
       }
     });
-    this.inputEl.addEventListener("input", () =>
-      this.suggestPopup.onInputChange()
-    );
+    this.inputEl.addEventListener("input", () => {
+      this.autoResizeInput();
+      this.suggestPopup.onInputChange();
+    });
 
     const buttons = inputArea.createDiv({ cls: "opencode-buttons" });
 
@@ -1017,6 +1029,13 @@ export class ChatView extends ItemView {
     this.currentProc = proc;
   }
 
+  private autoResizeInput(): void {
+    if (!this.inputEl) return;
+    this.inputEl.style.height = "auto";
+    const next = Math.min(180, Math.max(64, this.inputEl.scrollHeight));
+    this.inputEl.style.height = `${next}px`;
+  }
+
   private finishContinuation(prompt: string, notice: string): void {
     this.viewSession = "";
     this.plugin.settings.sessionId = "";
@@ -1024,6 +1043,7 @@ export class ChatView extends ItemView {
     void this.populateSessionSelect();
     this.loadHistoryForSession("");
     this.inputEl.value = prompt;
+    this.autoResizeInput();
     this.inputEl.focus();
     new Notice(notice);
   }
@@ -1060,6 +1080,7 @@ export class ChatView extends ItemView {
     const raw = this.inputEl.value.trim();
     if (!raw || this.running || this.dispatching) return;
     this.inputEl.value = "";
+    this.autoResizeInput();
     await this.dispatchPrompt(raw);
   }
 
@@ -1464,53 +1485,25 @@ export class ChatView extends ItemView {
       if (rec.role === "user") {
         this.addUserMessage(rec.text, rec.contextLabel);
       } else {
-        const row = this.messagesEl.createDiv({
-          cls: "opencode-message opencode-message--assistant",
-        });
-        metaWithCopy(
-          row,
+        renderHistoryAssistantRow(
+          this.messagesEl,
+          this.app,
+          this,
+          rec,
           this.assistantLabel(),
-          () => rec.text,
+          this.assistantIcon(),
+          this.plugin.settings.showThinking,
+          (s) => this.plugin.t(s),
           (t) => this.copyText(t),
-          this.plugin.t("Copy text"),
-          this.assistantIcon()
+          (tot, inp, out, cost) =>
+            this.fmtTokens(tot, inp, out, cost, this.sessionEngine())
         );
-        if (this.plugin.settings.showThinking && rec.reasoning) {
-          const det = row.createEl("details", { cls: "opencode-reasoning" });
-          const summary = det.createEl("summary");
-          const brainIcon = summary.createSpan({ cls: "opencode-reasoning-icon" });
-          setIcon(brainIcon, "brain");
-          summary.createSpan({ text: this.plugin.t("Reasoning") });
-          det.createDiv({
-            cls: "opencode-reasoning-content",
-            text: rec.reasoning,
-          });
-        }
-        const bubble = row.createDiv({
-          cls: "opencode-bubble opencode-bubble--assistant",
-        });
-        if (rec.text.length <= 30000) {
-          MarkdownRenderer.render(
-            this.app,
-            neutralizeRemoteMarkdown(rec.text),
-            bubble,
-            this.app.workspace.getActiveFile()?.path ?? "",
-            this
-          );
-        } else {
-          bubble.textContent = rec.text;
-        }
         if (rec.tokens) {
           const inp = rec.tokens.input ?? 0;
           const out = rec.tokens.output ?? 0;
           const reas = rec.tokens.reasoning ?? 0;
-          const tot = inp + out + reas;
-          const stats = row.createDiv({ cls: "opencode-msg-stats" });
-          stats.setText(
-            this.fmtTokens(tot, inp, out, rec.cost, this.sessionEngine())
-          );
           this.addStats({
-            tokens: { ...rec.tokens, total: tot },
+            tokens: { ...rec.tokens, total: inp + out + reas },
             cost: rec.cost,
           });
         }
