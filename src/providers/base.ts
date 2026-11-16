@@ -91,8 +91,11 @@ export function parseCmdNodeScript(
     /"(?:%~dp0\\?|%dp0%\\?)([^"]+\.(?:c?js|mjs))"/i
   );
   if (!scriptMatch || !scriptMatch[1]) return null;
-  const rel = scriptMatch[1].replace(/^[/\\]+/, "");
-  return join(shimDir, rel);
+  const parts = scriptMatch[1]
+    .replace(/^[/\\]+/, "")
+    .split(/[/\\]+/)
+    .filter(Boolean);
+  return join(shimDir, ...parts);
 }
 
 /**
@@ -313,18 +316,39 @@ export abstract class BaseCliRunner {
     child.stdout?.on("data", (chunk: string | Buffer) => {
       const chunkStr =
         typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      let offset = 0;
+
       if (discardingOversized) {
         const nl = chunkStr.indexOf("\n");
         if (nl < 0) return;
-        buffer = chunkStr.slice(nl + 1);
+        offset = nl + 1;
+        buffer = "";
         discardingOversized = false;
-      } else {
-        buffer += chunkStr;
       }
-      let idx: number;
-      while ((idx = buffer.indexOf("\n")) >= 0) {
-        const line = buffer.slice(0, idx).trim();
-        buffer = buffer.slice(idx + 1);
+
+      while (offset < chunkStr.length) {
+        const nl = chunkStr.indexOf("\n", offset);
+        if (nl < 0) {
+          const tail = chunkStr.slice(offset);
+          if (buffer.length + tail.length > MAX_STREAM_LINE_BYTES) {
+            buffer = "";
+            discardingOversized = true;
+            cb.onError("Stream line exceeded maximum buffer size");
+          } else {
+            buffer += tail;
+          }
+          break;
+        }
+
+        const slice = chunkStr.slice(offset, nl);
+        offset = nl + 1;
+        if (buffer.length + slice.length > MAX_STREAM_LINE_BYTES) {
+          buffer = "";
+          cb.onError("Stream line exceeded maximum buffer size");
+          continue;
+        }
+        const line = (buffer + slice).trim();
+        buffer = "";
         if (!line) continue;
         try {
           onLine(line);
@@ -334,11 +358,6 @@ export abstract class BaseCliRunner {
             redact(e)
           );
         }
-      }
-      if (buffer.length > MAX_STREAM_LINE_BYTES) {
-        buffer = "";
-        discardingOversized = true;
-        cb.onError("Stream line exceeded maximum buffer size");
       }
     });
 
