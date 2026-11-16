@@ -596,7 +596,7 @@ test("AntigravityRunner.getUsageStats filters time windows", async () => {
   const twentyDaysAgo = now - 20 * 24 * 3600 * 1000;
 
   const histories: HistoryMap = {
-    "uuid-agy-1": [
+    "0da89d6e-47ea-4d39-aa41-2bd0aa103371": [
       {
         role: "assistant",
         text: "a",

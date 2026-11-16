@@ -72,6 +72,22 @@ export function buildAnydocArgs(
 }
 
 /**
+ * Extract the target JS/MJS/CJS script path from a Windows `.cmd`/`.bat` npm
+ * launcher shim (supporting `%dp0%` and `%~dp0`).
+ */
+export function parseCmdNodeScript(
+  content: string,
+  shimDir: string
+): string | null {
+  const scriptMatch = content.match(
+    /"(?:%~dp0\\?|%dp0%\\?)([^"]+\.(?:c?js|mjs))"/i
+  );
+  if (!scriptMatch || !scriptMatch[1]) return null;
+  const rel = scriptMatch[1].replace(/^[/\\]+/, "");
+  return join(shimDir, rel);
+}
+
+/**
  * Create the conversion cache directory with owner-only permissions. The
  * directory may already exist with looser permissions from older versions.
  */
@@ -278,12 +294,17 @@ export abstract class BaseCliRunner {
     child.stderr?.setEncoding("utf8");
 
     let buffer = "";
+    let discardingOversized = false;
     child.stdout?.on("data", (chunk: string | Buffer) => {
-      buffer += typeof chunk === "string" ? chunk : chunk.toString("utf8");
-      if (buffer.length > MAX_STREAM_LINE_BYTES) {
-        buffer = "";
-        cb.onError("Stream line exceeded maximum buffer size");
-        return;
+      const chunkStr =
+        typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      if (discardingOversized) {
+        const nl = chunkStr.indexOf("\n");
+        if (nl < 0) return;
+        buffer = chunkStr.slice(nl + 1);
+        discardingOversized = false;
+      } else {
+        buffer += chunkStr;
       }
       let idx: number;
       while ((idx = buffer.indexOf("\n")) >= 0) {
@@ -299,9 +320,15 @@ export abstract class BaseCliRunner {
           );
         }
       }
+      if (buffer.length > MAX_STREAM_LINE_BYTES) {
+        buffer = "";
+        discardingOversized = true;
+        cb.onError("Stream line exceeded maximum buffer size");
+      }
     });
 
     child.stdout?.on("end", () => {
+      if (discardingOversized) return;
       const remaining = buffer.trim();
       if (remaining) {
         try {
@@ -439,7 +466,10 @@ export abstract class BaseCliRunner {
     candidatePaths: string[] = []
   ): string {
     const cached = this.resolvedBinaries.get(bin);
-    if (cached !== undefined && cached !== null) return cached;
+    if (cached !== undefined && cached !== null) {
+      if (existsSync(cached)) return cached;
+      this.resolvedBinaries.delete(bin);
+    }
 
     if (process.platform === "win32") {
       const winResolved = this.findWindowsBinary(bin);
@@ -449,7 +479,8 @@ export abstract class BaseCliRunner {
       }
     }
 
-    if (existsSync(bin)) {
+    const hasSeparator = bin.includes("/") || bin.includes("\\");
+    if (hasSeparator && existsSync(bin)) {
       this.resolvedBinaries.set(bin, bin);
       return bin;
     }
@@ -481,24 +512,44 @@ export abstract class BaseCliRunner {
   }
 
   private findWindowsBinary(bin: string): string | null {
-    if (bin.toLowerCase().endsWith(".exe")) return bin;
+    const lower = bin.toLowerCase();
     const hasPath = bin.includes("\\") || bin.includes("/");
+    if (lower.endsWith(".exe")) {
+      if (existsSync(bin)) return bin;
+      if (!hasPath) {
+        const dirs = (process.env.PATH ?? "").split(";").filter(Boolean);
+        for (const dir of dirs) {
+          const exePath = join(dir, bin);
+          if (existsSync(exePath)) return exePath;
+        }
+      }
+      return null;
+    }
     if (hasPath) {
-      const resolved = this.resolveCmdShim(bin);
-      if (resolved) return resolved;
-      const dir = join(bin, "..");
-      const exe = join(dir, bin.replace(/\.(cmd|bat|ps1)$/i, "") + ".exe");
+      if (/\.(cmd|bat)$/i.test(bin)) {
+        const resolvedExe = this.resolveCmdShim(bin);
+        if (resolvedExe) return resolvedExe;
+        if (this.resolveCmdNodeScript(bin)) return bin;
+      }
+      const dir = dirname(bin);
+      const exe = join(
+        dir,
+        basename(bin).replace(/\.(cmd|bat|ps1)$/i, "") + ".exe"
+      );
       return existsSync(exe) ? exe : null;
     }
     const dirs = (process.env.PATH ?? "").split(";").filter(Boolean);
     for (const dir of dirs) {
-      const cmdPath = join(dir, bin + ".cmd");
       const exePath = join(dir, bin + ".exe");
-      if (existsSync(cmdPath)) {
-        const resolved = this.resolveCmdShim(cmdPath);
-        if (resolved) return resolved;
-      }
       if (existsSync(exePath)) return exePath;
+      for (const ext of [".cmd", ".bat"]) {
+        const shimPath = join(dir, bin + ext);
+        if (existsSync(shimPath)) {
+          const resolvedExe = this.resolveCmdShim(shimPath);
+          if (resolvedExe) return resolvedExe;
+          if (this.resolveCmdNodeScript(shimPath)) return shimPath;
+        }
+      }
     }
     return null;
   }
@@ -525,19 +576,13 @@ export abstract class BaseCliRunner {
       if (!existsSync(shimPath)) return null;
       const content = readFileSync(shimPath, "utf8");
       const dir = dirname(shimPath);
-      const scriptMatch = content.match(
-        /"(?:%~?dp0%|%dp0%\\?)([^"]+\.(?:c?js|mjs))"/i
-      );
-      if (scriptMatch && scriptMatch[1]) {
-        const rel = scriptMatch[1].replace(/^[/\\]+/, "");
-        const scriptPath = join(dir, rel);
-        if (existsSync(scriptPath)) {
-          const localNode = join(dir, "node.exe");
-          return {
-            nodeBin: existsSync(localNode) ? localNode : "node",
-            scriptPath,
-          };
-        }
+      const scriptPath = parseCmdNodeScript(content, dir);
+      if (scriptPath && existsSync(scriptPath)) {
+        const localNode = join(dir, "node.exe");
+        return {
+          nodeBin: existsSync(localNode) ? localNode : "node",
+          scriptPath,
+        };
       }
     } catch {
       // ignore
@@ -688,17 +733,18 @@ export abstract class BaseCliRunner {
           const out = msg.tokens.output ?? 0;
           const cost = msg.cost ?? 0;
           const ts = msg.timestamp;
-          if (!ts || ts >= monthCutoff) {
+          const hasTs = typeof ts === "number" && Number.isFinite(ts) && ts > 0;
+          if (!hasTs || ts >= monthCutoff) {
             month.input += inp;
             month.output += out;
             month.cost += cost;
           }
-          if (!ts || ts >= weekCutoff) {
+          if (hasTs && ts >= weekCutoff) {
             week.input += inp;
             week.output += out;
             week.cost += cost;
           }
-          if (!ts || ts >= h5Cutoff) {
+          if (hasTs && ts >= h5Cutoff) {
             h5.input += inp;
             h5.output += out;
             h5.cost += cost;

@@ -19,10 +19,11 @@ import { redact } from "../../core/redact";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
 import type { AntigravityEvent } from "./types";
 
-// Legacy Antigravity conversation ids are UUID-style (they contain "-"), while
-// opencode session ids use the "ses_..." form. Used to attribute untagged
-// history entries that pre-date `sessionEngines`.
-const ANTIGRAVITY_ID_HINT = /-/;
+// Legacy Antigravity conversation ids are UUIDs, while OpenCode uses "ses_...",
+// Hermes uses "hermes-...", and Pi uses "pi-..." or its own IDs. Used to
+// attribute untagged history entries that pre-date `sessionEngines`.
+const ANTIGRAVITY_ID_HINT =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   id: "antigravity",
@@ -72,6 +73,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
   readonly costNote = "Google AI Pro";
 
   private cachedModels: string[] | null = null;
+  private cachedModelsBin = "";
 
   constructor(plugin: RunnerHost) {
     super(plugin);
@@ -87,10 +89,15 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async listModels(forceRefresh = false): Promise<string[]> {
-    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+    const bin = this.resolveBinaryPath(this.getConfig().binary || "agy");
+    if (
+      !forceRefresh &&
+      this.cachedModels &&
+      this.cachedModels.length > 0 &&
+      this.cachedModelsBin === bin
+    ) {
       return this.cachedModels;
     }
-    const bin = this.resolveBinaryPath(this.getConfig().binary || "agy");
     try {
       const out = await this.execCli(bin, ["models"]);
       const models: string[] = [];
@@ -111,6 +118,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       }
       if (models.length > 0) {
         this.cachedModels = models;
+        this.cachedModelsBin = bin;
         return models;
       }
     } catch (e) {
@@ -134,6 +142,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       "gpt-oss-120b-medium",
     ];
     this.cachedModels = defaults;
+    this.cachedModelsBin = bin;
     return defaults;
   }
 

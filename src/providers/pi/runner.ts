@@ -235,6 +235,9 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
       args.push("--thinking", thinking);
     }
 
+    // Stop CLI option parsing before positional `@<filepath>` and prompt args
+    args.push("--");
+
     // Pi natively supports `@<filepath>` for both text and image attachments
     for (const f of req.fileAttachments) {
       const fullPath = !isAbsolute(f) && cwd ? join(cwd, f) : f;
