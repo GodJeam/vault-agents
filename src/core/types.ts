@@ -137,8 +137,11 @@ export interface PluginSettings {
   showToolIO: boolean;
   sessionId: string;
   sessionEngines?: Record<string, EngineType>;
+  sessionTitles?: Record<string, string>;
   pinned: string[];
   prompts: PromptTemplate[];
+  /** Automatically summarize and prepare a new session when context saturates. */
+  autoContinueOnLimit: boolean;
   /** Persist chat history in the plugin's data.json. */
   saveHistory: boolean;
   /** Maximum number of history sessions kept on disk. */
@@ -207,8 +210,10 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   showToolIO: true,
   sessionId: "",
   sessionEngines: {},
+  sessionTitles: {},
   pinned: [],
   prompts: [],
+  autoContinueOnLimit: true,
   saveHistory: true,
   historyMaxSessions: 50,
   historyMaxBytes: 5_000_000,
@@ -423,6 +428,7 @@ export function migrateSettings(
     ...DEFAULT_SETTINGS,
     engines: createDefaultEnginesMap(),
     sessionEngines: {},
+    sessionTitles: {},
     pinned: [],
     prompts: [],
   };
@@ -447,8 +453,13 @@ export function migrateSettings(
   base.sessionId =
     typeof data.sessionId === "string" ? data.sessionId.trim() : "";
   base.sessionEngines = asStringRecord(data.sessionEngines);
+  base.sessionTitles = asStringRecord(data.sessionTitles);
   base.pinned = asStringArray(data.pinned);
   base.prompts = asPrompts(data.prompts);
+  base.autoContinueOnLimit = asBool(
+    data.autoContinueOnLimit,
+    DEFAULT_SETTINGS.autoContinueOnLimit
+  );
   base.dbAutoCleanup = asBool(
     data.dbAutoCleanup,
     DEFAULT_SETTINGS.dbAutoCleanup

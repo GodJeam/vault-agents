@@ -357,7 +357,56 @@ print(json.dumps({"models": models}))
   }
 
   async listSessions(): Promise<SessionInfo[]> {
-    return this.listHistorySessions("hermes");
+    const sessions: SessionInfo[] = [];
+    const seenIds = new Set<string>();
+
+    const dbPath = join(this.getHermesHome(), "state.db");
+    if (existsSync(dbPath)) {
+      try {
+        const query = [
+          "SELECT id, COALESCE(title, '') AS title,",
+          "COALESCE(last_activity_at, started_at) AS updated_sec,",
+          "started_at AS created_sec, cwd AS directory",
+          "FROM sessions",
+          "WHERE COALESCE(archived, 0) = 0 AND COALESCE(hidden, 0) = 0",
+          "ORDER BY COALESCE(last_activity_at, started_at) DESC LIMIT 60",
+        ].join(" ");
+        const out = await this.execCli("sqlite3", ["-json", dbPath, query]);
+        const rows = JSON.parse(out.trim() || "[]") as Array<{
+          id?: string;
+          title?: string;
+          updated_sec?: number;
+          created_sec?: number;
+          directory?: string;
+        }>;
+        for (const row of rows) {
+          const id = row.id?.trim();
+          if (!id || seenIds.has(id)) continue;
+          const updatedSec = Number(row.updated_sec);
+          const createdSec = Number(row.created_sec);
+          sessions.push({
+            id,
+            title: row.title?.trim() || id,
+            updated:
+              Number.isFinite(updatedSec) && updatedSec > 0
+                ? Math.round(updatedSec * 1000)
+                : Date.now(),
+            created:
+              Number.isFinite(createdSec) && createdSec > 0
+                ? Math.round(createdSec * 1000)
+                : undefined,
+            directory: row.directory?.trim() || undefined,
+            engine: "hermes",
+          });
+          seenIds.add(id);
+        }
+      } catch {
+        // Fallback to local Obsidian histories if sqlite3 is missing
+      }
+    }
+
+    sessions.push(...this.listHistorySessions("hermes", seenIds));
+    return sessions;
   }
 
   async renameSession(sessionId: string, title: string): Promise<void> {
@@ -500,8 +549,58 @@ print(json.dumps({"models": models}))
 
   async getSessionTokens(
     sessionId: string
-  ): Promise<{ input: number; output: number }> {
-    return this.getHistorySessionTokens(sessionId);
+  ): Promise<{
+    input: number;
+    output: number;
+    totalInput?: number;
+    totalOutput?: number;
+    totalTokens?: number;
+    totalCost?: number;
+  }> {
+    const hist = this.getHistorySessionTokens(sessionId);
+    if (hist.input > 0 || hist.output > 0) return hist;
+
+    const dbPath = join(this.getHermesHome(), "state.db");
+    if (existsSync(dbPath) && sessionId) {
+      try {
+        const safeId = this.sqlEscape(sessionId);
+        const query = [
+          "SELECT input_tokens, output_tokens, cache_read_tokens,",
+          "cache_write_tokens, reasoning_tokens,",
+          "COALESCE(actual_cost_usd, estimated_cost_usd, 0) AS cost",
+          `FROM sessions WHERE id = '${safeId}' LIMIT 1`,
+        ].join(" ");
+        const out = await this.execCli("sqlite3", ["-json", dbPath, query]);
+        const rows = JSON.parse(out.trim() || "[]") as Array<{
+          input_tokens?: number;
+          output_tokens?: number;
+          cache_read_tokens?: number;
+          cache_write_tokens?: number;
+          reasoning_tokens?: number;
+          cost?: number;
+        }>;
+        const row = rows[0];
+        if (row) {
+          const inp = Number(row.input_tokens ?? 0);
+          const outTok = Number(row.output_tokens ?? 0);
+          const cacheR = Number(row.cache_read_tokens ?? 0);
+          const cacheW = Number(row.cache_write_tokens ?? 0);
+          const reas = Number(row.reasoning_tokens ?? 0);
+          const totalCost = Number(row.cost ?? 0);
+          return {
+            input: inp + cacheR + cacheW,
+            output: outTok,
+            totalInput: inp,
+            totalOutput: outTok,
+            totalTokens: inp + outTok + reas,
+            totalCost: Number.isFinite(totalCost) ? totalCost : undefined,
+          };
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return hist;
   }
 
   async getUsageStats(): Promise<UsageStats> {

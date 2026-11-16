@@ -497,6 +497,21 @@ const IT: Record<string, string> = {
   "Select an AI Agent...": "Seleziona un Agente AI...",
   "Search $1 models or type a custom ID...":
     "Cerca i modelli di $1 o digita un ID personalizzato...",
+  "Refresh": "Aggiorna",
+  "Refresh models from CLI": "Aggiorna i modelli dalla CLI",
+  "Models refreshed.": "Modelli aggiornati.",
+  "All": "Tutti",
+  "Models": "Modelli",
+  "No matching models found.": "Nessun modello corrispondente trovato.",
+  "Auto-continue on context limit": "Continua automaticamente al limite del contesto",
+  [
+    "Automatically summarize and prepare a new session when context " +
+      "usage exceeds 92%."
+  ]:
+    "Riassume e prepara automaticamente una nuova sessione quando l'uso del " +
+    "contesto supera il 92%.",
+  "Context limit reached: generating summary for a new session...":
+    "Limite del contesto raggiunto: generazione riassunto per una nuova sessione...",
   "Installed": "Installato",
   "Not found": "Non trovato",
   "Default": "Default",

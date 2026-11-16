@@ -7,10 +7,9 @@ import {
 import type VaultAgentsPlugin from "../../main";
 import {
   ConfirmModal,
-  ModelSuggestModal,
   PromptModal,
-  type ModelItem,
 } from "../../shared/modals";
+import { openProviderModelPicker } from "../../shared/modelPicker";
 import { substitute, type Language } from "../../i18n";
 import type { EngineType } from "../../core/types";
 import type { AgentProvider } from "../../core/provider";
@@ -281,6 +280,23 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.showToolIO)
           .onChange(async (value) => {
             this.plugin.settings.showToolIO = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t("Auto-continue on context limit"))
+      .setDesc(
+        t(
+          "Automatically summarize and prepare a new session when context " +
+            "usage exceeds 92%."
+        )
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.autoContinueOnLimit)
+          .onChange(async (value) => {
+            this.plugin.settings.autoContinueOnLimit = value;
             await this.plugin.saveSettings();
           })
       );
@@ -594,63 +610,14 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
 
   private async openProviderModelModal(provider: AgentProvider): Promise<void> {
     const t = (s: string) => this.plugin.t(s);
-    const desc = provider.descriptor;
-    const cfg = this.plugin.getEngineConfig(desc.id);
-    const cur = cfg.model || desc.defaultModel;
-    const providerLabel = provider.costNote || t(desc.shortName);
-    const items: ModelItem[] = [];
-    const seen = new Set<string>();
+    const cfg = this.plugin.getEngineConfig(provider.id);
 
-    if (!desc.defaultModel) {
-      items.push({
-        id: "",
-        label: substitute(t("(default from $1)"), desc.shortName),
-        engine: desc.id,
-        provider: providerLabel,
-        isActive: cur === "",
-        isDefault: true,
-      });
-      seen.add("");
-    }
-
-    if (cur && !seen.has(cur)) {
-      items.push({
-        id: cur,
-        engine: desc.id,
-        provider: providerLabel,
-        isActive: true,
-      });
-      seen.add(cur);
-    }
-
-    try {
-      const models = await provider.listModels();
-      for (const m of models) {
-        if (seen.has(m)) continue;
-        seen.add(m);
-        items.push({
-          id: m,
-          engine: desc.id,
-          provider: providerLabel,
-          isActive: m === cur,
-        });
-      }
-    } catch {
-      // If listing fails, the user can still type a custom model ID
-    }
-
-    new ModelSuggestModal(
-      this.app,
-      this.plugin,
-      items,
-      desc.id,
-      async (item) => {
-        cfg.model = item.id;
-        await this.plugin.saveSettings();
-        this.display();
-        const shownModel = item.label || item.id;
-        new Notice(`${t("Model set:")} ${shownModel} (${item.provider})`);
-      }
-    ).open();
+    await openProviderModelPicker(this.app, this.plugin, provider, async (item) => {
+      cfg.model = item.id;
+      await this.plugin.saveSettings();
+      this.display();
+      const shownModel = item.label || item.id;
+      new Notice(`${t("Model set:")} ${shownModel} (${item.provider})`);
+    });
   }
 }

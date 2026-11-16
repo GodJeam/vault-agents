@@ -37,6 +37,7 @@ import { PiRunner } from "../src/providers/pi/runner";
 import { formatToolAction } from "../src/features/chat/stepWidget";
 import { formatQuestionAnswers } from "../src/features/chat/questionCard";
 import { AGENT_ICON_IDS, AGENT_ICON_SVGS } from "../src/shared/agentIcons";
+import { fuzzyMatchScore } from "../src/shared/suggestModals";
 import { substitute, translate } from "../src/i18n";
 
 function createMockHost(
@@ -1361,6 +1362,21 @@ test("Official SVG agent icons are defined for all providers without outer <svg>
     assert.equal(svg.includes("<svg"), false);
     assert.ok(svg.includes("<path"));
   }
+});
+
+test("fuzzyMatchScore ranks exact/prefix matches above fuzzy matches and rejects misses", () => {
+  const exact = fuzzyMatchScore("sonnet", "anthropic/claude-sonnet-4");
+  const fuzzy = fuzzyMatchScore("cs4", "anthropic/claude-sonnet-4");
+  assert.ok(exact > fuzzy);
+  assert.ok(fuzzy > 0);
+  assert.equal(fuzzyMatchScore("gemini gpt", "anthropic/claude-sonnet-4"), -1);
+
+  const migrated = migrateSettings({
+    sessionTitles: { ses_1: "Architecture review", bad: 42 },
+    autoContinueOnLimit: false,
+  } as unknown as Record<string, unknown>);
+  assert.deepEqual(migrated.settings.sessionTitles, { ses_1: "Architecture review" });
+  assert.equal(migrated.settings.autoContinueOnLimit, false);
 });
 
 

@@ -16,12 +16,11 @@ import { substitute } from "../../i18n";
 import {
   AgentSuggestModal,
   ConfirmModal,
-  ModelSuggestModal,
   RenameModal,
   StatsModal,
   type AgentItem,
-  type ModelItem,
 } from "../../shared/modals";
+import { openProviderModelPicker } from "../../shared/modelPicker";
 import type { TurnContext, SessionStats } from "./types";
 import {
   AssistantBubble,
@@ -350,15 +349,20 @@ export class ChatView extends ItemView {
     }
     const current = this.sessionSelect.selectedOptions[0]?.textContent ?? id;
     new RenameModal(this.app, this.plugin, current, (newTitle) => {
-      this.getRunner()
-        .renameSession(id, newTitle)
-        .then(() => {
-          void this.populateSessionSelect();
-          new Notice(this.plugin.t("Session renamed."));
-        })
-        .catch((e) =>
-          new Notice(`${this.plugin.t("Error:")} ${redact((e as Error).message)}`)
-        );
+      void (async () => {
+        if (!this.plugin.settings.sessionTitles) {
+          this.plugin.settings.sessionTitles = {};
+        }
+        this.plugin.settings.sessionTitles[id] = newTitle;
+        try {
+          await this.getRunner().renameSession(id, newTitle);
+        } catch (e) {
+          console.debug("[vault-agents] remote renameSession failed:", redact(e));
+        }
+        await this.plugin.saveSettings();
+        void this.populateSessionSelect();
+        new Notice(this.plugin.t("Session renamed."));
+      })();
     }).open();
   }
 
@@ -396,6 +400,9 @@ export class ChatView extends ItemView {
           this.plugin.settings.pinned = pinned;
           if (this.plugin.settings.sessionEngines) {
             delete this.plugin.settings.sessionEngines[id];
+          }
+          if (this.plugin.settings.sessionTitles) {
+            delete this.plugin.settings.sessionTitles[id];
           }
           if (this.viewSession === id) {
             this.viewSession = "";
@@ -866,80 +873,26 @@ export class ChatView extends ItemView {
 
   private async openModelList(): Promise<void> {
     const activeEngine = this.sessionEngine();
-    const cur = this.activeModelFor(activeEngine);
     const provider = this.plugin.registry.resolveProvider(activeEngine);
 
-    let models: string[] = [];
-    try {
-      models = await provider.listModels();
-    } catch {
-      // Allow opening the modal so custom model IDs can still be entered
-    }
-    const providerLabel =
-      provider.costNote || this.plugin.t(provider.descriptor.shortName);
-    const items: ModelItem[] = [];
-    const seen = new Set<string>();
-
-    if (!provider.descriptor.defaultModel) {
-      items.push({
-        id: "",
-        label: substitute(
-          this.plugin.t("(default from $1)"),
-          provider.descriptor.shortName
-        ),
-        engine: provider.id,
-        provider: providerLabel,
-        isActive: cur === "",
-        isDefault: true,
-      });
-      seen.add("");
-    }
-
-    if (cur && !seen.has(cur)) {
-      items.push({
-        id: cur,
-        engine: provider.id,
-        provider: providerLabel,
-        isActive: true,
-      });
-      seen.add(cur);
-    }
-
-    for (const m of models) {
-      if (seen.has(m)) continue;
-      seen.add(m);
-      items.push({
-        id: m,
-        engine: provider.id,
-        provider: providerLabel,
-        isActive: m === cur,
-      });
-    }
-
-    new ModelSuggestModal(
-      this.app,
-      this.plugin,
-      items,
-      activeEngine,
-      (item) => {
-        const cfg = this.plugin.getEngineConfig(activeEngine);
-        cfg.model = item.id;
-        if (this.viewSession) {
-          if (!this.plugin.settings.sessionEngines) {
-            this.plugin.settings.sessionEngines = {};
-          }
-          this.plugin.settings.sessionEngines[this.viewSession] = activeEngine;
+    await openProviderModelPicker(this.app, this.plugin, provider, (item) => {
+      const cfg = this.plugin.getEngineConfig(activeEngine);
+      cfg.model = item.id;
+      if (this.viewSession) {
+        if (!this.plugin.settings.sessionEngines) {
+          this.plugin.settings.sessionEngines = {};
         }
-        void this.plugin.saveSettings();
-        this.updateModelBtn();
-        this.updateStatsBar();
-        this.contextLimit = 0;
-        void this.refreshContext();
-        const shownModel = item.label || item.id;
-        const setPrefix = this.plugin.t("Model set:");
-        new Notice(`${setPrefix} ${shownModel} (${item.provider})`);
+        this.plugin.settings.sessionEngines[this.viewSession] = activeEngine;
       }
-    ).open();
+      void this.plugin.saveSettings();
+      this.updateModelBtn();
+      this.updateStatsBar();
+      this.contextLimit = 0;
+      void this.refreshContext();
+      const shownModel = item.label || item.id;
+      const setPrefix = this.plugin.t("Model set:");
+      new Notice(`${setPrefix} ${shownModel} (${item.provider})`);
+    });
   }
 
   continueInNewSession(): void {
@@ -1327,16 +1280,38 @@ export class ChatView extends ItemView {
           if (failed && !this.stoppedByUser) {
             this.handleProcessFailure(code);
           }
+          const wasStoppedByUser = this.stoppedByUser;
           this.stoppedByUser = false;
           this.pendingUser = null;
           void this.populateSessionSelect();
-          void this.refreshContext();
 
           const queued = this.pendingQueuedAnswer;
           this.pendingQueuedAnswer = null;
           if (queued) {
+            void this.refreshContext();
             void this.dispatchPrompt(queued);
+            return;
           }
+
+          void this.refreshContext().then(() => {
+            if (
+              !failed &&
+              !wasStoppedByUser &&
+              !hasQuestion &&
+              this.viewSession &&
+              this.plugin.settings.autoContinueOnLimit &&
+              this.contextLimit > 0 &&
+              this.contextUsed >= this.contextLimit * 0.92 &&
+              !this.running
+            ) {
+              new Notice(
+                this.plugin.t(
+                  "Context limit reached: generating summary for a new session..."
+                )
+              );
+              this.continueInNewSession();
+            }
+          });
         },
       }
     );

@@ -243,8 +243,11 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
       keepIds: this.collectKeepIds(),
     });
     const removed = before.filter((id) => !(id in pruned));
-    if (removed.length > 0 && this.settings.sessionEngines) {
-      for (const id of removed) delete this.settings.sessionEngines[id];
+    if (removed.length > 0) {
+      for (const id of removed) {
+        if (this.settings.sessionEngines) delete this.settings.sessionEngines[id];
+        if (this.settings.sessionTitles) delete this.settings.sessionTitles[id];
+      }
     }
     this.histories = pruned;
   }
