@@ -323,6 +323,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     const bin = this.resolveBinaryPath(this.getConfig().binary || "agy");
     const streamState = {
       accumulatedText: "",
+      reasoningParts: new Map<string, string>(),
       emittedQuestionSteps: new Set<string>(),
     };
 
@@ -340,6 +341,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     cb: StreamCallbacks,
     streamState: {
       accumulatedText: string;
+      reasoningParts?: Map<string, string>;
       emittedQuestionSteps?: Set<string>;
     } = {
       accumulatedText: "",
@@ -389,13 +391,24 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
         cb.onText(streamState.accumulatedText, String(stepIndex ?? 0));
       }
 
-      // Reasoning / thought block if present
-      if (typeof su.thought === "string" && su.thought) {
+      // Reasoning / thought block if present (preserved across steps)
+      const thoughtText =
+        typeof su.thought === "string" && su.thought
+          ? su.thought
+          : typeof su.reasoning === "string" && su.reasoning
+            ? su.reasoning
+            : "";
+      if (thoughtText) {
+        const key = String(stepIndex ?? 0);
+        if (!streamState.reasoningParts) {
+          streamState.reasoningParts = new Map<string, string>();
+        }
+        streamState.reasoningParts.set(key, thoughtText);
+        const fullThought = Array.from(streamState.reasoningParts.values()).join(
+          "\n\n"
+        );
         cb.onActivity?.(this.plugin.t("Thinking..."));
-        cb.onReasoning(su.thought, String(stepIndex ?? 0));
-      } else if (typeof su.reasoning === "string" && su.reasoning) {
-        cb.onActivity?.(this.plugin.t("Thinking..."));
-        cb.onReasoning(su.reasoning, String(stepIndex ?? 0));
+        cb.onReasoning(fullThought, key);
       }
 
       // Tool execution: extract descriptive title from parameters for the UI

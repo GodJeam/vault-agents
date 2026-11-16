@@ -62,6 +62,8 @@ export const HERMES_DESCRIPTOR: ProviderDescriptor = {
 
 export interface HermesStreamState {
   accumulatedText: string;
+  accumulatedReasoning?: string;
+  hadToolSinceReasoning?: boolean;
   activeToolSteps: Map<
     string,
     { id: string; tool: string; title: string; input: unknown }
@@ -548,6 +550,8 @@ print(json.dumps({"models": models}))
   private createStreamState(): HermesStreamState {
     return {
       accumulatedText: "",
+      accumulatedReasoning: "",
+      hadToolSinceReasoning: false,
       activeToolSteps: new Map(),
     };
   }
@@ -614,12 +618,17 @@ print(json.dumps({"models": models}))
       typeof (ev.text ?? ev.reasoning) === "string"
     ) {
       const thought = String(ev.text ?? ev.reasoning);
+      const prev = state.accumulatedReasoning ?? "";
+      const sep = state.hadToolSinceReasoning && prev ? "\n\n" : "";
+      state.accumulatedReasoning = prev + sep + thought;
+      state.hadToolSinceReasoning = false;
       cb.onActivity?.(this.plugin.t("Thinking..."));
-      cb.onReasoning(thought, "reasoning");
+      cb.onReasoning(state.accumulatedReasoning, "reasoning");
       return;
     }
 
     if (ev.type === "tool_use") {
+      state.hadToolSinceReasoning = true;
       const toolName = String(ev.name || ev.tool || "tool");
       const key = String(ev.tool_call_id || ev.call_id || ev.id || toolName);
       const stepId = `step-${ev.timestamp ?? Date.now()}-${key}`;

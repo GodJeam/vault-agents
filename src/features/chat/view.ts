@@ -198,6 +198,7 @@ export class ChatView extends ItemView {
   startNewSession(silent = false): void {
     this.viewSession = "";
     this.plugin.settings.sessionId = "";
+    this.attachmentManager?.clear();
     void this.plugin.saveSettings();
     void this.populateSessionSelect();
     this.loadHistoryForSession("");
@@ -234,6 +235,7 @@ export class ChatView extends ItemView {
       if (v !== this.viewSession) {
         this.viewSession = v;
         this.plugin.settings.sessionId = v;
+        this.attachmentManager?.clear();
         void this.plugin.saveSettings();
         this.loadHistoryForSession(v);
       }
@@ -1085,6 +1087,7 @@ export class ChatView extends ItemView {
       const filePaths = await this.attachmentManager.prepareAttachments(
         this.getRunner()
       );
+      this.attachmentManager.clear();
       this.dispatching = false;
       this.doRun(prompt, filePaths);
     } catch (e) {
@@ -1283,7 +1286,8 @@ export class ChatView extends ItemView {
       (total, input, output, cost) =>
         this.fmtTokens(total, input, output, cost, this.sessionEngine()),
       (formattedAnswer) => this.handleQuestionAnswer(formattedAnswer),
-      this.assistantIcon()
+      this.assistantIcon(),
+      this.plugin.settings.showThinking
     );
     this.activeBubble?.dispose();
     this.activeBubble = bubble;
@@ -1413,7 +1417,7 @@ export class ChatView extends ItemView {
           this.plugin.t("Copy text"),
           this.assistantIcon()
         );
-        if (rec.reasoning) {
+        if (this.plugin.settings.showThinking && rec.reasoning) {
           const det = row.createEl("details", { cls: "opencode-reasoning" });
           const summary = det.createEl("summary");
           const brainIcon = summary.createSpan({ cls: "opencode-reasoning-icon" });

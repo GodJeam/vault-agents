@@ -204,6 +204,7 @@ const IT: Record<string, string> = {
   "Delete session": "Elimina sessione",
   "Pin/Unpin session": "Fissa/Rimuovi la sessione",
   "Attach file": "Allega file",
+  "Remove attachment": "Rimuovi allegato",
   "Current note": "Nota corrente",
   "Remove the attached context": "Rimuovi il contesto allegato",
   "Session pinned.": "Sessione pinnata.",

@@ -147,7 +147,8 @@ export class AssistantBubble {
       cost?: number
     ) => string,
     private onAnswerQuestion?: (formattedAnswer: string) => void,
-    private assistantIcon = "bot"
+    private assistantIcon = "bot",
+    private showThinking = true
   ) {
     metaWithCopy(
       this.row,
@@ -286,9 +287,23 @@ export class AssistantBubble {
 
   setReasoning(text: string): void {
     this.rawReasoning = text;
+    if (!this.showThinking || !text.trim()) {
+      this.reasoningEl.addClass("hidden");
+      return;
+    }
     this.reasoningEl.removeClass("hidden");
     this.scheduleReasoningRender();
     this.onScrollRequest();
+  }
+
+  setShowThinking(show: boolean): void {
+    this.showThinking = show;
+    if (show && this.rawReasoning.trim()) {
+      this.reasoningEl.removeClass("hidden");
+      this.flushReasoningRender();
+    } else {
+      this.reasoningEl.addClass("hidden");
+    }
   }
 
   private scheduleReasoningRender(): void {

@@ -59,6 +59,11 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
   ],
 };
 
+export interface OpencodeStreamState {
+  textParts: Map<string, string>;
+  reasoningParts: Map<string, string>;
+}
+
 export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   readonly descriptor = OPENCODE_DESCRIPTOR;
   readonly id: EngineType = "opencode";
@@ -510,6 +515,13 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     return args;
   }
 
+  private createStreamState(): OpencodeStreamState {
+    return {
+      textParts: new Map(),
+      reasoningParts: new Map(),
+    };
+  }
+
   runStream(
     reqOrPrompt: RunRequest | string,
     fileAttachmentsOrCb?: string[] | StreamCallbacks,
@@ -523,17 +535,22 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
     const args = this.buildArgs({ ...req, cwd });
     const bin = this.getBin();
+    const state = this.createStreamState();
 
     return this.spawnJsonlStream(
       bin,
       args,
       cwd,
-      (line) => this.handleLine(line, cb),
+      (line) => this.handleLine(line, cb, state),
       cb
     );
   }
 
-  public handleLine(line: string, cb: StreamCallbacks): void {
+  public handleLine(
+    line: string,
+    cb: StreamCallbacks,
+    state: OpencodeStreamState = this.createStreamState()
+  ): void {
     if (line.length > MAX_STREAM_LINE_BYTES) {
       cb.onRaw?.(`[omitted event of ${line.length} bytes]\n`);
       return;
@@ -557,14 +574,24 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
         break;
       case "text":
         if (part?.type === "text" && typeof part.text === "string") {
+          const partId = String(part.id ?? "0");
+          state.textParts.set(partId, part.text);
+          const combined = Array.from(state.textParts.values())
+            .filter((s) => s.length > 0)
+            .join("\n\n");
           cb.onActivity?.(this.plugin.t("Writing response..."));
-          cb.onText(part.text, String(part.id));
+          cb.onText(combined, partId);
         }
         break;
       case "reasoning":
         if (typeof part?.text === "string") {
+          const partId = String(part.id ?? "0");
+          state.reasoningParts.set(partId, part.text);
+          const combined = Array.from(state.reasoningParts.values())
+            .filter((s) => s.length > 0)
+            .join("\n\n");
           cb.onActivity?.(this.plugin.t("Thinking..."));
-          cb.onReasoning(part.text, String(part.id));
+          cb.onReasoning(combined, partId);
         }
         break;
       case "tool_use":
@@ -659,8 +686,13 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       part?.type === "reasoning" &&
       typeof part?.text === "string"
     ) {
+      const partId = String(part.id ?? "0");
+      state.reasoningParts.set(partId, part.text);
+      const combined = Array.from(state.reasoningParts.values())
+        .filter((s) => s.length > 0)
+        .join("\n\n");
       cb.onActivity?.(this.plugin.t("Thinking..."));
-      cb.onReasoning(part.text, String(part.id));
+      cb.onReasoning(combined, partId);
     }
   }
 
