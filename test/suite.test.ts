@@ -36,7 +36,11 @@ import { HermesRunner } from "../src/providers/hermes/runner";
 import { PiRunner } from "../src/providers/pi/runner";
 import { formatToolAction } from "../src/features/chat/stepWidget";
 import { formatQuestionAnswers } from "../src/features/chat/questionCard";
-import { AGENT_ICON_IDS, AGENT_ICON_SVGS } from "../src/shared/agentIcons";
+import {
+  AGENT_ICON_IDS,
+  AGENT_ICON_SVGS,
+  buildAgentSvgMarkup,
+} from "../src/shared/agentIcons";
 import { fuzzyMatchScore } from "../src/shared/suggestModals";
 import { substitute, translate } from "../src/i18n";
 
@@ -1346,7 +1350,7 @@ test("PiRunner.buildArgs separates options from prompt with -- and spawnJsonlStr
   assert.equal(JSON.parse(lines[0]).text, "ok");
 });
 
-test("Official SVG agent icons are defined for all providers without outer <svg>", () => {
+test("Official SVG agent icons are defined for all providers in original brand colors", () => {
   const host = createMockHost();
   const runners = [
     new AntigravityRunner(host),
@@ -1360,8 +1364,22 @@ test("Official SVG agent icons are defined for all providers without outer <svg>
     assert.equal(iconId, AGENT_ICON_IDS[r.id as keyof typeof AGENT_ICON_IDS]);
     const svg = AGENT_ICON_SVGS[iconId];
     assert.equal(svg.includes("<svg"), false);
+    assert.equal(svg.includes("currentColor"), false);
     assert.ok(svg.includes("<path"));
+
+    const fullMarkup = buildAgentSvgMarkup(iconId);
+    assert.ok(fullMarkup && fullMarkup.startsWith("<svg ") && fullMarkup.endsWith("</svg>"));
   }
+
+  assert.equal(buildAgentSvgMarkup("bot"), null);
+
+  const agy1 = buildAgentSvgMarkup(AGENT_ICON_IDS.antigravity) || "";
+  const agy2 = buildAgentSvgMarkup(AGENT_ICON_IDS.antigravity) || "";
+  const id1 = agy1.match(/id="(va-agy-\d+-m)"/)?.[1];
+  const id2 = agy2.match(/id="(va-agy-\d+-m)"/)?.[1];
+  assert.ok(id1 && id2 && id1 !== id2, "Antigravity mask IDs should be unique per render");
+  assert.ok(agy1.includes(`mask="url(#${id1})"`));
+  assert.ok(agy2.includes(`mask="url(#${id2})"`));
 });
 
 test("fuzzyMatchScore ranks exact/prefix matches above fuzzy matches and rejects misses", () => {

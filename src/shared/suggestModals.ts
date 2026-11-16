@@ -4,6 +4,7 @@ import type VaultAgentsPlugin from "../main";
 import type { EngineType } from "../core/types";
 import { substitute } from "../i18n";
 import { redact } from "../core/redact";
+import { renderAgentIcon } from "./agentIcons";
 
 export class FileSuggestModal extends SuggestModal<TFile> {
   private items: TFile[] | null = null;
@@ -101,7 +102,7 @@ export class AgentSuggestModal extends SuggestModal<AgentItem> {
     const leftGroup = topRow.createDiv({ cls: "opencode-agent-suggest-left" });
 
     const iconEl = leftGroup.createSpan({ cls: "opencode-agent-suggest-icon" });
-    setIcon(iconEl, item.icon || "bot");
+    renderAgentIcon(iconEl, item.icon || "bot");
 
     leftGroup.createSpan({
       text: item.shortName,

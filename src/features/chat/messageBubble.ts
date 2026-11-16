@@ -8,6 +8,7 @@ import type {
 import { StepManager } from "./stepWidget";
 import { renderQuestionCard } from "./questionCard";
 import { neutralizeRemoteMarkdown } from "./sanitize";
+import { renderAgentIcon } from "../../shared/agentIcons";
 
 export function metaWithCopy(
   row: HTMLElement,
@@ -19,7 +20,7 @@ export function metaWithCopy(
 ): void {
   const meta = row.createDiv({ cls: "opencode-meta" });
   const iconEl = meta.createSpan({ cls: "opencode-meta-icon" });
-  setIcon(iconEl, iconName);
+  renderAgentIcon(iconEl, iconName);
   meta.createSpan({ text: label, cls: "opencode-meta-label" });
   meta.createSpan({ cls: "opencode-meta-spacer" });
   const btn = meta.createEl("button", {

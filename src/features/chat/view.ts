@@ -21,6 +21,7 @@ import {
   type AgentItem,
 } from "../../shared/modals";
 import { openProviderModelPicker } from "../../shared/modelPicker";
+import { renderAgentIcon } from "../../shared/agentIcons";
 import type { TurnContext, SessionStats } from "./types";
 import {
   AssistantBubble,
@@ -794,7 +795,7 @@ export class ChatView extends ItemView {
     if (this.agentBtn) {
       this.agentBtn.empty();
       const iconEl = this.agentBtn.createSpan({ cls: "opencode-chip-icon" });
-      setIcon(iconEl, provider?.descriptor.icon || "bot");
+      renderAgentIcon(iconEl, provider?.descriptor.icon || "bot");
       this.agentBtn.createSpan({
         text: this.plugin.t(shortName),
         cls: "opencode-chip-text",
