@@ -4,12 +4,12 @@ An **Obsidian** desktop plugin that connects local AI CLI agents (**Antigravity*
 
 ## Features
 
-- **Multi-Agent Architecture**: Switch seamlessly between **Antigravity (`agy`)**, **OpenCode (`opencode`)**, **Hermes (`hermes`)**, and **Pi (`pi`)** via `/agent` or the header agent selector.
+- **Multi-Agent Architecture**: Switch seamlessly between **Antigravity (`agy`)**, **OpenCode (`opencode`)**, **Hermes (`hermes`)**, and **Pi (`pi`)** via `/agent` or the header agent selector, with official brand icons for each provider.
 - **Grouped Model Switcher (`/model`)**: Collapsible provider groups, filter chips, fuzzy search, live CLI **Refresh**, and custom model ID input, backed by universal runtime model and context window discovery (`1M` / `500K` / `256K` / `200K`).
 - **Live Activity & Tool Inspection**: Real-time streaming responses, reasoning blocks, human-readable tool step badges with expandable `INPUT`/`OUTPUT` payloads, and interactive multi-choice question cards.
 - **Vault Integration**: `/` slash commands (`/agent`, `/model`, `/new`, `/stats`, `/prompt`, `/pin`, `/rename`), `@` vault file attachments, `!` quick actions, and reusable prompt templates.
 - **Document Conversion**: Optional automatic conversion of PDF, Word, and Excel attachments to Markdown via [anydoc](https://github.com/firecrawl/anydoc). Hosted OCR is opt-in.
-- **Session & Context Management**: Multiple independent chat panes, context usage bar, token/cost statistics (`5h`, `week`, `month`), and automatic session continuation via summarization when context saturates.
+- **Session & Context Management**: Multiple independent chat panes, persistent local session titles, context usage bar, token/cost statistics (`5h`, `week`, `month`), and automatic session continuation via summarization when context exceeds 92% (configurable in Settings).
 - **Secure Defaults**: Auto-approve is off, hosted OCR is off, remote images in agent replies are neutralized, and chat history retention is bounded and configurable.
 
 ## Requirements
@@ -85,7 +85,7 @@ Vault Agents runs locally inside Obsidian and does not include telemetry, analyt
 
 ### Local agent databases
 
-- Session listing, rename, and delete operations read or update the local SQLite databases managed by OpenCode and Antigravity.
+- Session listing, rename, and delete operations read or update the local SQLite databases managed by OpenCode, Antigravity, and Hermes (read-only session/token lookup on `state.db`, CLI rename/delete).
 - Database cleanup is **manual** (Settings → Database self-cleanup). Before deleting oversized file parts from `opencode.db`, the plugin creates an `opencode.db.bak` backup.
 
 ### Permissions and remote content

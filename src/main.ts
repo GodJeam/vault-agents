@@ -31,7 +31,7 @@ export type {
 } from "./core/types";
 
 export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
-  settings!: PluginSettings;
+  declare settings: PluginSettings;
   histories: HistoryMap = {};
   registry!: ProviderRegistry;
   private saveTimer: number | null = null;
