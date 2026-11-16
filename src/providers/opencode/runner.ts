@@ -19,6 +19,7 @@ import type {
 import { DEFAULT_ENGINE_CONFIGS } from "../../core/types";
 import { substitute } from "../../i18n";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES, parseSqliteChanges } from "../base";
+import { AGENT_ICON_IDS } from "../../shared/agentIcons";
 import type {
   OpencodeEvent,
   OpencodeModelInfo,
@@ -32,7 +33,7 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
   id: "opencode",
   displayName: "OpenCode CLI",
   shortName: "Opencode",
-  icon: "terminal-square",
+  icon: AGENT_ICON_IDS.opencode,
   defaultBinary: "opencode",
   defaultModel: "opencode-go/deepseek-v4.1-flash",
   binaryDesc:
@@ -59,6 +60,11 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
   ],
 };
 
+export interface OpencodeStreamState {
+  textParts: Map<string, string>;
+  reasoningParts: Map<string, string>;
+}
+
 export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   readonly descriptor = OPENCODE_DESCRIPTOR;
   readonly id: EngineType = "opencode";
@@ -69,6 +75,9 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   private contextLimitCache = new Map<string, number>();
   private contextLimitFailedAt = new Map<string, number>();
   private cachedModels: string[] | null = null;
+  private cachedModelsBin = "";
+  private cachedDbPath: string | null | undefined = undefined;
+  private cachedDbBin = "";
 
   constructor(plugin: RunnerHost) {
     super(plugin);
@@ -87,15 +96,22 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   async listModels(forceRefresh = false): Promise<string[]> {
-    if (!forceRefresh && this.cachedModels && this.cachedModels.length > 0) {
+    const bin = this.getBin();
+    if (
+      !forceRefresh &&
+      this.cachedModels &&
+      this.cachedModels.length > 0 &&
+      this.cachedModelsBin === bin
+    ) {
       return this.cachedModels;
     }
-    const out = await this.execCli(this.getBin(), ["models"]);
+    const out = await this.execCli(bin, ["models"]);
     this.cachedModels = out
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => /^[a-zA-Z0-9_.:/+-]+$/.test(l))
       .sort();
+    this.cachedModelsBin = bin;
     return this.cachedModels;
   }
 
@@ -109,37 +125,72 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     if (dbPath) {
       for (const table of ["session_v2", "session"]) {
         try {
-          const query = [
-            "SELECT id,",
-            "replace(replace(COALESCE(title, ''), char(10), ' '), '|', ' '),",
+          const jsonQuery = [
+            "SELECT id, COALESCE(title, '') AS title,",
             "time_updated, time_created, project_id, directory",
             `FROM ${table} ORDER BY time_updated DESC LIMIT 60`,
           ].join(" ");
-          const out = await this.execSqlite(dbPath, query);
-          for (const line of out.trim().split(/\r?\n/)) {
-            if (!line.trim()) continue;
-            const parts = line.split("|");
-            const id = parts[0]?.trim();
+          const out = await this.execCli("sqlite3", ["-json", dbPath, jsonQuery]);
+          const rows = JSON.parse(out.trim() || "[]") as Array<{
+            id?: string;
+            title?: string;
+            time_updated?: number;
+            time_created?: number;
+            project_id?: string;
+            directory?: string;
+          }>;
+          for (const row of rows) {
+            const id = row.id?.trim();
             if (!id || seenIds.has(id)) continue;
-            const rawTitle = parts[1]?.trim() || "";
-            const updated = parseInt(parts[2]?.trim() || "", 10);
-            const created = parseInt(parts[3]?.trim() || "", 10);
-            const projectId = parts[4]?.trim() || undefined;
-            const directory = parts[5]?.trim() || undefined;
+            const rawTitle = row.title?.trim() || "";
+            const updated = Number(row.time_updated);
+            const created = Number(row.time_created);
             sessions.push({
               id,
               title: rawTitle || this.fallbackSessionTitle(id),
-              updated: !isNaN(updated) && updated > 0 ? updated : Date.now(),
-              created: !isNaN(created) && created > 0 ? created : undefined,
-              projectId,
-              directory,
+              updated: Number.isFinite(updated) && updated > 0 ? updated : Date.now(),
+              created: Number.isFinite(created) && created > 0 ? created : undefined,
+              projectId: row.project_id?.trim() || undefined,
+              directory: row.directory?.trim() || undefined,
               engine: "opencode",
             });
             seenIds.add(id);
           }
           if (sessions.length > 0) break;
         } catch {
-          // Try next table or fallback
+          try {
+            const query = [
+              "SELECT id,",
+              "replace(replace(COALESCE(title, ''), char(10), ' '), '|', ' '),",
+              "time_updated, time_created, project_id, directory",
+              `FROM ${table} ORDER BY time_updated DESC LIMIT 60`,
+            ].join(" ");
+            const out = await this.execSqlite(dbPath, query);
+            for (const line of out.trim().split(/\r?\n/)) {
+              if (!line.trim()) continue;
+              const parts = line.split("|");
+              const id = parts[0]?.trim();
+              if (!id || seenIds.has(id)) continue;
+              const rawTitle = parts[1]?.trim() || "";
+              const updated = parseInt(parts[2]?.trim() || "", 10);
+              const created = parseInt(parts[3]?.trim() || "", 10);
+              const projectId = parts[4]?.trim() || undefined;
+              const directory = parts[5]?.trim() || undefined;
+              sessions.push({
+                id,
+                title: rawTitle || this.fallbackSessionTitle(id),
+                updated: !isNaN(updated) && updated > 0 ? updated : Date.now(),
+                created: !isNaN(created) && created > 0 ? created : undefined,
+                projectId,
+                directory,
+                engine: "opencode",
+              });
+              seenIds.add(id);
+            }
+            if (sessions.length > 0) break;
+          } catch {
+            // Try next table or fallback
+          }
         }
       }
     }
@@ -208,14 +259,20 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     await this.execCli(this.getBin(), [
       "api",
       "PATCH",
-      `/api/session/${sessionId}`,
+      `/api/session/${encodeURIComponent(sessionId)}`,
       "-d",
       JSON.stringify({ title }),
     ]);
   }
 
   async deleteSession(sessionId: string): Promise<void> {
-    await this.execCli(this.getBin(), ["session", "delete", sessionId]);
+    try {
+      await this.execCli(this.getBin(), ["session", "delete", sessionId]);
+    } catch (e) {
+      const msg = (e as Error)?.message ?? "";
+      if (/not found|no such session|ENOENT/i.test(msg)) return;
+      throw e;
+    }
   }
 
   async getModelContextLimit(model: string): Promise<number> {
@@ -284,7 +341,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     if (dbPath) {
       for (const table of ["session_message", "message"]) {
         try {
-          const safeId = sessionId.replace(/'/g, "''");
+          const safeId = this.sqlEscape(sessionId);
           const whereClause =
             table === "session_message"
               ? `session_id = '${safeId}' AND type = 'assistant'`
@@ -369,7 +426,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       const out = await this.execCli(this.getBin(), [
         "api",
         "GET",
-        `/api/session/${sessionId}/message`,
+        `/api/session/${encodeURIComponent(sessionId)}/message`,
       ]);
       const parsed = JSON.parse(out) as { data?: OpencodeMessageInfo[] };
       const messages = Array.isArray(parsed.data) ? parsed.data : [];
@@ -421,15 +478,25 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   }
 
   private async getDbPath(): Promise<string | null> {
+    const bin = this.getBin();
+    if (this.cachedDbPath !== undefined && this.cachedDbBin === bin) {
+      return this.cachedDbPath;
+    }
     try {
-      const out = await this.execCli(this.getBin(), ["debug", "paths"]);
+      const out = await this.execCli(bin, ["debug", "paths"]);
       for (const line of out.split(/\r?\n/)) {
         const m = line.match(/^\s*db\s+(.+\.db)\s*$/);
-        if (m) return m[1].trim();
+        if (m) {
+          this.cachedDbPath = m[1].trim();
+          this.cachedDbBin = bin;
+          return this.cachedDbPath;
+        }
       }
     } catch {
       // ignore
     }
+    this.cachedDbPath = null;
+    this.cachedDbBin = bin;
     return null;
   }
 
@@ -510,6 +577,13 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     return args;
   }
 
+  private createStreamState(): OpencodeStreamState {
+    return {
+      textParts: new Map(),
+      reasoningParts: new Map(),
+    };
+  }
+
   runStream(
     reqOrPrompt: RunRequest | string,
     fileAttachmentsOrCb?: string[] | StreamCallbacks,
@@ -523,17 +597,22 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     const cwd = req.cwd ?? this.getVaultPath() ?? undefined;
     const args = this.buildArgs({ ...req, cwd });
     const bin = this.getBin();
+    const state = this.createStreamState();
 
     return this.spawnJsonlStream(
       bin,
       args,
       cwd,
-      (line) => this.handleLine(line, cb),
+      (line) => this.handleLine(line, cb, state),
       cb
     );
   }
 
-  public handleLine(line: string, cb: StreamCallbacks): void {
+  public handleLine(
+    line: string,
+    cb: StreamCallbacks,
+    state: OpencodeStreamState = this.createStreamState()
+  ): void {
     if (line.length > MAX_STREAM_LINE_BYTES) {
       cb.onRaw?.(`[omitted event of ${line.length} bytes]\n`);
       return;
@@ -557,14 +636,24 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
         break;
       case "text":
         if (part?.type === "text" && typeof part.text === "string") {
+          const partId = String(part.id ?? "0");
+          state.textParts.set(partId, part.text);
+          const combined = Array.from(state.textParts.values())
+            .filter((s) => s.length > 0)
+            .join("\n\n");
           cb.onActivity?.(this.plugin.t("Writing response..."));
-          cb.onText(part.text, String(part.id));
+          cb.onText(combined, partId);
         }
         break;
       case "reasoning":
         if (typeof part?.text === "string") {
+          const partId = String(part.id ?? "0");
+          state.reasoningParts.set(partId, part.text);
+          const combined = Array.from(state.reasoningParts.values())
+            .filter((s) => s.length > 0)
+            .join("\n\n");
           cb.onActivity?.(this.plugin.t("Thinking..."));
-          cb.onReasoning(part.text, String(part.id));
+          cb.onReasoning(combined, partId);
         }
         break;
       case "tool_use":
@@ -659,8 +748,13 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       part?.type === "reasoning" &&
       typeof part?.text === "string"
     ) {
+      const partId = String(part.id ?? "0");
+      state.reasoningParts.set(partId, part.text);
+      const combined = Array.from(state.reasoningParts.values())
+        .filter((s) => s.length > 0)
+        .join("\n\n");
       cb.onActivity?.(this.plugin.t("Thinking..."));
-      cb.onReasoning(part.text, String(part.id));
+      cb.onReasoning(combined, partId);
     }
   }
 

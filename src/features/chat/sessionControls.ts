@@ -13,6 +13,8 @@ export async function fetchDisplayedSessions(
   const all: SessionInfo[] = [];
   const seen = new Set<string>();
 
+  const titleOverrides = plugin.settings.sessionTitles ?? {};
+
   results.forEach((res, i) => {
     if (res.status === "fulfilled") {
       const providerId = providers[i].id;
@@ -20,7 +22,8 @@ export async function fetchDisplayedSessions(
         if (!seen.has(s.id)) {
           seen.add(s.id);
           const engine = s.engine || providerId;
-          all.push({ ...s, engine });
+          const title = titleOverrides[s.id] || s.title;
+          all.push({ ...s, title, engine });
           if (!plugin.settings.sessionEngines) {
             plugin.settings.sessionEngines = {};
           }
@@ -49,9 +52,11 @@ export async function fetchDisplayedSessions(
       const firstUser = hist.find(
         (m) => m.role === "user" && m.text.trim()
       );
-      const fallbackTitle = firstUser
-        ? firstUser.text.trim().replace(/\s+/g, " ").slice(0, 40)
-        : viewSession;
+      const fallbackTitle =
+        titleOverrides[viewSession] ||
+        (firstUser
+          ? firstUser.text.trim().replace(/\s+/g, " ").slice(0, 40)
+          : viewSession);
       displayed.push({
         id: viewSession,
         title: fallbackTitle,

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -22,9 +22,11 @@ import { redact } from "../src/core/redact";
 import { pruneHistoryMap } from "../src/core/history";
 import { neutralizeRemoteMarkdown } from "../src/features/chat/sanitize";
 import {
+  MAX_STREAM_LINE_BYTES,
   buildAnydocArgs,
   chooseAttachmentMode,
   ensurePrivateTempDir,
+  parseCmdNodeScript,
   parseSqliteChanges,
   restrictFilePermissions,
 } from "../src/providers/base";
@@ -34,6 +36,12 @@ import { HermesRunner } from "../src/providers/hermes/runner";
 import { PiRunner } from "../src/providers/pi/runner";
 import { formatToolAction } from "../src/features/chat/stepWidget";
 import { formatQuestionAnswers } from "../src/features/chat/questionCard";
+import {
+  AGENT_ICON_IDS,
+  AGENT_ICON_SVGS,
+  buildAgentSvgMarkup,
+} from "../src/shared/agentIcons";
+import { fuzzyMatchScore } from "../src/shared/suggestModals";
 import { substitute, translate } from "../src/i18n";
 
 function createMockHost(
@@ -596,7 +604,7 @@ test("AntigravityRunner.getUsageStats filters time windows", async () => {
   const twentyDaysAgo = now - 20 * 24 * 3600 * 1000;
 
   const histories: HistoryMap = {
-    "uuid-agy-1": [
+    "0da89d6e-47ea-4d39-aa41-2bd0aa103371": [
       {
         role: "assistant",
         text: "a",
@@ -644,7 +652,7 @@ test("OpencodeRunner.buildArgs resolves relative fileAttachments", () => {
   });
   const firstFileIdx = args.indexOf("--file");
   assert.ok(firstFileIdx >= 0);
-  assert.equal(args[firstFileIdx + 1], "/mock/vault/Docs/Lecture 1.pdf");
+  assert.equal(args[firstFileIdx + 1], join("/mock/vault", "Docs/Lecture 1.pdf"));
   const secondFileIdx = args.indexOf("--file", firstFileIdx + 1);
   assert.ok(secondFileIdx >= 0);
   assert.equal(args[secondFileIdx + 1], "/tmp/already-abs.md");
@@ -1146,4 +1154,247 @@ test("spawnJsonlStream decodes multi-byte UTF-8 split across chunks and calls on
   assert.equal(lines.length, 1);
   assert.equal(JSON.parse(lines[0]).text, "🚀 Ciao");
 });
+
+test("Runners accumulate multi-part text and reasoning without overwriting", () => {
+  const host = createMockHost();
+  const oc = new OpencodeRunner(host);
+  const ocState = { textParts: new Map<string, string>(), reasoningParts: new Map<string, string>() };
+  const ocCol = createCollector();
+
+  oc.handleLine(
+    JSON.stringify({ type: "reasoning", sessionID: "ses_1", part: { id: "r1", type: "reasoning", text: "Step 1 thought" } }),
+    ocCol.cb,
+    ocState
+  );
+  oc.handleLine(
+    JSON.stringify({ type: "text", sessionID: "ses_1", part: { id: "p1", type: "text", text: "Checking file..." } }),
+    ocCol.cb,
+    ocState
+  );
+  oc.handleLine(
+    JSON.stringify({ type: "reasoning", sessionID: "ses_1", part: { id: "r2", type: "reasoning", text: "Step 2 thought" } }),
+    ocCol.cb,
+    ocState
+  );
+  oc.handleLine(
+    JSON.stringify({ type: "text", sessionID: "ses_1", part: { id: "p2", type: "text", text: "All done." } }),
+    ocCol.cb,
+    ocState
+  );
+
+  assert.equal(ocCol.texts.at(-1)?.text, "Checking file...\n\nAll done.");
+  assert.equal(ocCol.reasonings.at(-1)?.text, "Step 1 thought\n\nStep 2 thought");
+
+  const agy = new AntigravityRunner(host);
+  const agyState = { accumulatedText: "", reasoningParts: new Map<string, string>() };
+  const agyCol = createCollector();
+  agy.handleLine(
+    JSON.stringify({ event: "step_update", step_update: { step_index: 1, thought: "First" } }),
+    agyCol.cb,
+    agyState
+  );
+  agy.handleLine(
+    JSON.stringify({ event: "step_update", step_update: { step_index: 3, thought: "Second" } }),
+    agyCol.cb,
+    agyState
+  );
+  assert.equal(agyCol.reasonings.at(-1)?.text, "First\n\nSecond");
+
+  const hermes = new HermesRunner(host);
+  const hermesState = {
+    accumulatedText: "",
+    accumulatedReasoning: "",
+    hadToolSinceReasoning: false,
+    activeToolSteps: new Map(),
+  };
+  const hCol = createCollector();
+  hermes.handleLine(JSON.stringify({ type: "reasoning", text: "Part A" }), hCol.cb, hermesState);
+  hermes.handleLine(JSON.stringify({ type: "tool_use", call_id: "c1", name: "read", input: { path: "a.md" } }), hCol.cb, hermesState);
+  hermes.handleLine(JSON.stringify({ type: "reasoning", text: "Part B" }), hCol.cb, hermesState);
+  assert.equal(hCol.reasonings.at(-1)?.text, "Part A\n\nPart B");
+});
+
+test("neutralizeRemoteMarkdown preserves code blocks and blocks unquoted/SVG/paren media", () => {
+  const md = [
+    "```markdown",
+    "![example](https://evil.example/inside-code.png)",
+    "[ref]: https://evil.example/code-ref.png",
+    "```",
+    "Inline code `![inline](https://evil.example/inline.png)` stays intact.",
+    "Balanced parens ![wiki](https://evil.example/Image_(2026).png)",
+    "<object data=https://evil.example/obj.swf></object>",
+    "<svg><image href=\"https://evil.example/svg.png\"/></svg>",
+    "<video src=https://evil.example/v.mp4></video>",
+    "[multiline]:\n  https://evil.example/multi-line-ref.png",
+  ].join("\n");
+
+  const out = neutralizeRemoteMarkdown(md);
+  assert.ok(out.includes("![example](https://evil.example/inside-code.png)"));
+  assert.ok(out.includes("[ref]: https://evil.example/code-ref.png"));
+  assert.ok(out.includes("`![inline](https://evil.example/inline.png)`"));
+  assert.equal(out.includes("Image_(2026).png"), false);
+  assert.equal(out.includes("obj.swf"), false);
+  assert.equal(out.includes("svg.png"), false);
+  assert.equal(out.includes("v.mp4"), false);
+  assert.equal(out.includes("multi-line-ref.png"), false);
+});
+
+test("redact masks JSON credentials and additional provider prefixes", () => {
+  assert.equal(
+    redact('{"apiKey": "my-secret-value-123"}'),
+    '{"apiKey": "[REDACTED]"}'
+  );
+  assert.equal(
+    redact("failed with xai-1234567890abcdef and gsk_1234567890abcdef and hf_1234567890abcdef"),
+    "failed with xai-[REDACTED] and gsk_[REDACTED] and hf_[REDACTED]"
+  );
+});
+
+test("ensurePrivateTempDir rejects symlinks and parseCmdNodeScript handles %dp0% and %~dp0", async (t) => {
+  assert.equal(
+    parseCmdNodeScript('"%_prog%" "%dp0%\\node_modules\\pkg\\cli.js" %*', "C:\\npm"),
+    join("C:\\npm", "node_modules", "pkg", "cli.js")
+  );
+  assert.equal(
+    parseCmdNodeScript('node "%~dp0\\bin\\tool.mjs" %*', "C:\\npm"),
+    join("C:\\npm", "bin", "tool.mjs")
+  );
+
+  if (process.platform === "win32") {
+    t.skip("POSIX symlink check");
+    return;
+  }
+  const root = await mkdtemp(join(tmpdir(), "vault-agents-sym-"));
+  try {
+    const target = join(root, "real");
+    const link = join(root, "link");
+    await mkdir(target);
+    await symlink(target, link);
+    await assert.rejects(() => ensurePrivateTempDir(link), /Unsafe temp directory|File exists/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("AntigravityRunner does not claim Hermes/Pi IDs and stats skip undated messages in 5h/week", async () => {
+  const histories: HistoryMap = {
+    "hermes-sess-001": [
+      { role: "assistant", text: "h", tokens: { input: 500, output: 50 }, timestamp: Date.now() },
+    ],
+    "pi-sess-001": [
+      { role: "assistant", text: "p", tokens: { input: 600, output: 60 }, timestamp: Date.now() },
+    ],
+    "0da89d6e-47ea-4d39-aa41-2bd0aa103371": [
+      { role: "assistant", text: "undated", tokens: { input: 100, output: 10 } },
+      { role: "assistant", text: "recent", tokens: { input: 25, output: 5 }, timestamp: Date.now() },
+    ],
+  };
+  const host = createMockHost({ sessionEngines: {} }, histories);
+  const agy = new AntigravityRunner(host);
+  const agySessions = await agy.listSessions();
+  const ids = agySessions.map((s) => s.id);
+  assert.equal(ids.includes("hermes-sess-001"), false);
+  assert.equal(ids.includes("pi-sess-001"), false);
+  assert.equal(ids.includes("0da89d6e-47ea-4d39-aa41-2bd0aa103371"), true);
+
+  const stats = await agy.getUsageStats();
+  assert.equal(stats.h5.input, 25);
+  assert.equal(stats.week.input, 25);
+  assert.equal(stats.month.input, 125);
+});
+
+test("PiRunner.buildArgs separates options from prompt with -- and spawnJsonlStream recovers after oversized line", async () => {
+  const host = createMockHost();
+  const pi = new PiRunner(host);
+  const args = pi.buildArgs({ prompt: "- leading dash", fileAttachments: ["a.md"] });
+  const sepIdx = args.indexOf("--");
+  assert.ok(sepIdx >= 0);
+  assert.equal(args[sepIdx + 1], `@${join("/mock/vault", "a.md")}`);
+  assert.equal(args[sepIdx + 2], "- leading dash");
+
+  const runner = new HermesRunner(host) as unknown as {
+    spawnJsonlStream: (
+      bin: string,
+      args: string[],
+      cwd: string | undefined,
+      onLine: (line: string) => void,
+      cb: StreamCallbacks
+    ) => { abort: () => void };
+  };
+  const lines: string[] = [];
+  const col = createCollector();
+  const script = [
+    `const big = "x".repeat(${MAX_STREAM_LINE_BYTES + 100});`,
+    "process.stdout.write(big + '\\n' + JSON.stringify({ text: 'ok' }) + '\\n');",
+  ].join(" ");
+
+  await new Promise<void>((resolve) => {
+    runner.spawnJsonlStream(
+      process.execPath,
+      ["-e", script],
+      undefined,
+      (line) => lines.push(line),
+      {
+        ...col.cb,
+        onDone: (code) => {
+          col.dones.push(code);
+          resolve();
+        },
+      }
+    );
+  });
+
+  assert.equal(col.errors.length, 1);
+  assert.match(col.errors[0], /exceeded maximum buffer size/);
+  assert.equal(lines.length, 1);
+  assert.equal(JSON.parse(lines[0]).text, "ok");
+});
+
+test("Official SVG agent icons are defined for all providers in original brand colors", () => {
+  const host = createMockHost();
+  const runners = [
+    new AntigravityRunner(host),
+    new OpencodeRunner(host),
+    new HermesRunner(host),
+    new PiRunner(host),
+  ];
+  for (const r of runners) {
+    const iconId = r.descriptor.icon;
+    assert.ok(iconId && iconId in AGENT_ICON_SVGS, `missing icon SVG for ${r.id}`);
+    assert.equal(iconId, AGENT_ICON_IDS[r.id as keyof typeof AGENT_ICON_IDS]);
+    const svg = AGENT_ICON_SVGS[iconId];
+    assert.equal(svg.includes("<svg"), false);
+    assert.equal(svg.includes("currentColor"), false);
+    assert.ok(svg.includes("<path"));
+
+    const fullMarkup = buildAgentSvgMarkup(iconId);
+    assert.ok(fullMarkup && fullMarkup.startsWith("<svg ") && fullMarkup.endsWith("</svg>"));
+  }
+
+  assert.equal(buildAgentSvgMarkup("bot"), null);
+
+  const agy1 = buildAgentSvgMarkup(AGENT_ICON_IDS.antigravity) || "";
+  const agy2 = buildAgentSvgMarkup(AGENT_ICON_IDS.antigravity) || "";
+  const id1 = agy1.match(/id="(va-agy-\d+-m)"/)?.[1];
+  const id2 = agy2.match(/id="(va-agy-\d+-m)"/)?.[1];
+  assert.ok(id1 && id2 && id1 !== id2, "Antigravity mask IDs should be unique per render");
+  assert.ok(agy1.includes(`mask="url(#${id1})"`));
+  assert.ok(agy2.includes(`mask="url(#${id2})"`));
+});
+
+test("fuzzyMatchScore ranks exact/prefix matches above fuzzy matches and rejects misses", () => {
+  const exact = fuzzyMatchScore("sonnet", "anthropic/claude-sonnet-4");
+  const fuzzy = fuzzyMatchScore("cs4", "anthropic/claude-sonnet-4");
+  assert.ok(exact > fuzzy);
+  assert.ok(fuzzy > 0);
+  assert.equal(fuzzyMatchScore("gemini gpt", "anthropic/claude-sonnet-4"), -1);
+
+  const migrated = migrateSettings({
+    sessionTitles: { ses_1: "Architecture review", bad: 42 },
+    autoContinueOnLimit: false,
+  } as unknown as Record<string, unknown>);
+  assert.deepEqual(migrated.settings.sessionTitles, { ses_1: "Architecture review" });
+  assert.equal(migrated.settings.autoContinueOnLimit, false);
+});
+
 

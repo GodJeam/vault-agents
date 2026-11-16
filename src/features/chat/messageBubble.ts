@@ -1,8 +1,14 @@
 import { App, Component, MarkdownRenderer, setIcon } from "obsidian";
-import type { AgentQuestion, FinishInfo, StepInfo } from "../../core/types";
+import type {
+  AgentQuestion,
+  FinishInfo,
+  HistoryAssistant,
+  StepInfo,
+} from "../../core/types";
 import { StepManager } from "./stepWidget";
 import { renderQuestionCard } from "./questionCard";
 import { neutralizeRemoteMarkdown } from "./sanitize";
+import { renderAgentIcon } from "../../shared/agentIcons";
 
 export function metaWithCopy(
   row: HTMLElement,
@@ -14,12 +20,12 @@ export function metaWithCopy(
 ): void {
   const meta = row.createDiv({ cls: "opencode-meta" });
   const iconEl = meta.createSpan({ cls: "opencode-meta-icon" });
-  setIcon(iconEl, iconName);
+  renderAgentIcon(iconEl, iconName);
   meta.createSpan({ text: label, cls: "opencode-meta-label" });
   meta.createSpan({ cls: "opencode-meta-spacer" });
   const btn = meta.createEl("button", {
     cls: "opencode-icon-btn",
-    attr: { title: copyTitle },
+    attr: { type: "button", title: copyTitle, "aria-label": copyTitle },
   });
   setIcon(btn, "copy");
   btn.addEventListener("click", () => onCopy(getText()));
@@ -147,7 +153,8 @@ export class AssistantBubble {
       cost?: number
     ) => string,
     private onAnswerQuestion?: (formattedAnswer: string) => void,
-    private assistantIcon = "bot"
+    private assistantIcon = "bot",
+    private showThinking = true
   ) {
     metaWithCopy(
       this.row,
@@ -286,9 +293,23 @@ export class AssistantBubble {
 
   setReasoning(text: string): void {
     this.rawReasoning = text;
+    if (!this.showThinking || !text.trim()) {
+      this.reasoningEl.addClass("hidden");
+      return;
+    }
     this.reasoningEl.removeClass("hidden");
     this.scheduleReasoningRender();
     this.onScrollRequest();
+  }
+
+  setShowThinking(show: boolean): void {
+    this.showThinking = show;
+    if (show && this.rawReasoning.trim()) {
+      this.reasoningEl.removeClass("hidden");
+      this.flushReasoningRender();
+    } else {
+      this.reasoningEl.addClass("hidden");
+    }
   }
 
   private scheduleReasoningRender(): void {
@@ -408,5 +429,68 @@ export class AssistantBubble {
       clearTimeout(this.reasoningTimer);
       this.reasoningTimer = null;
     }
+  }
+}
+
+export function renderHistoryAssistantRow(
+  container: HTMLElement,
+  app: App,
+  component: Component,
+  rec: HistoryAssistant,
+  assistantLabel: string,
+  assistantIcon: string,
+  showThinking: boolean,
+  t: (s: string) => string,
+  onCopy: (text: string) => void,
+  fmtStats?: (
+    total: number,
+    input: number,
+    output: number,
+    cost?: number
+  ) => string
+): void {
+  const row = container.createDiv({
+    cls: "opencode-message opencode-message--assistant",
+  });
+  metaWithCopy(
+    row,
+    assistantLabel,
+    () => rec.text,
+    onCopy,
+    t("Copy text"),
+    assistantIcon
+  );
+  if (showThinking && rec.reasoning) {
+    const det = row.createEl("details", { cls: "opencode-reasoning" });
+    const summary = det.createEl("summary");
+    const brainIcon = summary.createSpan({ cls: "opencode-reasoning-icon" });
+    setIcon(brainIcon, "brain");
+    summary.createSpan({ text: t("Reasoning") });
+    det.createDiv({
+      cls: "opencode-reasoning-content",
+      text: rec.reasoning,
+    });
+  }
+  const bubble = row.createDiv({
+    cls: "opencode-bubble opencode-bubble--assistant",
+  });
+  if (rec.text.length <= 30000) {
+    MarkdownRenderer.render(
+      app,
+      neutralizeRemoteMarkdown(rec.text),
+      bubble,
+      app.workspace.getActiveFile()?.path ?? "",
+      component
+    );
+  } else {
+    bubble.textContent = rec.text;
+  }
+  if (rec.tokens && fmtStats) {
+    const inp = rec.tokens.input ?? 0;
+    const out = rec.tokens.output ?? 0;
+    const reas = rec.tokens.reasoning ?? 0;
+    const tot = inp + out + reas;
+    const stats = row.createDiv({ cls: "opencode-msg-stats" });
+    stats.setText(fmtStats(tot, inp, out, rec.cost));
   }
 }

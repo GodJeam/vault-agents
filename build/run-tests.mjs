@@ -28,6 +28,7 @@ try {
             contents: `
               module.exports = {
                 Notice: class Notice {},
+                addIcon: () => {},
                 setIcon: () => {},
                 App: class App {},
                 Component: class Component {},

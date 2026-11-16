@@ -10,6 +10,8 @@ import { ProviderRegistry } from "./core/registry";
 import type { AgentProvider, RunnerHost } from "./core/provider";
 import { pruneHistoryMap } from "./core/history";
 import {
+  MAX_HISTORY_MESSAGES,
+  MAX_HISTORY_TEXT,
   getEngineConfig,
   migrateSettings,
   type EngineConfig,
@@ -18,6 +20,7 @@ import {
   type PluginSettings,
 } from "./core/types";
 import { VaultAgentsSettingTab } from "./features/settings/settingsTab";
+import { registerAgentIcons } from "./shared/agentIcons";
 import { translate } from "./i18n";
 
 export type {
@@ -28,11 +31,9 @@ export type {
 } from "./core/types";
 
 export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
-  settings!: PluginSettings;
+  declare settings: PluginSettings;
   histories: HistoryMap = {};
   registry!: ProviderRegistry;
-  opencodeRunner!: OpencodeRunner;
-  antigravityRunner!: AntigravityRunner;
   private saveTimer: number | null = null;
 
   getRunnerForSession(sessionId?: string): AgentProvider {
@@ -56,16 +57,15 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
   }
 
   async onload(): Promise<void> {
+    registerAgentIcons();
     const raw = (await this.loadData()) as Record<string, unknown> | null;
     const migrated = migrateSettings(raw);
     this.settings = migrated.settings;
     this.histories = migrated.histories;
 
-    this.opencodeRunner = new OpencodeRunner(this);
-    this.antigravityRunner = new AntigravityRunner(this);
     this.registry = new ProviderRegistry();
-    this.registry.register(this.opencodeRunner);
-    this.registry.register(this.antigravityRunner);
+    this.registry.register(new OpencodeRunner(this));
+    this.registry.register(new AntigravityRunner(this));
     this.registry.register(new HermesRunner(this));
     this.registry.register(new PiRunner(this));
 
@@ -160,8 +160,7 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
       id: "reset-session",
       name: t("Reset the active session"),
       callback: async () => {
-        this.settings.sessionId = "";
-        await this.saveSettings();
+        await this.resetActiveSession();
         new Notice(t("Session reset."));
       },
     });
@@ -200,7 +199,7 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     await workspace.revealLeaf(leaf);
     const view = leaf.view as ChatView;
     if (resetSession && hadExistingChat) {
-      view.startNewSession(true);
+      this.scheduleSaveSettings();
     }
     return view;
   }
@@ -242,8 +241,11 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
       keepIds: this.collectKeepIds(),
     });
     const removed = before.filter((id) => !(id in pruned));
-    if (removed.length > 0 && this.settings.sessionEngines) {
-      for (const id of removed) delete this.settings.sessionEngines[id];
+    if (removed.length > 0) {
+      for (const id of removed) {
+        if (this.settings.sessionEngines) delete this.settings.sessionEngines[id];
+        if (this.settings.sessionTitles) delete this.settings.sessionTitles[id];
+      }
     }
     this.histories = pruned;
   }
@@ -279,7 +281,9 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
   async appendHistory(sessionId: string, msg: HistoryMessage): Promise<void> {
     if (!sessionId) return;
     const cap = (s: string | undefined): string | undefined =>
-      s && s.length > 50000 ? s.slice(0, 50000) + "…" : s;
+      s && s.length > MAX_HISTORY_TEXT
+        ? s.slice(0, MAX_HISTORY_TEXT) + "…"
+        : s;
     const cloned: HistoryMessage =
       msg.role === "assistant"
         ? {
@@ -296,7 +300,9 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     if (!this.histories[sessionId]) this.histories[sessionId] = [];
     const arr = this.histories[sessionId];
     arr.push(cloned);
-    if (arr.length > 100) arr.splice(0, arr.length - 100);
+    if (arr.length > MAX_HISTORY_MESSAGES) {
+      arr.splice(0, arr.length - MAX_HISTORY_MESSAGES);
+    }
     this.scheduleSave();
   }
 
@@ -305,12 +311,31 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     this.scheduleSave();
   }
 
-  async saveSettings(): Promise<void> {
-    await this.flushSave();
+  async resetActiveSession(): Promise<void> {
+    this.settings.sessionId = "";
+    for (const leaf of this.app.workspace.getLeavesOfType(CHAT_VIEW_TYPE)) {
+      if (leaf.view instanceof ChatView) {
+        leaf.view.startNewSession(true, false);
+      }
+    }
+    await this.saveSettings();
+  }
+
+  private refreshOpenViews(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(CHAT_VIEW_TYPE)) {
       if (leaf.view instanceof ChatView) {
         leaf.view.refreshSettings();
       }
     }
+  }
+
+  scheduleSaveSettings(): void {
+    this.scheduleSave();
+    this.refreshOpenViews();
+  }
+
+  async saveSettings(): Promise<void> {
+    await this.flushSave();
+    this.refreshOpenViews();
   }
 }

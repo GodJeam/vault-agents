@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "fs";
+import { readFile } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
 import type {
@@ -16,13 +17,14 @@ import type {
 } from "../../core/types";
 import { substitute } from "../../i18n";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
+import { AGENT_ICON_IDS } from "../../shared/agentIcons";
 import type { HermesStreamEvent } from "./types";
 
 export const HERMES_DESCRIPTOR: ProviderDescriptor = {
   id: "hermes",
   displayName: "Hermes Agent CLI (Nous Research)",
   shortName: "Hermes",
-  icon: "zap",
+  icon: AGENT_ICON_IDS.hermes,
   defaultBinary: "hermes",
   defaultModel: "",
   binaryDesc:
@@ -62,6 +64,8 @@ export const HERMES_DESCRIPTOR: ProviderDescriptor = {
 
 export interface HermesStreamState {
   accumulatedText: string;
+  accumulatedReasoning?: string;
+  hadToolSinceReasoning?: boolean;
   activeToolSteps: Map<
     string,
     { id: string; tool: string; title: string; input: unknown }
@@ -234,7 +238,7 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
     // This works universally for ANY provider the user authenticated in Hermes.
     const requestedProvider = this.getConfig().options.provider?.trim() || "";
     const pyScript = `
-import json, sys
+import concurrent.futures, json, sys
 from hermes_cli.config import load_config
 from hermes_cli.models import list_available_providers, cached_provider_model_ids, provider_model_ids
 
@@ -257,13 +261,22 @@ models = []
 if default_model:
     models.append(str(default_model).strip())
 
-for pid in providers:
+def fetch_prov(pid):
     try:
-        rows = provider_model_ids(pid, force_refresh=force) if force else (cached_provider_model_ids(pid) or provider_model_ids(pid))
-        for mid in (rows or []):
-            models.append(str(mid).strip())
+        return provider_model_ids(pid, force_refresh=force) if force else (cached_provider_model_ids(pid) or provider_model_ids(pid))
     except Exception:
-        pass
+        return []
+
+if providers:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(providers))) as pool:
+        futs = {pool.submit(fetch_prov, pid): pid for pid in providers}
+        for fut in futs:
+            try:
+                rows = fut.result(timeout=12)
+                for mid in (rows or []):
+                    models.append(str(mid).strip())
+            except Exception:
+                pass
 
 print(json.dumps({"models": models}))
 `;
@@ -291,10 +304,9 @@ print(json.dumps({"models": models}))
     try {
       const provCachePath = join(hermesHome, "provider_models_cache.json");
       if (existsSync(provCachePath)) {
-        const parsed = JSON.parse(readFileSync(provCachePath, "utf-8")) as Record<
-          string,
-          { models?: string[]; fallback?: boolean }
-        >;
+        const parsed = JSON.parse(
+          await readFile(provCachePath, "utf-8")
+        ) as Record<string, { models?: string[]; fallback?: boolean }>;
         const entries = Object.entries(parsed);
         entries.sort(([, a], [, b]) =>
           (a.fallback ? 1 : 0) - (b.fallback ? 1 : 0)
@@ -316,7 +328,7 @@ print(json.dumps({"models": models}))
       try {
         const catalogPath = join(hermesHome, "cache", "model_catalog.json");
         if (existsSync(catalogPath)) {
-          const parsed = JSON.parse(readFileSync(catalogPath, "utf-8")) as {
+          const parsed = JSON.parse(await readFile(catalogPath, "utf-8")) as {
             providers?: Record<
               string,
               { models?: Array<{ id?: string }> }
@@ -354,7 +366,56 @@ print(json.dumps({"models": models}))
   }
 
   async listSessions(): Promise<SessionInfo[]> {
-    return this.listHistorySessions("hermes");
+    const sessions: SessionInfo[] = [];
+    const seenIds = new Set<string>();
+
+    const dbPath = join(this.getHermesHome(), "state.db");
+    if (existsSync(dbPath)) {
+      try {
+        const query = [
+          "SELECT id, COALESCE(title, '') AS title,",
+          "COALESCE(last_activity_at, started_at) AS updated_sec,",
+          "started_at AS created_sec, cwd AS directory",
+          "FROM sessions",
+          "WHERE COALESCE(archived, 0) = 0 AND COALESCE(hidden, 0) = 0",
+          "ORDER BY COALESCE(last_activity_at, started_at) DESC LIMIT 60",
+        ].join(" ");
+        const out = await this.execCli("sqlite3", ["-json", dbPath, query]);
+        const rows = JSON.parse(out.trim() || "[]") as Array<{
+          id?: string;
+          title?: string;
+          updated_sec?: number;
+          created_sec?: number;
+          directory?: string;
+        }>;
+        for (const row of rows) {
+          const id = row.id?.trim();
+          if (!id || seenIds.has(id)) continue;
+          const updatedSec = Number(row.updated_sec);
+          const createdSec = Number(row.created_sec);
+          sessions.push({
+            id,
+            title: row.title?.trim() || id,
+            updated:
+              Number.isFinite(updatedSec) && updatedSec > 0
+                ? Math.round(updatedSec * 1000)
+                : Date.now(),
+            created:
+              Number.isFinite(createdSec) && createdSec > 0
+                ? Math.round(createdSec * 1000)
+                : undefined,
+            directory: row.directory?.trim() || undefined,
+            engine: "hermes",
+          });
+          seenIds.add(id);
+        }
+      } catch {
+        // Fallback to local Obsidian histories if sqlite3 is missing
+      }
+    }
+
+    sessions.push(...this.listHistorySessions("hermes", seenIds));
+    return sessions;
   }
 
   async renameSession(sessionId: string, title: string): Promise<void> {
@@ -497,8 +558,58 @@ print(json.dumps({"models": models}))
 
   async getSessionTokens(
     sessionId: string
-  ): Promise<{ input: number; output: number }> {
-    return this.getHistorySessionTokens(sessionId);
+  ): Promise<{
+    input: number;
+    output: number;
+    totalInput?: number;
+    totalOutput?: number;
+    totalTokens?: number;
+    totalCost?: number;
+  }> {
+    const hist = this.getHistorySessionTokens(sessionId);
+    if (hist.input > 0 || hist.output > 0) return hist;
+
+    const dbPath = join(this.getHermesHome(), "state.db");
+    if (existsSync(dbPath) && sessionId) {
+      try {
+        const safeId = this.sqlEscape(sessionId);
+        const query = [
+          "SELECT input_tokens, output_tokens, cache_read_tokens,",
+          "cache_write_tokens, reasoning_tokens,",
+          "COALESCE(actual_cost_usd, estimated_cost_usd, 0) AS cost",
+          `FROM sessions WHERE id = '${safeId}' LIMIT 1`,
+        ].join(" ");
+        const out = await this.execCli("sqlite3", ["-json", dbPath, query]);
+        const rows = JSON.parse(out.trim() || "[]") as Array<{
+          input_tokens?: number;
+          output_tokens?: number;
+          cache_read_tokens?: number;
+          cache_write_tokens?: number;
+          reasoning_tokens?: number;
+          cost?: number;
+        }>;
+        const row = rows[0];
+        if (row) {
+          const inp = Number(row.input_tokens ?? 0);
+          const outTok = Number(row.output_tokens ?? 0);
+          const cacheR = Number(row.cache_read_tokens ?? 0);
+          const cacheW = Number(row.cache_write_tokens ?? 0);
+          const reas = Number(row.reasoning_tokens ?? 0);
+          const totalCost = Number(row.cost ?? 0);
+          return {
+            input: inp + cacheR + cacheW,
+            output: outTok,
+            totalInput: inp,
+            totalOutput: outTok,
+            totalTokens: inp + outTok + reas,
+            totalCost: Number.isFinite(totalCost) ? totalCost : undefined,
+          };
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return hist;
   }
 
   async getUsageStats(): Promise<UsageStats> {
@@ -548,6 +659,8 @@ print(json.dumps({"models": models}))
   private createStreamState(): HermesStreamState {
     return {
       accumulatedText: "",
+      accumulatedReasoning: "",
+      hadToolSinceReasoning: false,
       activeToolSteps: new Map(),
     };
   }
@@ -614,12 +727,17 @@ print(json.dumps({"models": models}))
       typeof (ev.text ?? ev.reasoning) === "string"
     ) {
       const thought = String(ev.text ?? ev.reasoning);
+      const prev = state.accumulatedReasoning ?? "";
+      const sep = state.hadToolSinceReasoning && prev ? "\n\n" : "";
+      state.accumulatedReasoning = prev + sep + thought;
+      state.hadToolSinceReasoning = false;
       cb.onActivity?.(this.plugin.t("Thinking..."));
-      cb.onReasoning(thought, "reasoning");
+      cb.onReasoning(state.accumulatedReasoning, "reasoning");
       return;
     }
 
     if (ev.type === "tool_use") {
+      state.hadToolSinceReasoning = true;
       const toolName = String(ev.name || ev.tool || "tool");
       const key = String(ev.tool_call_id || ev.call_id || ev.id || toolName);
       const stepId = `step-${ev.timestamp ?? Date.now()}-${key}`;

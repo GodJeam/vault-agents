@@ -84,6 +84,12 @@ export class AttachmentManager {
     return results.filter((p): p is string => typeof p === "string");
   }
 
+  clear(): void {
+    if (this.attachments.length === 0) return;
+    this.attachments = [];
+    this.updateBar();
+  }
+
   private resolveVaultFile(relPath: string): string | null {
     const adapter = this.app.vault.adapter;
     if (adapter instanceof FileSystemAdapter) {
@@ -106,7 +112,14 @@ export class AttachmentManager {
       const icon = chip.createSpan({ cls: "opencode-attachment-icon" });
       setIcon(icon, a.image ? "image" : "file-text");
       chip.createSpan({ text: a.label, cls: "opencode-attachment-label" });
-      const rm = chip.createEl("button", { cls: "opencode-icon-btn" });
+      const rm = chip.createEl("button", {
+        cls: "opencode-icon-btn",
+        attr: {
+          type: "button",
+          title: this.plugin.t("Remove attachment"),
+          "aria-label": this.plugin.t("Remove attachment"),
+        },
+      });
       setIcon(rm, "x");
       rm.addEventListener("click", () => {
         this.attachments = this.attachments.filter((x) => x.path !== a.path);

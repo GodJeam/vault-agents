@@ -102,19 +102,7 @@ const IT: Record<string, string> = {
   ]:
     "Mostra input e output di ogni strumento eseguito durante la " +
     "richiesta, in blocchi apribili con un clic.",
-  "Database self-cleanup": "Pulizia automatica del database",
-  "Enable automatic cleanup": "Attiva pulizia automatica",
-  [
-    "Periodically remove large file attachments from the opencode database " +
-      "(opencode.db), which would otherwise bloat it. Only file attachments " +
-      "older than the minimum age and larger than the max size are removed; " +
-      "conversation text is never touched."
-  ]:
-    "Rimuove periodicamente gli allegati file di grandi dimensioni dal " +
-    "database di opencode (opencode.db), che altrimenti si gonfia. Vengono " +
-    "rimossi solo gli allegati più vecchi dell'età minima e più grandi " +
-    "della dimensione massima; il testo delle conversazioni non viene " +
-    "mai toccato.",
+  "Database self-cleanup": "Pulizia manuale del database",
   "Max part size (MB)": "Dimensione massima parte (MB)",
   "File attachments larger than this (in the database) are removed.":
     "Gli allegati file più grandi di questo valore (nel database) " +
@@ -204,6 +192,7 @@ const IT: Record<string, string> = {
   "Delete session": "Elimina sessione",
   "Pin/Unpin session": "Fissa/Rimuovi la sessione",
   "Attach file": "Allega file",
+  "Remove attachment": "Rimuovi allegato",
   "Current note": "Nota corrente",
   "Remove the attached context": "Rimuovi il contesto allegato",
   "Session pinned.": "Sessione pinnata.",
@@ -393,7 +382,6 @@ const IT: Record<string, string> = {
     "direttamente al tuo abbonamento Google AI Pro senza alcuna API key.",
   "Antigravity CLI (Google AI Pro)": "Antigravity CLI (Google AI Pro)",
   "OpenCode CLI": "OpenCode CLI",
-  "OpenCode settings": "Impostazioni OpenCode",
   "General settings": "Impostazioni generali",
   "Document conversion": "Conversione documenti",
   [
@@ -441,12 +429,9 @@ const IT: Record<string, string> = {
   ]:
     "Comando o percorso completo dell'eseguibile hermes. Il default è " +
     "'hermes' o '~/.hermes/bin/hermes'.",
-  [
-    "Pick a model for Hermes Agent (e.g. anthropic/claude-sonnet-4, " +
-      "nous/hermes-4-405b)."
-  ]:
-    "Scegli un modello per Hermes Agent (es. anthropic/claude-sonnet-4, " +
-    "nous/hermes-4-405b).",
+  "Optional reasoning effort level for Hermes.":
+    "Livello di ragionamento opzionale per Hermes.",
+  "Default (from config.yaml)": "Default (da config.yaml)",
   "Provider": "Provider",
   "Optional Hermes backend provider (e.g. openrouter, nous, anthropic).":
     "Provider backend opzionale per Hermes (es. openrouter, nous, anthropic).",
@@ -457,12 +442,6 @@ const IT: Record<string, string> = {
   ]:
     "Comando o percorso completo dell'eseguibile pi. Di solito " +
     "basta 'pi' se è nel PATH.",
-  [
-    "Pick a model for the Pi coding agent (e.g. claude-sonnet-4-5, " +
-      "gpt-5, gemini-2.5-pro)."
-  ]:
-    "Scegli un modello per l'agente Pi (es. claude-sonnet-4-5, " +
-    "gpt-5, gemini-2.5-pro).",
   "Optional model provider for Pi (e.g. anthropic, openai, google).":
     "Provider opzionale per Pi (es. anthropic, openai, google).",
   "e.g. anthropic": "es. anthropic",
@@ -498,12 +477,6 @@ const IT: Record<string, string> = {
     "per inserirli rapidamente nel compositore.",
   "Included with $1 ($0.00)": "Incluso con $1 ($0.00)",
   "Included ($0.00)": "Incluso ($0.00)",
-  [
-    "Type any exact model ID or alias manually. Leave empty to use " +
-      "the CLI's own configured default model."
-  ]:
-    "Digita manualmente qualsiasi ID modello o alias esatto. Lascia vuoto " +
-    "per usare il modello predefinito configurato nella CLI.",
   "(CLI default)": "(default della CLI)",
   "(default from $1)": "(default di $1)",
   "(default)": "(default)",
@@ -524,6 +497,21 @@ const IT: Record<string, string> = {
   "Select an AI Agent...": "Seleziona un Agente AI...",
   "Search $1 models or type a custom ID...":
     "Cerca i modelli di $1 o digita un ID personalizzato...",
+  "Refresh": "Aggiorna",
+  "Refresh models from CLI": "Aggiorna i modelli dalla CLI",
+  "Models refreshed.": "Modelli aggiornati.",
+  "All": "Tutti",
+  "Models": "Modelli",
+  "No matching models found.": "Nessun modello corrispondente trovato.",
+  "Auto-continue on context limit": "Continua automaticamente al limite del contesto",
+  [
+    "Automatically summarize and prepare a new session when context " +
+      "usage exceeds 92%."
+  ]:
+    "Riassume e prepara automaticamente una nuova sessione quando l'uso del " +
+    "contesto supera il 92%.",
+  "Context limit reached: generating summary for a new session...":
+    "Limite del contesto raggiunto: generazione riassunto per una nuova sessione...",
   "Installed": "Installato",
   "Not found": "Non trovato",
   "Default": "Default",

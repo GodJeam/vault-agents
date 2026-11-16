@@ -14,13 +14,14 @@ import type {
 } from "../../core/types";
 import { substitute } from "../../i18n";
 import { BaseCliRunner, MAX_STREAM_LINE_BYTES } from "../base";
+import { AGENT_ICON_IDS } from "../../shared/agentIcons";
 import type { PiMessage, PiStreamEvent } from "./types";
 
 export const PI_DESCRIPTOR: ProviderDescriptor = {
   id: "pi",
   displayName: "Pi Coding Agent CLI",
   shortName: "Pi",
-  icon: "compass",
+  icon: AGENT_ICON_IDS.pi,
   defaultBinary: "pi",
   defaultModel: "",
   binaryDesc:
@@ -234,6 +235,9 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
     if (thinking && !model.includes(":")) {
       args.push("--thinking", thinking);
     }
+
+    // Stop CLI option parsing before positional `@<filepath>` and prompt args
+    args.push("--");
 
     // Pi natively supports `@<filepath>` for both text and image attachments
     for (const f of req.fileAttachments) {
