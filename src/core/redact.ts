@@ -43,11 +43,17 @@ const RULES: RedactionRule[] = [
     pattern: /\b(Basic\s+)[A-Za-z0-9+/=]{8,}/gi,
     replacement: "$1[REDACTED]",
   },
-  // Explicit credential assignments (avoid bare "token"/"secret" to reduce
-  // false positives on normal token-count messages).
+  // Provider-specific API key prefixes
+  { pattern: /\bxai-[A-Za-z0-9_-]{12,}/g, replacement: "xai-[REDACTED]" },
+  { pattern: /\bgsk_[A-Za-z0-9_-]{16,}/g, replacement: "gsk_[REDACTED]" },
+  { pattern: /\bhf_[A-Za-z0-9]{16,}/g, replacement: "hf_[REDACTED]" },
+  { pattern: /\bpplx-[A-Za-z0-9_-]{16,}/g, replacement: "pplx-[REDACTED]" },
+  { pattern: /\bnvapi-[A-Za-z0-9_-]{16,}/g, replacement: "nvapi-[REDACTED]" },
+  // Explicit credential assignments (including JSON `"apiKey": "..."` pairs,
+  // avoiding bare "token"/"secret" to reduce false positives).
   {
     pattern:
-      /((?:api[_-]?key|access[_-]?key|secret[_-]?key|client[_-]?secret|password|passwd|auth[_-]?token|access[_-]?token|refresh[_-]?token)\s*[:=]\s*["']?)[^\s"',;]{4,}/gi,
+      /((?:api[_-]?key|access[_-]?key|secret[_-]?key|client[_-]?secret|password|passwd|auth[_-]?token|access[_-]?token|refresh[_-]?token)["']?\s*[:=]\s*["']?)[^\s"',;}]{4,}/gi,
     replacement: "$1[REDACTED]",
   },
   // Credentials embedded in URLs

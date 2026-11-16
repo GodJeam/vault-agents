@@ -1,7 +1,15 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "child_process";
 import { createHash } from "crypto";
 import { existsSync, readFileSync, statSync } from "fs";
-import { copyFile, chmod, mkdir, readdir, stat, unlink } from "fs/promises";
+import {
+  copyFile,
+  chmod,
+  lstat,
+  mkdir,
+  readdir,
+  stat,
+  unlink,
+} from "fs/promises";
 import { basename, dirname, extname, isAbsolute, join } from "path";
 import { homedir, tmpdir } from "os";
 import { redact } from "../core/redact";
@@ -93,6 +101,13 @@ export function parseCmdNodeScript(
  */
 export async function ensurePrivateTempDir(dir: string): Promise<void> {
   await mkdir(dir, { recursive: true, mode: 0o700 });
+  const st = await lstat(dir);
+  if (st.isSymbolicLink() || !st.isDirectory()) {
+    throw new Error(`Unsafe temp directory path: ${dir}`);
+  }
+  if (typeof process.getuid === "function" && st.uid !== process.getuid()) {
+    throw new Error(`Temp directory not owned by current user: ${dir}`);
+  }
   await chmod(dir, 0o700).catch(() => {});
 }
 
@@ -960,8 +975,9 @@ export abstract class BaseCliRunner {
    * Convert a document (PDF, Word, Excel, etc.) to Markdown using anydoc
    */
   async convertDocument(absPath: string): Promise<string> {
+    const hostedOcr = this.plugin.settings.anydocHostedOcr;
     const hash = createHash("sha256")
-      .update(absPath)
+      .update(`${absPath}\0ocr=${hostedOcr ? 1 : 0}`)
       .digest("hex")
       .slice(0, 16);
     const dir = join(tmpdir(), "vault-agents-anydoc");
