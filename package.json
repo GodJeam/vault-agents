@@ -1,6 +1,6 @@
 {
   "name": "vault-agents",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Multi-agent AI orchestrator for Obsidian",
   "repository": "https://github.com/GodJeam/vault-agents",
   "main": "main.js",
