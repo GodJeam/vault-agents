@@ -49,6 +49,10 @@ const RULES: RedactionRule[] = [
   { pattern: /\bhf_[A-Za-z0-9]{16,}/g, replacement: "hf_[REDACTED]" },
   { pattern: /\bpplx-[A-Za-z0-9_-]{16,}/g, replacement: "pplx-[REDACTED]" },
   { pattern: /\bnvapi-[A-Za-z0-9_-]{16,}/g, replacement: "nvapi-[REDACTED]" },
+  { pattern: /\bfc-[A-Za-z0-9_-]{16,}/g, replacement: "fc-[REDACTED]" },
+  { pattern: /\btvly-[A-Za-z0-9_-]{16,}/g, replacement: "tvly-[REDACTED]" },
+  { pattern: /\bnpm_[A-Za-z0-9]{20,}/g, replacement: "npm_[REDACTED]" },
+  { pattern: /\bpypi-[A-Za-z0-9_-]{20,}/g, replacement: "pypi-[REDACTED]" },
   // Explicit credential assignments (including JSON `"apiKey": "..."` pairs,
   // avoiding bare "token"/"secret" to reduce false positives).
   {

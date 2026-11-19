@@ -515,7 +515,7 @@ export abstract class BaseCliRunner {
    * Escape a string value for safe single-quoted SQLite literals.
    */
   public sqlEscape(value: string): string {
-    return String(value ?? "").replace(/'/g, "''");
+    return String(value ?? "").replace(/\0/g, "").replace(/'/g, "''");
   }
 
   /**

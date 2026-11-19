@@ -1,5 +1,5 @@
 import { isAbsolute, join } from "path";
-import { copyFile } from "fs/promises";
+import { copyFile, rename, unlink } from "fs/promises";
 import { redact } from "../../core/redact";
 import type {
   AgentProvider,
@@ -18,7 +18,12 @@ import type {
 } from "../../core/types";
 import { DEFAULT_ENGINE_CONFIGS } from "../../core/types";
 import { substitute } from "../../i18n";
-import { BaseCliRunner, MAX_STREAM_LINE_BYTES, parseSqliteChanges } from "../base";
+import {
+  BaseCliRunner,
+  MAX_STREAM_LINE_BYTES,
+  parseSqliteChanges,
+  restrictFilePermissions,
+} from "../base";
 import { AGENT_ICON_IDS } from "../../shared/agentIcons";
 import type {
   OpencodeEvent,
@@ -464,7 +469,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       .filter(Boolean)
       .join(" ");
     try {
-      await copyFile(dbPath, dbPath + ".bak");
+      await this.backupSqliteDb(dbPath, dbPath + ".bak");
     } catch (e) {
       console.debug(
         "[vault-agents] could not back up opencode.db:",
@@ -476,6 +481,28 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     } catch (e) {
       console.debug("[vault-agents] pruneOversizedParts skipped:", redact(e));
     }
+  }
+
+  /**
+   * Create a WAL-safe backup using SQLite `VACUUM INTO` into a temporary file
+   * and atomically move it into place, falling back to a plain file copy if
+   * `sqlite3` is unavailable or fails.
+   */
+  private async backupSqliteDb(dbPath: string, backupPath: string): Promise<void> {
+    const tmpBackup = `${backupPath}.${process.pid}.${Date.now()}.tmp`;
+    try {
+      await this.execSqlite(
+        dbPath,
+        `VACUUM INTO '${this.sqlEscape(tmpBackup)}';`
+      );
+      await restrictFilePermissions(tmpBackup);
+      await rename(tmpBackup, backupPath);
+      return;
+    } catch {
+      await unlink(tmpBackup).catch(() => {});
+    }
+    await copyFile(dbPath, backupPath);
+    await restrictFilePermissions(backupPath);
   }
 
   private async getDbPath(): Promise<string | null> {
