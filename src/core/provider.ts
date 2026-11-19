@@ -90,6 +90,9 @@ export interface AgentProvider {
   /** Quick synchronous check whether the CLI binary appears installed */
   isAvailable?(): boolean;
 
+  /** Clear cached binary path lookups (e.g. after editing binary path in settings) */
+  invalidateBinaryCache?(): void;
+
   /** List available models */
   listModels(forceRefresh?: boolean): Promise<string[]>;
 

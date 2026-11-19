@@ -1,6 +1,12 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "child_process";
 import { createHash } from "crypto";
-import { existsSync, readFileSync, statSync } from "fs";
+import {
+  accessSync,
+  constants as fsConstants,
+  existsSync,
+  readFileSync,
+  statSync,
+} from "fs";
 import {
   copyFile,
   chmod,
@@ -119,6 +125,19 @@ export async function restrictFilePermissions(path: string): Promise<void> {
   await chmod(path, 0o600).catch(() => {});
 }
 
+/** Check that a path points to a regular file (and is executable on POSIX). */
+export function isExecutableFile(p: string): boolean {
+  try {
+    if (!statSync(p).isFile()) return false;
+    if (process.platform !== "win32") {
+      accessSync(p, fsConstants.X_OK);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export abstract class BaseCliRunner {
   abstract readonly descriptor: ProviderDescriptor;
   protected plugin: RunnerHost;
@@ -154,12 +173,11 @@ export abstract class BaseCliRunner {
         child.kill("SIGKILL");
       }
     } catch {
-      // ignore
-    }
-    try {
-      child.kill();
-    } catch {
-      // ignore
+      try {
+        child.kill();
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -181,6 +199,7 @@ export abstract class BaseCliRunner {
       }
       this.killNow(child);
     }, 1000);
+    if (typeof timer.unref === "function") timer.unref();
   }
 
   /**
@@ -215,6 +234,7 @@ export abstract class BaseCliRunner {
         join(home, ".opencode", "bin"),
         join(home, ".gemini", "antigravity-cli", "bin"),
         join(home, ".hermes", "bin"),
+        "/opt/homebrew/bin",
         "/usr/local/bin",
         "/usr/bin",
       ];
@@ -264,7 +284,7 @@ export abstract class BaseCliRunner {
     ) {
       return (
         message +
-        " — " +
+        ": " +
         this.plugin.t(
           "Windows .cmd/.bat launchers cannot be run safely; use the " +
             "native .exe or install the Node CLI."
@@ -472,7 +492,25 @@ export abstract class BaseCliRunner {
    * Execute a SQL query against a local SQLite database file via sqlite3 CLI.
    */
   protected execSqlite(dbPath: string, sql: string): Promise<string> {
-    return this.execCli("sqlite3", [dbPath, sql]);
+    return this.execCli(this.resolveBinaryPath("sqlite3"), [dbPath, sql]);
+  }
+
+  /**
+   * Execute a SQL query returning JSON rows via `sqlite3 -json`.
+   */
+  protected execSqliteJson(dbPath: string, sql: string): Promise<string> {
+    return this.execCli(this.resolveBinaryPath("sqlite3"), [
+      "-json",
+      dbPath,
+      sql,
+    ]);
+  }
+
+  /**
+   * Clear cached binary resolutions (e.g. after updating Binary path in Settings).
+   */
+  public invalidateBinaryCache(): void {
+    this.resolvedBinaries.clear();
   }
 
   /**
@@ -492,7 +530,9 @@ export abstract class BaseCliRunner {
     const cfg = this.plugin.getEngineConfig(this.descriptor.id);
     const binName = cfg.binary || this.descriptor.defaultBinary;
     const bin = this.resolveBinaryPath(binName);
-    return existsSync(bin);
+    const hasPath = bin.includes("/") || bin.includes("\\");
+    if (!hasPath) return false;
+    return isExecutableFile(bin);
   }
 
   /**
@@ -504,7 +544,7 @@ export abstract class BaseCliRunner {
   ): string {
     const cached = this.resolvedBinaries.get(bin);
     if (cached !== undefined && cached !== null) {
-      if (existsSync(cached)) return cached;
+      if (isExecutableFile(cached)) return cached;
       this.resolvedBinaries.delete(bin);
     }
 
@@ -517,7 +557,7 @@ export abstract class BaseCliRunner {
     }
 
     const hasSeparator = bin.includes("/") || bin.includes("\\");
-    if (hasSeparator && existsSync(bin)) {
+    if (hasSeparator && isExecutableFile(bin)) {
       this.resolvedBinaries.set(bin, bin);
       return bin;
     }
@@ -528,6 +568,7 @@ export abstract class BaseCliRunner {
       join(homedir(), ".gemini", "antigravity-cli", "bin", bin),
       join(homedir(), ".hermes", "bin", bin),
       join(homedir(), ".hermes", "hermes-agent", ".hermes", "bin", bin),
+      `/opt/homebrew/bin/${bin}`,
       `/usr/local/bin/${bin}`,
       `/usr/bin/${bin}`,
     ];
@@ -539,7 +580,7 @@ export abstract class BaseCliRunner {
 
     const allCandidates = [...candidatePaths, ...defaultCandidates, ...pathDirs];
     for (const p of allCandidates) {
-      if (existsSync(p)) {
+      if (isExecutableFile(p)) {
         this.resolvedBinaries.set(bin, p);
         return p;
       }
@@ -647,7 +688,7 @@ export abstract class BaseCliRunner {
     cwd?: string
   ): string {
     const s = this.plugin.settings;
-    let finalPrompt = prompt;
+    const blocks: string[] = [];
     let inlineBudget = MAX_TOTAL_INLINE_ATTACHMENT_BYTES;
     const maxInlineBytes = Math.min(
       MAX_INLINE_ATTACHMENT_BYTES,
@@ -657,7 +698,7 @@ export abstract class BaseCliRunner {
     for (const p of fileAttachments) {
       const fullPath = !isAbsolute(p) && cwd ? join(cwd, p) : p;
       if (BINARY_EXT_REGEX.test(fullPath)) {
-        finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+        blocks.push(`[ATTACHMENT PATH: ${fullPath}]`);
         continue;
       }
       try {
@@ -665,21 +706,19 @@ export abstract class BaseCliRunner {
         if (
           chooseAttachmentMode(st.size, maxInlineBytes, inlineBudget) === "path"
         ) {
-          finalPrompt =
-            `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+          blocks.push(`[ATTACHMENT PATH: ${fullPath}]`);
           continue;
         }
         const content = readFileSync(fullPath, "utf-8");
         inlineBudget -= st.size;
         const filename = basename(fullPath);
-        finalPrompt =
-          `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
+        blocks.push(`[ATTACHMENT: ${filename}]\n${content}`);
       } catch {
-        finalPrompt =
-          `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+        blocks.push(`[ATTACHMENT PATH: ${fullPath}]`);
       }
     }
-    return finalPrompt;
+    if (blocks.length === 0) return prompt;
+    return blocks.join("\n\n---\n\n") + "\n\n---\n\n" + prompt;
   }
 
   /**
