@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import { redact } from "../../core/redact";
 import type { StepInfo } from "../../core/types";
 
 export interface StepRecord {
@@ -70,7 +71,7 @@ export function formatToolAction(
   const label = mapped ? t(mapped.labelKey) : tool || t("Tool");
   const icon = mapped ? mapped.icon : "wrench";
 
-  const cleanTitle = (rawTitle || "").trim();
+  const cleanTitle = redact((rawTitle || "").trim());
   const isDuplicate =
     !cleanTitle ||
     cleanTitle.toLowerCase() === key ||
@@ -82,6 +83,28 @@ export function formatToolAction(
       : cleanTitle;
 
   return { label, target, icon };
+}
+
+export function serializeStepDetails(
+  step: StepInfo,
+  t: (s: string) => string
+): string {
+  const parts: string[] = [];
+  const fmt = (v: unknown): string => {
+    const s = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+    const truncated = s.length > 4000;
+    const sample = redact(truncated ? s.slice(0, 4200) : s);
+    return truncated
+      ? (sample.length > 4000 ? sample.slice(0, 4000) : sample) + "…"
+      : sample;
+  };
+  if (step.input !== undefined && step.input !== null) {
+    parts.push(t("INPUT:") + "\n" + fmt(step.input));
+  }
+  if (step.output !== undefined && step.output !== null) {
+    parts.push(t("OUTPUT:") + "\n" + fmt(step.output));
+  }
+  return parts.join("\n\n---\n\n") || t("(no details)");
 }
 
 export class StepManager {
@@ -243,17 +266,6 @@ export class StepManager {
   }
 
   private serializeStep(step: StepInfo): string {
-    const parts: string[] = [];
-    const fmt = (v: unknown): string => {
-      const s = typeof v === "string" ? v : JSON.stringify(v, null, 2);
-      return s.length > 4000 ? s.slice(0, 4000) + "…" : s;
-    };
-    if (step.input !== undefined && step.input !== null) {
-      parts.push(this.t("INPUT:") + "\n" + fmt(step.input));
-    }
-    if (step.output !== undefined && step.output !== null) {
-      parts.push(this.t("OUTPUT:") + "\n" + fmt(step.output));
-    }
-    return parts.join("\n\n---\n\n") || this.t("(no details)");
+    return serializeStepDetails(step, this.t);
   }
 }

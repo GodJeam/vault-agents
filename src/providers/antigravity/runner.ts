@@ -129,8 +129,9 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       );
     }
 
-    // Default fallback models for Antigravity (Google AI Pro)
-    const defaults = [
+    // Default fallback models for Antigravity (Google AI Pro). Intentionally
+    // not cached so a subsequent open retries dynamic discovery if CLI recovers.
+    return [
       "gemini-3.8-flash-high",
       "gemini-3.8-flash-medium",
       "gemini-3.8-flash-low",
@@ -142,9 +143,6 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
       "claude-sonnet-5-5-low",
       "gpt-oss-120b-medium",
     ];
-    this.cachedModels = defaults;
-    this.cachedModelsBin = bin;
-    return defaults;
   }
 
   async listSessions(): Promise<SessionInfo[]> {
@@ -160,7 +158,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
           "CAST(strftime('%s', last_modified_time) AS INTEGER) AS sec " +
           "FROM conversation_summaries " +
           "ORDER BY last_modified_time DESC LIMIT 50";
-        const out = await this.execCli("sqlite3", ["-json", dbPath, query]);
+        const out = await this.execSqliteJson(dbPath, query);
         const rows = JSON.parse(out.trim() || "[]") as Array<{
           id?: string;
           title?: string;
@@ -295,7 +293,7 @@ export class AntigravityRunner extends BaseCliRunner implements AgentProvider {
     }
 
     const sid = req.sessionId !== undefined ? req.sessionId : s.sessionId;
-    if (sid && !sid.startsWith("ses_")) {
+    if (sid && !/^(?:ses_|hermes-|pi-)/i.test(sid)) {
       args.push("--conversation", sid);
     }
 

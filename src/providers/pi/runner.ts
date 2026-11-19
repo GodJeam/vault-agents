@@ -66,6 +66,7 @@ export interface PiStreamState {
   accumulatedText: string;
   accumulatedReasoning: string;
   toolTitles: Map<string, { tool: string; title: string; input: unknown }>;
+  emittedUsage?: boolean;
 }
 
 export class PiRunner extends BaseCliRunner implements AgentProvider {
@@ -254,6 +255,7 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
       accumulatedText: "",
       accumulatedReasoning: "",
       toolTitles: new Map(),
+      emittedUsage: false,
     };
   }
 
@@ -373,7 +375,7 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
     // 4. Message end / Agent end with final text and usage
     if (ev.type === "message_end" && ev.message) {
       if (ev.message.role === "assistant") {
-        this.extractPiMessageUsage(ev.message, cb, state);
+        this.extractPiMessageUsage(ev.message, cb, state, false);
       }
       return;
     }
@@ -382,7 +384,7 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
       const assistantMsgs = ev.messages.filter((m) => m?.role === "assistant");
       const lastAssistant = assistantMsgs[assistantMsgs.length - 1];
       if (lastAssistant) {
-        this.extractPiMessageUsage(lastAssistant, cb, state);
+        this.extractPiMessageUsage(lastAssistant, cb, state, true);
       }
       return;
     }
@@ -400,27 +402,42 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
   private extractPiMessageUsage(
     msg: PiMessage,
     cb: StreamCallbacks,
-    state: PiStreamState
+    state: PiStreamState,
+    fromAgentEnd: boolean
   ): void {
     if (msg.stopReason === "error" && msg.errorMessage) {
       cb.onError(msg.errorMessage);
     }
     if (Array.isArray(msg.content)) {
+      const textBlocks: string[] = [];
+      const thinkingBlocks: string[] = [];
       for (const block of msg.content) {
-        if (block?.type === "text" && typeof block.text === "string" && block.text.trim()) {
-          state.accumulatedText = block.text;
-          cb.onText(state.accumulatedText, "final");
+        if (
+          block?.type === "text" &&
+          typeof block.text === "string" &&
+          block.text.trim()
+        ) {
+          textBlocks.push(block.text);
         } else if (
           block?.type === "thinking" &&
           typeof block.thinking === "string" &&
           block.thinking.trim()
         ) {
-          state.accumulatedReasoning = block.thinking;
-          cb.onReasoning(state.accumulatedReasoning, "final");
+          thinkingBlocks.push(block.thinking);
         }
       }
+      if (textBlocks.length > 0) {
+        state.accumulatedText = textBlocks.join("\n\n");
+        cb.onText(state.accumulatedText, "final");
+      }
+      if (thinkingBlocks.length > 0) {
+        state.accumulatedReasoning = thinkingBlocks.join("\n\n");
+        cb.onReasoning(state.accumulatedReasoning, "final");
+      }
     }
-    if (msg.usage) {
+    // Pi emits message_end per turn and then agent_end with the same trailing
+    // assistant message; avoid double-counting tokens and cost on agent_end.
+    if (msg.usage && (!fromAgentEnd || !state.emittedUsage)) {
       const u = msg.usage;
       const input = Number(u.input ?? 0);
       const output = Number(u.output ?? 0);
@@ -428,6 +445,7 @@ export class PiRunner extends BaseCliRunner implements AgentProvider {
       const cacheWrite = Number(u.cacheWrite ?? 0);
       const total = Number(u.totalTokens ?? 0) || input + output;
       if (total > 0) {
+        state.emittedUsage = true;
         cb.onFinish({
           tokens: {
             total,

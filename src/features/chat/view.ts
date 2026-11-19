@@ -1,4 +1,5 @@
 import {
+  Component,
   ItemView,
   Notice,
   WorkspaceLeaf,
@@ -66,6 +67,10 @@ export class ChatView extends ItemView {
   private pendingUser: { text: string; contextLabel?: string } | null = null;
   private currentProc: RunHandle | null = null;
   private runSeq = 0;
+  private populateSeq = 0;
+  private contextSeq = 0;
+  private closed = false;
+  private lastEngineModelKey = "";
   private running = false;
   private dispatching = false;
   private pendingQueuedAnswer: string | null = null;
@@ -82,6 +87,8 @@ export class ChatView extends ItemView {
   private contextRunInput = 0;
   private activityTimer: number | null = null;
   private activeBubble: AssistantBubble | null = null;
+  private sessionRenderComponent: Component | null = null;
+  private autoScrollEnabled = true;
   private autoApproveBtn!: HTMLButtonElement;
   private autoApproveHintShown = false;
   private lastRun: { prompt: string; fileAttachments: string[] } | null = null;
@@ -143,11 +150,16 @@ export class ChatView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    this.closed = false;
     const container = this.contentEl;
     container.empty();
     container.addClass("opencode-chat");
 
     this.messagesEl = container.createDiv({ cls: "opencode-messages" });
+    this.autoScrollEnabled = true;
+    this.messagesEl.addEventListener("scroll", () => {
+      this.autoScrollEnabled = this.isNearBottom();
+    });
     this.buildContextBar(container);
     this.attachmentManager = new AttachmentManager(
       container,
@@ -164,12 +176,17 @@ export class ChatView extends ItemView {
     this.registerEvent(this.app.vault.on("rename", inv));
 
     void this.populateSessionSelect().then(() => {
-      this.loadHistoryForSession(this.viewSession);
+      if (!this.closed) {
+        this.loadHistoryForSession(this.viewSession);
+      }
     });
   }
 
   onClose(): Promise<void> {
+    this.closed = true;
     this.runSeq++;
+    this.populateSeq++;
+    this.contextSeq++;
     this.pendingQueuedAnswer = null;
     this.currentProc?.abort();
     this.currentProc = null;
@@ -187,6 +204,10 @@ export class ChatView extends ItemView {
     }
     this.activeBubble?.dispose();
     this.activeBubble = null;
+    if (this.sessionRenderComponent) {
+      this.removeChild(this.sessionRenderComponent);
+      this.sessionRenderComponent = null;
+    }
     return super.onClose();
   }
 
@@ -211,7 +232,7 @@ export class ChatView extends ItemView {
     this.viewSession = "";
     this.plugin.settings.sessionId = "";
     this.attachmentManager?.clear();
-    if (persist) void this.plugin.saveSettings();
+    if (persist) void this.plugin.saveSettings(false);
     void this.populateSessionSelect();
     this.loadHistoryForSession("");
     if (!silent) {
@@ -258,7 +279,7 @@ export class ChatView extends ItemView {
         this.viewSession = v;
         this.plugin.settings.sessionId = v;
         this.attachmentManager?.clear();
-        void this.plugin.saveSettings();
+        void this.plugin.saveSettings(false);
         this.loadHistoryForSession(v);
       }
       this.updateSessionBtnStates();
@@ -325,6 +346,10 @@ export class ChatView extends ItemView {
 
     const attachBtn = this.contextBar.createEl("button", {
       cls: "opencode-add-note-btn",
+      attr: {
+        type: "button",
+        "aria-label": this.plugin.t("Attach file"),
+      },
     });
     const attachIcon = attachBtn.createSpan({ cls: "opencode-btn-icon" });
     setIcon(attachIcon, "paperclip");
@@ -355,7 +380,7 @@ export class ChatView extends ItemView {
     if (idx >= 0) pinned.splice(idx, 1);
     else pinned.push(id);
     this.plugin.settings.pinned = pinned;
-    void this.plugin.saveSettings();
+    void this.plugin.saveSettings(false);
     void this.populateSessionSelect();
     const msg =
       idx >= 0
@@ -382,7 +407,7 @@ export class ChatView extends ItemView {
         } catch (e) {
           console.debug("[vault-agents] remote renameSession failed:", redact(e));
         }
-        await this.plugin.saveSettings();
+        await this.plugin.saveSettings(false);
         void this.populateSessionSelect();
         new Notice(this.plugin.t("Session renamed."));
       })();
@@ -431,7 +456,7 @@ export class ChatView extends ItemView {
             this.viewSession = "";
             this.plugin.settings.sessionId = "";
           }
-          await this.plugin.saveSettings();
+          await this.plugin.saveSettings(false);
           await this.populateSessionSelect();
           this.loadHistoryForSession(this.viewSession);
           new Notice(this.plugin.t("Session deleted."));
@@ -459,8 +484,17 @@ export class ChatView extends ItemView {
     this.updateModelBtn();
     this.updateStatsBar();
     this.activeBubble?.setShowThinking(this.plugin.settings.showThinking);
-    this.contextLimit = 0;
-    void this.refreshContext();
+    const engine = this.sessionEngine();
+    const key = `${engine}\0${this.activeModelFor(engine)}`;
+    if (key !== this.lastEngineModelKey) {
+      this.lastEngineModelKey = key;
+      this.contextLimit = 0;
+      if (this.viewSession) {
+        void this.refreshContext();
+      } else if (this.isShowingWelcomeOnly()) {
+        this.loadHistoryForSession("");
+      }
+    }
   }
 
   private updateAutoApproveBtn(): void {
@@ -469,18 +503,18 @@ export class ChatView extends ItemView {
     this.autoApproveBtn.empty();
     setIcon(this.autoApproveBtn, on ? "shield-check" : "shield-off");
     this.autoApproveBtn.toggleClass("is-active", on);
-    this.autoApproveBtn.setAttribute(
-      "title",
-      on
-        ? this.plugin.t(
-            "Auto-approve On: the agent can run tools and edit files " +
-              "without asking"
-          )
-        : this.plugin.t(
-            "Auto-approve Off: the agent may stop when a tool needs " +
-              "permission"
-          )
-    );
+    const title = on
+      ? this.plugin.t(
+          "Auto-approve On: the agent can run tools and edit files " +
+            "without asking"
+        )
+      : this.plugin.t(
+          "Auto-approve Off: the agent may stop when a tool needs " +
+            "permission"
+        );
+    this.autoApproveBtn.setAttribute("title", title);
+    this.autoApproveBtn.setAttribute("aria-label", title);
+    this.autoApproveBtn.setAttribute("aria-pressed", String(on));
   }
 
   private async setAutoApprove(value: boolean): Promise<void> {
@@ -532,32 +566,37 @@ export class ChatView extends ItemView {
   }
 
   private async populateSessionSelect(): Promise<void> {
-    if (!this.sessionSelect) return;
+    if (!this.sessionSelect || this.closed) return;
+    const seq = ++this.populateSeq;
+    let displayed: Awaited<ReturnType<typeof fetchDisplayedSessions>> = [];
+    try {
+      displayed = await fetchDisplayedSessions(
+        this.plugin,
+        this.viewSession,
+        this.sessionEngine()
+      );
+    } catch {
+      // Keep only "New session"
+    }
+    if (seq !== this.populateSeq || this.closed || !this.sessionSelect) return;
+
     const sel = this.sessionSelect;
     sel.empty();
     const newOpt = sel.createEl("option");
     newOpt.value = "";
     newOpt.textContent = "＋ " + this.plugin.t("New session");
-    try {
-      const displayed = await fetchDisplayedSessions(
-        this.plugin,
-        this.viewSession,
-        this.sessionEngine()
-      );
-      const pinnedSet = new Set(this.plugin.settings.pinned ?? []);
 
-      for (const s of displayed) {
-        const o = sel.createEl("option");
-        o.value = s.id;
-        const title = s.title || s.id;
-        const mark = pinnedSet.has(s.id) ? "● " : "";
-        const short = title.length > 40 ? title.slice(0, 37) + "…" : title;
-        o.textContent = mark + short;
-        o.title = title;
-      }
-    } catch {
-      // Keep only "New session"
+    const pinnedSet = new Set(this.plugin.settings.pinned ?? []);
+    for (const s of displayed) {
+      const o = sel.createEl("option");
+      o.value = s.id;
+      const title = s.title || s.id;
+      const mark = pinnedSet.has(s.id) ? "● " : "";
+      const short = title.length > 40 ? title.slice(0, 37) + "…" : title;
+      o.textContent = mark + short;
+      o.title = title;
     }
+
     sel.value = this.viewSession || "";
     this.updateSessionBtnStates();
   }
@@ -605,7 +644,7 @@ export class ChatView extends ItemView {
     const used = this.contextUsed;
     const limit = this.contextLimit;
     if (!limit) {
-      this.contextEl.setText(this.plugin.t("Context:") + " —");
+      this.contextEl.setText(this.plugin.t("Context:") + " -");
       this.contextFillEl.style.width = "0%";
       return;
     }
@@ -620,6 +659,9 @@ export class ChatView extends ItemView {
 
   private async refreshContext(): Promise<void> {
     const sid = this.viewSession;
+    const seq = ++this.contextSeq;
+    const isStale = () =>
+      seq !== this.contextSeq || this.closed || this.viewSession !== sid;
     if (!sid) {
       this.contextUsed = 0;
       this.contextLimit = 0;
@@ -629,6 +671,7 @@ export class ChatView extends ItemView {
     try {
       const runner = this.getRunner();
       const tokens = await runner.getSessionTokens(sid);
+      if (isStale()) return;
       this.contextBaseInput = tokens.input;
       this.contextUsed = tokens.input;
       if (
@@ -645,12 +688,14 @@ export class ChatView extends ItemView {
       }
       if (!this.contextLimit) {
         const activeMod = this.activeModelFor(runner.id);
-        this.contextLimit = await runner.getModelContextLimit(activeMod);
+        const limit = await runner.getModelContextLimit(activeMod);
+        if (isStale()) return;
+        this.contextLimit = limit;
       }
     } catch (e) {
       console.error("[vault-agents] refreshContext error:", redact(e));
     }
-    this.updateContextUsage();
+    if (!isStale()) this.updateContextUsage();
   }
 
   private addStats(info: FinishInfo): void {
@@ -736,11 +781,13 @@ export class ChatView extends ItemView {
 
     this.agentBtn = selectorGroup.createEl("button", {
       cls: "opencode-agent-btn",
+      attr: { type: "button" },
     });
     this.agentBtn.addEventListener("click", () => this.openAgentList());
 
     this.modelBtn = selectorGroup.createEl("button", {
       cls: "opencode-model-btn",
+      attr: { type: "button" },
     });
     this.modelBtn.addEventListener("click", () => void this.openModelList());
 
@@ -748,13 +795,19 @@ export class ChatView extends ItemView {
 
     buttons.createSpan({ cls: "opencode-buttons-spacer" });
 
-    this.sendBtn = buttons.createEl("button", { cls: "opencode-send-btn" });
+    this.sendBtn = buttons.createEl("button", {
+      cls: "opencode-send-btn",
+      attr: { type: "button", "aria-label": this.plugin.t("Send") },
+    });
     const sendIcon = this.sendBtn.createSpan({ cls: "opencode-btn-icon" });
     setIcon(sendIcon, "send");
     this.sendBtn.createSpan({ text: this.plugin.t("Send") });
     this.sendBtn.addEventListener("click", () => void this.send());
 
-    this.stopBtn = buttons.createEl("button", { cls: "opencode-stop-btn" });
+    this.stopBtn = buttons.createEl("button", {
+      cls: "opencode-stop-btn",
+      attr: { type: "button", "aria-label": this.plugin.t("Stop") },
+    });
     const stopIcon = this.stopBtn.createSpan({ cls: "opencode-btn-icon" });
     setIcon(stopIcon, "square");
     this.stopBtn.createSpan({ text: this.plugin.t("Stop") });
@@ -802,10 +855,9 @@ export class ChatView extends ItemView {
       });
       const chevEl = this.agentBtn.createSpan({ cls: "opencode-chip-chevron" });
       setIcon(chevEl, "chevron-down");
-      this.agentBtn.setAttribute(
-        "title",
-        `${this.plugin.t("AI Engine")}: ${this.engineLabel(engine)}`
-      );
+      const agentTitle = `${this.plugin.t("AI Engine")}: ${this.engineLabel(engine)}`;
+      this.agentBtn.setAttribute("title", agentTitle);
+      this.agentBtn.setAttribute("aria-label", agentTitle);
     }
 
     if (this.modelBtn) {
@@ -834,10 +886,9 @@ export class ChatView extends ItemView {
 
       const chevEl = this.modelBtn.createSpan({ cls: "opencode-chip-chevron" });
       setIcon(chevEl, "chevron-down");
-      this.modelBtn.setAttribute(
-        "title",
-        `${this.plugin.t("Model")}: ${m || this.plugin.t("(CLI default)")}`
-      );
+      const modelTitle = `${this.plugin.t("Model")}: ${m || this.plugin.t("(CLI default)")}`;
+      this.modelBtn.setAttribute("title", modelTitle);
+      this.modelBtn.setAttribute("aria-label", modelTitle);
     }
   }
 
@@ -866,11 +917,16 @@ export class ChatView extends ItemView {
     new AgentSuggestModal(this.app, this.plugin, items, (item) => {
       const engineChanged = item.id !== activeEngine;
       this.plugin.settings.engine = item.id;
-      if (this.viewSession && engineChanged) {
-        this.viewSession = "";
-        this.plugin.settings.sessionId = "";
-        void this.plugin.saveSettings();
+      if (engineChanged) {
+        if (this.viewSession) {
+          this.viewSession = "";
+          this.plugin.settings.sessionId = "";
+          if (this.sessionSelect) this.sessionSelect.value = "";
+          this.updateSessionBtnStates();
+        }
         this.loadHistoryForSession("");
+        void this.plugin.saveSettings();
+        void this.populateSessionSelect();
       } else {
         void this.plugin.saveSettings();
         this.updateModelBtn();
@@ -951,7 +1007,7 @@ export class ChatView extends ItemView {
             this.plugin.settings.sessionEngines = {};
           }
           this.plugin.settings.sessionEngines[id] = runner.id;
-          void this.plugin.saveSettings();
+          void this.plugin.saveSettings(false);
         },
         onActivity: (activity) => {
           if (isCurrent()) bubble.setActivity(activity);
@@ -1040,7 +1096,7 @@ export class ChatView extends ItemView {
   private finishContinuation(prompt: string, notice: string): void {
     this.viewSession = "";
     this.plugin.settings.sessionId = "";
-    void this.plugin.saveSettings();
+    void this.plugin.saveSettings(false);
     void this.populateSessionSelect();
     this.loadHistoryForSession("");
     this.inputEl.value = prompt;
@@ -1057,9 +1113,21 @@ export class ChatView extends ItemView {
     );
   }
 
+  private isShowingWelcomeOnly(): boolean {
+    return (
+      Boolean(this.messagesEl) &&
+      this.messagesEl.children.length === 1 &&
+      Boolean(
+        this.messagesEl.firstElementChild?.classList.contains(
+          "opencode-welcome"
+        )
+      )
+    );
+  }
+
   private addWelcome(): void {
     const row = this.messagesEl.createDiv({
-      cls: "opencode-message opencode-message--assistant",
+      cls: "opencode-message opencode-message--assistant opencode-welcome",
     });
     const text = this.plugin.t(
       "Hi! I am Vault Agents, connecting AI agents directly to your " +
@@ -1123,15 +1191,24 @@ export class ChatView extends ItemView {
     }
 
     this.dispatching = true;
+    if (this.sendBtn) this.sendBtn.disabled = true;
+    if (this.inputEl) this.inputEl.disabled = true;
     try {
       const filePaths = await this.attachmentManager.prepareAttachments(
         this.getRunner()
       );
+      if (this.closed) {
+        this.dispatching = false;
+        return;
+      }
       this.attachmentManager.clear();
       this.dispatching = false;
+      if (this.sendBtn) this.sendBtn.disabled = false;
       this.doRun(prompt, filePaths);
     } catch (e) {
       this.dispatching = false;
+      if (this.sendBtn) this.sendBtn.disabled = false;
+      if (this.inputEl && !this.running) this.inputEl.disabled = false;
       new Notice(`${this.plugin.t("Error:")} ${redact((e as Error).message)}`);
     }
   }
@@ -1194,7 +1271,7 @@ export class ChatView extends ItemView {
               this.plugin.settings.sessionEngines = {};
             }
             this.plugin.settings.sessionEngines[id] = runner.id;
-            void this.plugin.saveSettings();
+            void this.plugin.saveSettings(false);
             void this.populateSessionSelect();
           }
           if (this.pendingUser) {
@@ -1352,14 +1429,25 @@ export class ChatView extends ItemView {
     this.scrollToBottom();
   }
 
+  private resetSessionRenderComponent(): Component {
+    if (this.sessionRenderComponent) {
+      this.removeChild(this.sessionRenderComponent);
+      this.sessionRenderComponent = null;
+    }
+    this.sessionRenderComponent = this.addChild(new Component());
+    return this.sessionRenderComponent;
+  }
+
   private addAssistantMessage(): AssistantBubble {
     const row = this.messagesEl.createDiv({
       cls: "opencode-message opencode-message--assistant",
     });
+    const renderParent =
+      this.sessionRenderComponent ?? this.resetSessionRenderComponent();
     const bubble = new AssistantBubble(
       row,
       this.app,
-      this,
+      renderParent,
       this.assistantLabel(),
       (s) => this.plugin.t(s),
       this.plugin.settings.showToolIO,
@@ -1399,8 +1487,16 @@ export class ChatView extends ItemView {
   }
 
   copyText(text: string): void {
-    void navigator.clipboard.writeText(text);
-    new Notice(this.plugin.t("Text copied."));
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        new Notice(this.plugin.t("Text copied."));
+      })
+      .catch((e) => {
+        new Notice(
+          `${this.plugin.t("Error:")} ${redact((e as Error)?.message || String(e))}`
+        );
+      });
   }
 
   private handleStreamError(err: string): void {
@@ -1438,7 +1534,7 @@ export class ChatView extends ItemView {
       }
       this.viewSession = "";
       this.plugin.settings.sessionId = "";
-      void this.plugin.saveSettings();
+      void this.plugin.saveSettings(false);
       void this.populateSessionSelect();
       return;
     }
@@ -1461,12 +1557,19 @@ export class ChatView extends ItemView {
   }
 
   loadHistoryForSession(sessionId: string): void {
+    this.activeBubble?.dispose();
+    this.activeBubble = null;
+    const renderComp = this.resetSessionRenderComponent();
     this.messagesEl.empty();
+    this.autoScrollEnabled = true;
     this.resetStats();
+    this.contextSeq++;
     this.contextUsed = 0;
     this.contextBaseInput = 0;
     this.contextRunInput = 0;
     this.contextLimit = 0;
+    const engine = this.sessionEngine();
+    this.lastEngineModelKey = `${engine}\0${this.activeModelFor(engine)}`;
     this.updateContextUsage();
     this.updateModelBtn();
 
@@ -1489,7 +1592,7 @@ export class ChatView extends ItemView {
         renderHistoryAssistantRow(
           this.messagesEl,
           this.app,
-          this,
+          renderComp,
           rec,
           this.assistantLabel(),
           this.assistantIcon(),
@@ -1547,12 +1650,27 @@ export class ChatView extends ItemView {
     if (this.inputEl) this.inputEl.disabled = running;
   }
 
-  scrollToBottom(): void {
+  private isNearBottom(thresholdPx = 80): boolean {
+    if (!this.messagesEl) return true;
+    const distance =
+      this.messagesEl.scrollHeight -
+      this.messagesEl.scrollTop -
+      this.messagesEl.clientHeight;
+    return distance <= thresholdPx;
+  }
+
+  scrollToBottom(force = true): void {
+    if (!this.messagesEl) return;
+    if (force) this.autoScrollEnabled = true;
     this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
   }
 
   scheduleScroll(): void {
+    if (!this.autoScrollEnabled) return;
     if (this.renderTimer !== null) clearTimeout(this.renderTimer);
-    this.renderTimer = window.setTimeout(() => this.scrollToBottom(), 150);
+    this.renderTimer = window.setTimeout(() => {
+      this.renderTimer = null;
+      if (this.autoScrollEnabled) this.scrollToBottom(false);
+    }, 150);
   }
 }

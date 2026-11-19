@@ -21,7 +21,7 @@ import {
 } from "./core/types";
 import { VaultAgentsSettingTab } from "./features/settings/settingsTab";
 import { registerAgentIcons } from "./shared/agentIcons";
-import { translate } from "./i18n";
+import { translate, type TranslatableText } from "./i18n";
 
 export type {
   HistoryUser,
@@ -169,7 +169,7 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
   }
 
   // Translate a UI string according to the selected language.
-  t(text: string): string {
+  t(text: TranslatableText): string {
     return translate(this.settings?.language ?? "en", text);
   }
 
@@ -204,13 +204,18 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     return view;
   }
 
-  async onunload(): Promise<void> {
-    await this.flushSave();
+  onunload(): void {
+    // Kill running CLI subprocesses synchronously first: Obsidian does not
+    // await an async onunload(), so deferring killAll behind flushSave could
+    // leave orphaned processes on shutdown.
     if (this.registry) {
       for (const provider of this.registry.getAll()) {
         provider.killAll();
       }
     }
+    void this.flushSave().catch((e) => {
+      console.debug("[vault-agents] flushSave on unload failed:", e);
+    });
   }
 
   private collectKeepIds(): string[] {
@@ -329,13 +334,19 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     }
   }
 
-  scheduleSaveSettings(): void {
+  scheduleSaveSettings(refreshViews = true): void {
     this.scheduleSave();
-    this.refreshOpenViews();
+    if (refreshViews) this.refreshOpenViews();
   }
 
-  async saveSettings(): Promise<void> {
+  async saveSettings(refreshViews = true): Promise<void> {
     await this.flushSave();
-    this.refreshOpenViews();
+    if (refreshViews) this.refreshOpenViews();
+  }
+
+  async flushPendingSave(): Promise<void> {
+    if (this.saveTimer !== null) {
+      await this.flushSave();
+    }
   }
 }

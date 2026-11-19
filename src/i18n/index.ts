@@ -2,13 +2,10 @@ export type Language = "en" | "it";
 
 // English is the default and is used inline in the code. This map provides
 // the Italian translations for the optional "it" language setting.
-const IT: Record<string, string> = {
+export const IT_TRANSLATIONS = {
   // --- settings ---
   "Language": "Lingua",
-  [
-    "Interface language. English is the default. Some command names " +
-      "update after reloading Obsidian."
-  ]:
+  "Interface language. English is the default. Some command names update after reloading Obsidian.":
     "Lingua dell'interfaccia. L'inglese è il default. Alcuni nomi dei " +
     "comandi si aggiornano dopo il ricaricamento di Obsidian.",
   "Language changed. Reload Obsidian to apply it everywhere.":
@@ -18,45 +15,26 @@ const IT: Record<string, string> = {
   "Binary path": "Percorso binario",
   "Convert documents with anydoc": "Converti i documenti con anydoc",
   "Anydoc binary path": "Percorso binario anydoc",
-  [
-    "Command or full path to the anydoc executable " +
-      "(npm install -g @firecrawl/anydoc)."
-  ]:
+  "Command or full path to the anydoc executable (npm install -g @firecrawl/anydoc).":
     "Comando o percorso completo dell'eseguibile anydoc " +
     "(npm install -g @firecrawl/anydoc).",
   "anydoc conversion failed": "Conversione anydoc fallita",
   "Send documents to hosted OCR": "Invia i documenti a OCR hosted",
-  [
-    "Upload scanned documents to the external Firecrawl Parse " +
-      "service. Only enable this if you accept that the document " +
-      "contents leave your machine."
-  ]:
+  "Upload scanned documents to the external Firecrawl Parse service. Only enable this if you accept that the document contents leave your machine.":
     "Carica i documenti scansionati sul servizio esterno Firecrawl " +
     "Parse. Attivalo solo se accetti che il contenuto dei documenti " +
     "lasci la tua macchina.",
-  [
-    "Windows .cmd/.bat launchers cannot be run safely; use the " +
-      "native .exe or install the Node CLI."
-  ]:
+  "Windows .cmd/.bat launchers cannot be run safely; use the native .exe or install the Node CLI.":
     "I launcher Windows .cmd/.bat non possono essere eseguiti in " +
     "sicurezza; usa l'eseguibile nativo .exe o installa la versione " +
     "Node del CLI.",
-  [
-    "Automatic cleanup on startup is disabled. Use the button below " +
-      "to remove oversized file attachments from the OpenCode " +
-      "database. Only attachments older than the minimum age and " +
-      "larger than the max size are removed; conversation text is " +
-      "never touched."
-  ]:
+  "Automatic cleanup on startup is disabled. Use the button below to remove oversized file attachments from the OpenCode database. Only attachments older than the minimum age and larger than the max size are removed; conversation text is never touched.":
     "La pulizia automatica all'avvio è disattivata. Usa il pulsante qui " +
     "sotto per rimuovere gli allegati troppo grandi dal database di " +
     "OpenCode. Vengono rimossi solo gli allegati più vecchi dell'età " +
     "minima e più grandi della dimensione massima; il testo delle " +
     "conversazioni non viene mai toccato.",
-  [
-    "Command or full path to the opencode executable. Usually 'opencode' " +
-      "is enough if it is on your PATH."
-  ]:
+  "Command or full path to the opencode executable. Usually 'opencode' is enough if it is on your PATH.":
     "Comando o percorso completo dell'eseguibile opencode. Di solito " +
     "basta 'opencode' se è nel PATH.",
   "Model": "Modello",
@@ -74,11 +52,7 @@ const IT: Record<string, string> = {
     "Sessione azzerata: il prossimo messaggio partirà da una nuova sessione.",
   "Chat history": "Cronologia chat",
   "Save chat history in the vault": "Salva la cronologia chat nel vault",
-  [
-    "Messages and reasoning are stored in plain text in this " +
-      "plugin's data.json. Disable to keep history only for the " +
-      "current session."
-  ]:
+  "Messages and reasoning are stored in plain text in this plugin's data.json. Disable to keep history only for the current session.":
     "Messaggi e ragionamento vengono salvati in chiaro nel data.json " +
     "del plugin. Disattiva per tenere la cronologia solo per la sessione " +
     "corrente.",
@@ -87,19 +61,13 @@ const IT: Record<string, string> = {
     "Le sessioni più vecchie vengono rimosse quando si supera questo " +
     "limite.",
   "Max history size (MB)": "Dimensione massima cronologia (MB)",
-  [
-    "Oldest sessions are dropped when the saved history grows " +
-      "beyond this size."
-  ]:
+  "Oldest sessions are dropped when the saved history grows beyond this size.":
     "Le sessioni più vecchie vengono scartate quando la cronologia " +
     "salvata supera questa dimensione.",
   "Auto-approve permissions": "Auto-approve permessi",
   "Show reasoning": "Mostra ragionamento",
   "Show tool details": "Mostra dettagli degli strumenti",
-  [
-    "Show the input and output of every tool executed during the " +
-      "request, in collapsible blocks."
-  ]:
+  "Show the input and output of every tool executed during the request, in collapsible blocks.":
     "Mostra input e output di ogni strumento eseguito durante la " +
     "richiesta, in blocchi apribili con un clic.",
   "Database self-cleanup": "Pulizia manuale del database",
@@ -108,18 +76,11 @@ const IT: Record<string, string> = {
     "Gli allegati file più grandi di questo valore (nel database) " +
     "vengono rimossi.",
   "Minimum age (days)": "Età minima (giorni)",
-  [
-    "Only attachments older than this are removed, so recent files " +
-      "stay available."
-  ]:
+  "Only attachments older than this are removed, so recent files stay available.":
     "Vengono rimossi solo gli allegati più vecchi di questo periodo, " +
     "così i file recenti restano disponibili.",
   "Max attachment size (MB)": "Dimensione massima allegato (MB)",
-  [
-    "When anydoc fails to convert a document, files larger than this are " +
-      "not attached to the request, to avoid storing unusable copies in " +
-      "the database."
-  ]:
+  "When anydoc fails to convert a document, files larger than this are not attached to the request, to avoid storing unusable copies in the database.":
     "Quando anydoc non riesce a convertire un documento, i file più " +
     "grandi di questo valore non vengono allegati alla richiesta, per " +
     "evitare di salvare copie inutilizzabili nel database.",
@@ -130,10 +91,7 @@ const IT: Record<string, string> = {
   "Cleanup": "Pulisci",
   "Cleaning...": "Pulizia in corso...",
   "Cleanup done.": "Pulizia completata.",
-  [
-    "Attachment skipped: the file is larger than $1 MB and could not be " +
-      "converted, so it was not attached."
-  ]:
+  "Attachment skipped: the file is larger than $1 MB and could not be converted, so it was not attached.":
     "Allegato saltato: il file è più grande di $1 MB e non è stato " +
     "possibile convertirlo, quindi non è stato allegato.",
   "Test connection": "Testa connessione",
@@ -153,11 +111,7 @@ const IT: Record<string, string> = {
   "No active note": "Nessuna nota attiva",
   "Analyze the current note with agent":
     "Analizza la nota corrente con l'agente",
-  [
-    "Analyze the content of the attached note below: provide a " +
-      "summary, key points, possible links with other vault notes " +
-      "and suggestions to develop it."
-  ]:
+  "Analyze the content of the attached note below: provide a summary, key points, possible links with other vault notes and suggestions to develop it.":
     "Analizza il contenuto della nota allegata qui sotto: fornisci un " +
     "riassunto, i punti chiave, eventuali collegamenti con altre note " +
     "del vault e suggerimenti per svilupparla.",
@@ -171,17 +125,10 @@ const IT: Record<string, string> = {
   "Error": "Errore",
   "Copy text": "Copia testo",
   "Text copied.": "Testo copiato.",
-  [
-    "Type a message for the agent... (Enter to send, Shift+Enter for " +
-      "a new line)"
-  ]:
+  "Type a message for the agent... (Enter to send, Shift+Enter for a new line)":
     "Scrivi un messaggio per l'agente... (Invio per inviare, " +
     "Shift+Invio per andare a capo)",
-  [
-    "Hi! I am Vault Agents, connecting AI agents directly to your " +
-      "notes. Write a message below. Try the commands: / for commands, " +
-      "@ to attach a file, ! for quick actions."
-  ]:
+  "Hi! I am Vault Agents, connecting AI agents directly to your notes. Write a message below. Try the commands: / for commands, @ to attach a file, ! for quick actions.":
     "Ciao! Sono Vault Agents, il plugin che connette gli agenti AI " +
     "direttamente alle tue note. Scrivi un messaggio qui sotto. Prova " +
     "i comandi: / per le azioni, @ per allegare file, ! per azioni rapide.",
@@ -203,10 +150,7 @@ const IT: Record<string, string> = {
   "The title cannot be empty.": "Il titolo non può essere vuoto.",
   "Session renamed.": "Sessione rinominata.",
   "Session deleted.": "Sessione eliminata.",
-  [
-    "Do you want to delete the session \"$1\"? The history saved in " +
-      "Obsidian will also be removed."
-  ]:
+  "Do you want to delete the session \"$1\"? The history saved in Obsidian will also be removed.":
     "Vuoi eliminare la sessione \"$1\"? Verrà rimossa anche la " +
     "cronologia salvata in Obsidian.",
   "Delete": "Elimina",
@@ -216,11 +160,7 @@ const IT: Record<string, string> = {
   "Retry": "Riprova",
   "Enable auto-approve": "Attiva auto-approve",
   "Enable auto-approve?": "Attivare auto-approve?",
-  [
-    "With auto-approve enabled the agent can run shell commands and " +
-      "edit files without asking for confirmation. Enable it only for " +
-      "vaults and notes you trust."
-  ]:
+  "With auto-approve enabled the agent can run shell commands and edit files without asking for confirmation. Enable it only for vaults and notes you trust.":
     "Con auto-approve attivo l'agente può eseguire comandi shell e " +
     "modificare file senza chiedere conferma. Attivalo solo su vault e " +
     "note di cui ti fidi.",
@@ -235,11 +175,7 @@ const IT: Record<string, string> = {
   "The agent stopped because it needs permission to continue.":
     "L'agente si è fermato perché ha bisogno di un permesso per " +
     "continuare.",
-  [
-    "Auto-approve is off: the agent may stop when it needs to edit " +
-      "files or run commands. Enable it from the shield icon or in " +
-      "Settings."
-  ]:
+  "Auto-approve is off: the agent may stop when it needs to edit files or run commands. Enable it from the shield icon or in Settings.":
     "Auto-approve è disattivato: l'agente potrebbe fermarsi quando deve " +
     "modificare file o eseguire comandi. Attivalo dall'icona scudo o " +
     "nelle impostazioni.",
@@ -286,23 +222,14 @@ const IT: Record<string, string> = {
   "out": "out",
   "included": "incluso",
   "Cost:": "Costo:",
-  [
-    "The selected model does not support images. Remove the attached " +
-      "image or choose a multimodal (vision) model from the Model menu."
-  ]:
+  "The selected model does not support images. Remove the attached image or choose a multimodal (vision) model from the Model menu.":
     "Il modello selezionato non supporta le immagini. Rimuovi l'allegato " +
     "immagine oppure scegli un modello multimodale (con supporto vision) " +
     "dal menu Modello.",
-  [
-    "The saved session no longer exists: a new one will be created, " +
-      "resend the message."
-  ]:
+  "The saved session no longer exists: a new one will be created, resend the message.":
     "La sessione salvata non esiste più: ne verrà creata una nuova, " +
     "rispedisci il messaggio.",
-  [
-    "The agent process exited with code $1. Check the binary path and " +
-      "the model in the settings."
-  ]:
+  "The agent process exited with code $1. Check the binary path and the model in the settings.":
     "Il processo dell'agente è terminato con codice $1. Verifica il " +
     "percorso del binario e il modello nelle impostazioni.",
   "Session at the limit: new session created with the recent history.":
@@ -346,8 +273,8 @@ const IT: Record<string, string> = {
   "Prompt": "Prompt",
   "Prompt name": "Nome prompt",
   "Prompt text": "Testo prompt",
-  "No saved prompts — add them in Settings":
-    "Nessun prompt salvato — aggiungili nelle impostazioni",
+  "No saved prompts - add them in Settings":
+    "Nessun prompt salvato - aggiungili nelle impostazioni",
   "The prompt cannot be empty.": "Il prompt non può essere vuoto.",
   "(untitled)": "(senza titolo)",
   "Attached": "Allegato",
@@ -362,11 +289,7 @@ const IT: Record<string, string> = {
   "pin/unpin session": "fissa/rimuovi sessione",
   "Pin the session in the list": "Fissa la sessione nella lista",
   "active model": "modello attivo",
-  [
-    "Summarize in detail this conversation: goals, decisions made, " +
-      "work done, current state and next steps. Write the summary so " +
-      "the work can continue in a new session without losing context."
-  ]:
+  "Summarize in detail this conversation: goals, decisions made, work done, current state and next steps. Write the summary so the work can continue in a new session without losing context.":
     "Riassumi in dettaglio questa conversazione: obiettivi, decisioni " +
     "prese, lavoro svolto, stato attuale e prossimi passi. Scrivi il " +
     "riassunto in modo che si possa continuare il lavoro in una nuova " +
@@ -374,41 +297,25 @@ const IT: Record<string, string> = {
 
   // --- Antigravity & multi-engine ---
   "AI Engine": "Motore AI",
-  [
-    "Select which AI backend to use. Antigravity connects directly to " +
-      "your Google AI Pro subscription with no API key needed."
-  ]:
+  "Select which AI backend to use. Antigravity connects directly to your Google AI Pro subscription with no API key needed.":
     "Seleziona quale backend AI usare. Antigravity si collega " +
     "direttamente al tuo abbonamento Google AI Pro senza alcuna API key.",
   "Antigravity CLI (Google AI Pro)": "Antigravity CLI (Google AI Pro)",
   "OpenCode CLI": "OpenCode CLI",
   "General settings": "Impostazioni generali",
   "Document conversion": "Conversione documenti",
-  [
-    "Command or full path to the agy executable. Default is 'agy' or " +
-      "'~/.local/bin/agy'."
-  ]:
+  "Command or full path to the agy executable. Default is 'agy' or '~/.local/bin/agy'.":
     "Comando o percorso completo dell'eseguibile agy. Il default è " +
     "'agy' o '~/.local/bin/agy'.",
-  [
-    "Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet " +
-      "5.5). The effort is part of the model name. Included with Google " +
-      "AI Pro."
-  ]:
+  "Pick a model from Antigravity (Gemini 3.8 Flash, Claude Opus/Sonnet 5.5). The effort is part of the model name. Included with Google AI Pro.":
     "Scegli un modello da Antigravity (Gemini 3.8 Flash, Claude " +
     "Opus/Sonnet 5.5). L'effort fa parte del nome del modello. Incluso " +
     "con Google AI Pro.",
-  [
-    "Pick a model from the opencode list. Default uses the OpenCode " +
-      "Go provider."
-  ]:
+  "Pick a model from the opencode list. Default uses the OpenCode Go provider.":
     "Scegli un modello dall'elenco opencode. Il default usa il provider " +
     "OpenCode Go.",
   "Reasoning effort": "Livello di ragionamento (Effort)",
-  [
-    "Effort sent only for models whose name does not already include it. " +
-      "Antigravity model names usually end with -low/-medium/-high."
-  ]:
+  "Effort sent only for models whose name does not already include it. Antigravity model names usually end with -low/-medium/-high.":
     "Effort inviato solo per i modelli il cui nome non lo include già. " +
     "I nomi dei modelli Antigravity di solito terminano con " +
     "-low/-medium/-high.",
@@ -423,10 +330,7 @@ const IT: Record<string, string> = {
     "Esegue '$1 --version' per verificare che il binario sia raggiungibile.",
   "Hermes Agent CLI (Nous Research)": "Hermes Agent CLI (Nous Research)",
   "Pi Coding Agent CLI": "Pi Coding Agent CLI",
-  [
-    "Command or full path to the hermes executable. Default is 'hermes' " +
-      "or '~/.hermes/bin/hermes'."
-  ]:
+  "Command or full path to the hermes executable. Default is 'hermes' or '~/.hermes/bin/hermes'.":
     "Comando o percorso completo dell'eseguibile hermes. Il default è " +
     "'hermes' o '~/.hermes/bin/hermes'.",
   "Optional reasoning effort level for Hermes.":
@@ -436,10 +340,7 @@ const IT: Record<string, string> = {
   "Optional Hermes backend provider (e.g. openrouter, nous, anthropic).":
     "Provider backend opzionale per Hermes (es. openrouter, nous, anthropic).",
   "e.g. openrouter": "es. openrouter",
-  [
-    "Command or full path to the pi executable. Usually 'pi' " +
-      "is enough if it is on your PATH."
-  ]:
+  "Command or full path to the pi executable. Usually 'pi' is enough if it is on your PATH.":
     "Comando o percorso completo dell'eseguibile pi. Di solito " +
     "basta 'pi' se è nel PATH.",
   "Optional model provider for Pi (e.g. anthropic, openai, google).":
@@ -449,30 +350,18 @@ const IT: Record<string, string> = {
     "Livello di ragionamento passato a Pi (--thinking).",
   "Off": "Disattivato",
   "Minimal": "Minimo",
-  [
-    "Automatically allow tool permissions (bash, file edits, etc.). " +
-      "Turn it off for extra safety."
-  ]:
+  "Automatically allow tool permissions (bash, file edits, etc.). Turn it off for extra safety.":
     "Concede automaticamente i permessi degli strumenti (bash, edit " +
     "file, ecc.). Disattivalo per maggiore sicurezza.",
   "Show the model's reasoning blocks.":
     "Mostra i blocchi di ragionamento del modello.",
-  [
-    "The persistent session id used for the chat. Managed automatically. " +
-      "Empty = new session on next message."
-  ]:
+  "The persistent session id used for the chat. Managed automatically. Empty = new session on next message.":
     "L'ID di sessione persistente usato per la chat. Gestito " +
     "automaticamente. Vuoto = nuova sessione al prossimo messaggio.",
-  [
-    "Run anydoc on attached documents (PDF, Word, Excel, etc.) and " +
-      "attach them as Markdown instead of the original file."
-  ]:
+  "Run anydoc on attached documents (PDF, Word, Excel, etc.) and attach them as Markdown instead of the original file.":
     "Esegue anydoc sui documenti allegati (PDF, Word, Excel, ecc.) e li " +
     "allega come Markdown anziché il file originale.",
-  [
-    "Save reusable prompt templates. In the chat, type /prompt to " +
-      "quickly insert them into the composer."
-  ]:
+  "Save reusable prompt templates. In the chat, type /prompt to quickly insert them into the composer.":
     "Salva modelli di prompt riutilizzabili. Nella chat, digita /prompt " +
     "per inserirli rapidamente nel compositore.",
   "Included with $1 ($0.00)": "Incluso con $1 ($0.00)",
@@ -481,16 +370,10 @@ const IT: Record<string, string> = {
   "(default from $1)": "(default di $1)",
   "(default)": "(default)",
   "default": "default",
-  [
-    "Leave on default to use your ~/.hermes/config.yaml model, or enter " +
-      "a provider/model ID."
-  ]:
+  "Leave on default to use your ~/.hermes/config.yaml model, or enter a provider/model ID.":
     "Lascia su default per usare il modello in ~/.hermes/config.yaml, " +
     "oppure inserisci un ID provider/modello.",
-  [
-    "Leave on default to use your Pi config, or pick a model from " +
-      "'pi --list-models'."
-  ]:
+  "Leave on default to use your Pi config, or pick a model from 'pi --list-models'.":
     "Lascia su default per usare la configurazione di Pi, oppure scegli " +
     "un modello da 'pi --list-models'.",
   "select": "seleziona",
@@ -504,10 +387,7 @@ const IT: Record<string, string> = {
   "Models": "Modelli",
   "No matching models found.": "Nessun modello corrispondente trovato.",
   "Auto-continue on context limit": "Continua automaticamente al limite del contesto",
-  [
-    "Automatically summarize and prepare a new session when context " +
-      "usage exceeds 92%."
-  ]:
+  "Automatically summarize and prepare a new session when context usage exceeds 92%.":
     "Riassume e prepara automaticamente una nuova sessione quando l'uso del " +
     "contesto supera il 92%.",
   "Context limit reached: generating summary for a new session...":
@@ -549,10 +429,19 @@ const IT: Record<string, string> = {
     "Seleziona o scrivi almeno una risposta prima di inviare.",
   "Here are my answers to your questions:":
     "Ecco le mie risposte alle tue domande:",
-};
+} as const satisfies Record<string, string>;
 
-export function translate(lang: Language, text: string): string {
-  if (lang === "it") return IT[text] ?? text;
+export type TranslationKey = keyof typeof IT_TRANSLATIONS;
+export type TranslatableText = TranslationKey | (string & {});
+
+export function hasTranslation(text: string): text is TranslationKey {
+  return Object.prototype.hasOwnProperty.call(IT_TRANSLATIONS, text);
+}
+
+export function translate(lang: Language, text: TranslatableText): string {
+  if (lang === "it" && hasTranslation(text)) {
+    return IT_TRANSLATIONS[text];
+  }
   return text;
 }
 

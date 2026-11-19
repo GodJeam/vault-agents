@@ -173,7 +173,7 @@ export class SuggestPopup {
       return [
         {
           label: "/prompt",
-          desc: this.plugin.t("No saved prompts — add them in Settings"),
+          desc: this.plugin.t("No saved prompts - add them in Settings"),
           icon: "bookmark-plus",
           action: () => this.removeTrigger(),
         },

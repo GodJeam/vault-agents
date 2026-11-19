@@ -1,12 +1,19 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "child_process";
 import { createHash } from "crypto";
-import { existsSync, readFileSync, statSync } from "fs";
+import {
+  accessSync,
+  constants as fsConstants,
+  existsSync,
+  readFileSync,
+  statSync,
+} from "fs";
 import {
   copyFile,
   chmod,
   lstat,
   mkdir,
   readdir,
+  rename,
   stat,
   unlink,
 } from "fs/promises";
@@ -27,6 +34,8 @@ import type {
 } from "../core/types";
 
 export const MAX_STREAM_LINE_BYTES = 20_000_000;
+export const MAX_EXEC_OUTPUT_BYTES = 20_000_000;
+export const MAX_EXEC_STDERR_BYTES = 256 * 1024;
 
 /**
  * Maximum size (in bytes) of a text attachment to inline directly into CLI args
@@ -99,6 +108,16 @@ export function parseCmdNodeScript(
 }
 
 /**
+ * Return the per-user temp directory path used for `anydoc` conversions.
+ * Appending the POSIX UID prevents pre-creation DoS in shared `/tmp`.
+ */
+export function getAnydocTempDir(): string {
+  const suffix =
+    typeof process.getuid === "function" ? `-${process.getuid()}` : "";
+  return join(tmpdir(), `vault-agents-anydoc${suffix}`);
+}
+
+/**
  * Create the conversion cache directory with owner-only permissions. The
  * directory may already exist with looser permissions from older versions.
  */
@@ -117,6 +136,59 @@ export async function ensurePrivateTempDir(dir: string): Promise<void> {
 /** Restrict a converted file to its owner (best effort on non-POSIX systems). */
 export async function restrictFilePermissions(path: string): Promise<void> {
   await chmod(path, 0o600).catch(() => {});
+}
+
+/**
+ * Atomically replace `dest` with `src`, retrying transient Windows NTFS
+ * `EPERM`/`EACCES`/`EBUSY` contention and falling back to copy + unlink.
+ */
+export async function replaceFileSafely(
+  src: string,
+  dest: string
+): Promise<void> {
+  const retryDelaysMs = [25, 50, 100];
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+    try {
+      await rename(src, dest);
+      return;
+    } catch (e) {
+      lastErr = e;
+      const code = (e as NodeJS.ErrnoException)?.code;
+      if (
+        code !== "EPERM" &&
+        code !== "EACCES" &&
+        code !== "EBUSY" &&
+        code !== "EXDEV"
+      ) {
+        throw e;
+      }
+      if (code === "EXDEV") break;
+      if (attempt < retryDelaysMs.length) {
+        await new Promise((r) => setTimeout(r, retryDelaysMs[attempt]));
+      }
+    }
+  }
+  try {
+    await copyFile(src, dest);
+    await restrictFilePermissions(dest);
+    await unlink(src).catch(() => {});
+  } catch {
+    throw lastErr;
+  }
+}
+
+/** Check that a path points to a regular file (and is executable on POSIX). */
+export function isExecutableFile(p: string): boolean {
+  try {
+    if (!statSync(p).isFile()) return false;
+    if (process.platform !== "win32") {
+      accessSync(p, fsConstants.X_OK);
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export abstract class BaseCliRunner {
@@ -154,12 +226,11 @@ export abstract class BaseCliRunner {
         child.kill("SIGKILL");
       }
     } catch {
-      // ignore
-    }
-    try {
-      child.kill();
-    } catch {
-      // ignore
+      try {
+        child.kill();
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -181,6 +252,7 @@ export abstract class BaseCliRunner {
       }
       this.killNow(child);
     }, 1000);
+    if (typeof timer.unref === "function") timer.unref();
   }
 
   /**
@@ -215,6 +287,7 @@ export abstract class BaseCliRunner {
         join(home, ".opencode", "bin"),
         join(home, ".gemini", "antigravity-cli", "bin"),
         join(home, ".hermes", "bin"),
+        "/opt/homebrew/bin",
         "/usr/local/bin",
         "/usr/bin",
       ];
@@ -264,7 +337,7 @@ export abstract class BaseCliRunner {
     ) {
       return (
         message +
-        " — " +
+        ": " +
         this.plugin.t(
           "Windows .cmd/.bat launchers cannot be run safely; use the " +
             "native .exe or install the Node CLI."
@@ -411,7 +484,8 @@ export abstract class BaseCliRunner {
     args: string[],
     cwd?: string,
     extraEnv?: NodeJS.ProcessEnv,
-    timeoutMs = 30_000
+    timeoutMs = 30_000,
+    maxOutputBytes = MAX_EXEC_OUTPUT_BYTES
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = this.spawnBinary(bin, args, cwd, extraEnv);
@@ -430,16 +504,32 @@ export abstract class BaseCliRunner {
               reject(new Error(`CLI command timed out after ${timeoutMs}ms`));
             }, timeoutMs)
           : null;
+      timer?.unref?.();
 
       const cleanupTimer = () => {
         if (timer !== null) clearTimeout(timer);
       };
 
       child.stdout?.on("data", (d: string | Buffer) => {
-        out += typeof d === "string" ? d : d.toString("utf8");
+        if (settled) return;
+        const chunk = typeof d === "string" ? d : d.toString("utf8");
+        if (maxOutputBytes > 0 && out.length + chunk.length > maxOutputBytes) {
+          settled = true;
+          cleanupTimer();
+          this.killProc(child, true);
+          reject(
+            new Error(
+              `CLI output exceeded maximum buffer size (${maxOutputBytes} bytes)`
+            )
+          );
+          return;
+        }
+        out += chunk;
       });
       child.stderr?.on("data", (d: string | Buffer) => {
-        err += typeof d === "string" ? d : d.toString("utf8");
+        if (settled || err.length >= MAX_EXEC_STDERR_BYTES) return;
+        const chunk = typeof d === "string" ? d : d.toString("utf8");
+        err += chunk.slice(0, MAX_EXEC_STDERR_BYTES - err.length);
       });
       child.on("error", (e: NodeJS.ErrnoException) => {
         if (settled) return;
@@ -465,14 +555,32 @@ export abstract class BaseCliRunner {
    * Escape a string value for safe single-quoted SQLite literals.
    */
   public sqlEscape(value: string): string {
-    return String(value ?? "").replace(/'/g, "''");
+    return String(value ?? "").replace(/\0/g, "").replace(/'/g, "''");
   }
 
   /**
    * Execute a SQL query against a local SQLite database file via sqlite3 CLI.
    */
   protected execSqlite(dbPath: string, sql: string): Promise<string> {
-    return this.execCli("sqlite3", [dbPath, sql]);
+    return this.execCli(this.resolveBinaryPath("sqlite3"), [dbPath, sql]);
+  }
+
+  /**
+   * Execute a SQL query returning JSON rows via `sqlite3 -json`.
+   */
+  protected execSqliteJson(dbPath: string, sql: string): Promise<string> {
+    return this.execCli(this.resolveBinaryPath("sqlite3"), [
+      "-json",
+      dbPath,
+      sql,
+    ]);
+  }
+
+  /**
+   * Clear cached binary resolutions (e.g. after updating Binary path in Settings).
+   */
+  public invalidateBinaryCache(): void {
+    this.resolvedBinaries.clear();
   }
 
   /**
@@ -492,7 +600,9 @@ export abstract class BaseCliRunner {
     const cfg = this.plugin.getEngineConfig(this.descriptor.id);
     const binName = cfg.binary || this.descriptor.defaultBinary;
     const bin = this.resolveBinaryPath(binName);
-    return existsSync(bin);
+    const hasPath = bin.includes("/") || bin.includes("\\");
+    if (!hasPath) return false;
+    return isExecutableFile(bin);
   }
 
   /**
@@ -504,7 +614,7 @@ export abstract class BaseCliRunner {
   ): string {
     const cached = this.resolvedBinaries.get(bin);
     if (cached !== undefined && cached !== null) {
-      if (existsSync(cached)) return cached;
+      if (isExecutableFile(cached)) return cached;
       this.resolvedBinaries.delete(bin);
     }
 
@@ -517,7 +627,7 @@ export abstract class BaseCliRunner {
     }
 
     const hasSeparator = bin.includes("/") || bin.includes("\\");
-    if (hasSeparator && existsSync(bin)) {
+    if (hasSeparator && isExecutableFile(bin)) {
       this.resolvedBinaries.set(bin, bin);
       return bin;
     }
@@ -528,6 +638,7 @@ export abstract class BaseCliRunner {
       join(homedir(), ".gemini", "antigravity-cli", "bin", bin),
       join(homedir(), ".hermes", "bin", bin),
       join(homedir(), ".hermes", "hermes-agent", ".hermes", "bin", bin),
+      `/opt/homebrew/bin/${bin}`,
       `/usr/local/bin/${bin}`,
       `/usr/bin/${bin}`,
     ];
@@ -539,7 +650,7 @@ export abstract class BaseCliRunner {
 
     const allCandidates = [...candidatePaths, ...defaultCandidates, ...pathDirs];
     for (const p of allCandidates) {
-      if (existsSync(p)) {
+      if (isExecutableFile(p)) {
         this.resolvedBinaries.set(bin, p);
         return p;
       }
@@ -647,7 +758,7 @@ export abstract class BaseCliRunner {
     cwd?: string
   ): string {
     const s = this.plugin.settings;
-    let finalPrompt = prompt;
+    const blocks: string[] = [];
     let inlineBudget = MAX_TOTAL_INLINE_ATTACHMENT_BYTES;
     const maxInlineBytes = Math.min(
       MAX_INLINE_ATTACHMENT_BYTES,
@@ -657,7 +768,7 @@ export abstract class BaseCliRunner {
     for (const p of fileAttachments) {
       const fullPath = !isAbsolute(p) && cwd ? join(cwd, p) : p;
       if (BINARY_EXT_REGEX.test(fullPath)) {
-        finalPrompt = `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+        blocks.push(`[ATTACHMENT PATH: ${fullPath}]`);
         continue;
       }
       try {
@@ -665,21 +776,19 @@ export abstract class BaseCliRunner {
         if (
           chooseAttachmentMode(st.size, maxInlineBytes, inlineBudget) === "path"
         ) {
-          finalPrompt =
-            `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+          blocks.push(`[ATTACHMENT PATH: ${fullPath}]`);
           continue;
         }
         const content = readFileSync(fullPath, "utf-8");
         inlineBudget -= st.size;
         const filename = basename(fullPath);
-        finalPrompt =
-          `[ATTACHMENT: ${filename}]\n${content}\n\n---\n\n` + finalPrompt;
+        blocks.push(`[ATTACHMENT: ${filename}]\n${content}`);
       } catch {
-        finalPrompt =
-          `[ATTACHMENT PATH: ${fullPath}]\n\n---\n\n` + finalPrompt;
+        blocks.push(`[ATTACHMENT PATH: ${fullPath}]`);
       }
     }
-    return finalPrompt;
+    if (blocks.length === 0) return prompt;
+    return blocks.join("\n\n---\n\n") + "\n\n---\n\n" + prompt;
   }
 
   /**
@@ -999,13 +1108,13 @@ export abstract class BaseCliRunner {
   /**
    * Convert a document (PDF, Word, Excel, etc.) to Markdown using anydoc
    */
-  async convertDocument(absPath: string): Promise<string> {
+  async convertDocument(absPath: string, timeoutMs = 60_000): Promise<string> {
     const hostedOcr = this.plugin.settings.anydocHostedOcr;
     const hash = createHash("sha256")
       .update(`${absPath}\0ocr=${hostedOcr ? 1 : 0}`)
       .digest("hex")
       .slice(0, 16);
-    const dir = join(tmpdir(), "vault-agents-anydoc");
+    const dir = getAnydocTempDir();
     await ensurePrivateTempDir(dir);
     await this.cleanupTempFiles(dir);
     const outPath = join(dir, hash + ".md");
@@ -1021,29 +1130,62 @@ export abstract class BaseCliRunner {
     }
 
     const ext = extname(absPath) || ".pdf";
-    const cleanInput = join(dir, "in-" + hash + ext);
+    const uniqueTag =
+      `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const cleanInput = join(dir, `in-${hash}-${uniqueTag}${ext}`);
+    const tempOut = join(dir, `out-${hash}-${uniqueTag}.md`);
     await copyFile(absPath, cleanInput);
     await restrictFilePermissions(cleanInput);
 
     const bin = this.resolveBinaryPath(
       this.plugin.settings.anydocBinary || "anydoc"
     );
+    let committed = false;
     try {
       await new Promise<void>((resolve, reject) => {
         const child = this.spawnBinary(
           bin,
           buildAnydocArgs(
             cleanInput,
-            outPath,
+            tempOut,
             this.plugin.settings.anydocHostedOcr
           )
         );
+        child.stderr?.setEncoding("utf8");
         let err = "";
-        child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
-        child.on("error", (e: NodeJS.ErrnoException) =>
-          reject(new Error(this.spawnErrorMessage(e)))
-        );
+        let settled = false;
+        const maxErrBytes = 64 * 1024;
+
+        const timer =
+          timeoutMs > 0
+            ? setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                this.killProc(child, true);
+                reject(new Error(`anydoc timed out after ${timeoutMs}ms`));
+              }, timeoutMs)
+            : null;
+        timer?.unref?.();
+
+        const cleanupTimer = () => {
+          if (timer !== null) clearTimeout(timer);
+        };
+
+        child.stderr?.on("data", (d: string | Buffer) => {
+          if (settled || err.length >= maxErrBytes) return;
+          const chunk = typeof d === "string" ? d : d.toString("utf8");
+          err += chunk.slice(0, maxErrBytes - err.length);
+        });
+        child.on("error", (e: NodeJS.ErrnoException) => {
+          if (settled) return;
+          settled = true;
+          cleanupTimer();
+          reject(new Error(this.spawnErrorMessage(e)));
+        });
         child.on("close", (code) => {
+          if (settled) return;
+          settled = true;
+          cleanupTimer();
           if (code === 0) resolve();
           else {
             const detail = redact(err.trim().slice(0, 200));
@@ -1051,11 +1193,17 @@ export abstract class BaseCliRunner {
           }
         });
       });
+
+      await restrictFilePermissions(tempOut);
+      await replaceFileSafely(tempOut, outPath);
+      committed = true;
     } finally {
       await unlink(cleanInput).catch(() => {});
+      if (!committed) {
+        await unlink(tempOut).catch(() => {});
+      }
     }
 
-    await restrictFilePermissions(outPath);
     return outPath;
   }
 
@@ -1072,8 +1220,8 @@ export abstract class BaseCliRunner {
       for (const f of files) {
         try {
           const p = join(dir, f);
-          const st = await stat(p);
-          if (now - st.mtimeMs > maxAgeMs) {
+          const st = await lstat(p);
+          if (st.isFile() && now - st.mtimeMs > maxAgeMs) {
             await unlink(p);
           }
         } catch {

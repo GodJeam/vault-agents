@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { mkdtemp, mkdir, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { readFileSync, readdirSync } from "node:fs";
+import { chmod, mkdtemp, mkdir, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Component, type App } from "obsidian";
 import {
   DEFAULT_SETTINGS,
   getEngineConfig,
@@ -26,6 +27,8 @@ import {
   buildAnydocArgs,
   chooseAttachmentMode,
   ensurePrivateTempDir,
+  getAnydocTempDir,
+  isExecutableFile,
   parseCmdNodeScript,
   parseSqliteChanges,
   restrictFilePermissions,
@@ -34,15 +37,21 @@ import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
 import { HermesRunner } from "../src/providers/hermes/runner";
 import { PiRunner } from "../src/providers/pi/runner";
-import { formatToolAction } from "../src/features/chat/stepWidget";
+import { formatToolAction, serializeStepDetails } from "../src/features/chat/stepWidget";
 import { formatQuestionAnswers } from "../src/features/chat/questionCard";
+import { AssistantBubble } from "../src/features/chat/messageBubble";
 import {
   AGENT_ICON_IDS,
   AGENT_ICON_SVGS,
   buildAgentSvgMarkup,
 } from "../src/shared/agentIcons";
 import { fuzzyMatchScore } from "../src/shared/suggestModals";
-import { substitute, translate } from "../src/i18n";
+import {
+  IT_TRANSLATIONS,
+  hasTranslation,
+  substitute,
+  translate,
+} from "../src/i18n";
 
 function createMockHost(
   customSettings?: Partial<PluginSettings> & Record<string, unknown>,
@@ -822,9 +831,9 @@ test("formatToolAction and formatQuestionAnswers format output", () => {
   assert.match(formatted, /Here are my answers to your questions:/);
   assert.match(
     formatted,
-    /\*\*Style — Which tone should be used\?\*\*: Formal, with academic/
+    /\*\*Style: Which tone should be used\?\*\*: Formal, with academic/
   );
-  assert.match(formatted, /\*\*Language — Which language\?\*\*: English/);
+  assert.match(formatted, /\*\*Language: Which language\?\*\*: English/);
 });
 
 test("Runners compute total tokens and read history fallback", async () => {
@@ -1395,6 +1404,542 @@ test("fuzzyMatchScore ranks exact/prefix matches above fuzzy matches and rejects
   } as unknown as Record<string, unknown>);
   assert.deepEqual(migrated.settings.sessionTitles, { ses_1: "Architecture review" });
   assert.equal(migrated.settings.autoContinueOnLimit, false);
+});
+
+test("PiRunner deduplicates message_end/agent_end usage and joins multi-block content", () => {
+  const host = createMockHost();
+  const pi = new PiRunner(host);
+  const col = createCollector();
+  const state = {
+    accumulatedText: "",
+    accumulatedReasoning: "",
+    toolTitles: new Map(),
+    emittedUsage: false,
+  };
+
+  const assistantMsg = {
+    role: "assistant",
+    content: [
+      { type: "thinking", thinking: "Plan A" },
+      { type: "thinking", thinking: "Plan B" },
+      { type: "text", text: "First paragraph." },
+      { type: "text", text: "Second paragraph." },
+    ],
+    usage: { input: 100, output: 40, totalTokens: 140, cost: { total: 0.002 } },
+  };
+
+  pi.handleLine(JSON.stringify({ type: "message_end", message: assistantMsg }), col.cb, state);
+  pi.handleLine(JSON.stringify({ type: "agent_end", messages: [assistantMsg] }), col.cb, state);
+
+  assert.equal(col.finishes.length, 1, "agent_end must not double-count message_end usage");
+  assert.equal(col.finishes[0].tokens?.total, 140);
+  assert.equal(col.finishes[0].cost, 0.002);
+  assert.equal(col.texts.at(-1)?.text, "First paragraph.\n\nSecond paragraph.");
+  assert.equal(col.reasonings.at(-1)?.text, "Plan A\n\nPlan B");
+
+  // When only agent_end is emitted, usage must still be recorded once
+  const col2 = createCollector();
+  const state2 = {
+    accumulatedText: "",
+    accumulatedReasoning: "",
+    toolTitles: new Map(),
+    emittedUsage: false,
+  };
+  pi.handleLine(JSON.stringify({ type: "agent_end", messages: [assistantMsg] }), col2.cb, state2);
+  assert.equal(col2.finishes.length, 1);
+});
+
+test("inlinePromptAttachments preserves attachment order and Antigravity/Hermes caches behave cleanly", async () => {
+  const root = await mkdtemp(join(tmpdir(), "vault-agents-order-"));
+  try {
+    const f1 = join(root, "alpha.md");
+    const f2 = join(root, "beta.md");
+    const f3 = join(root, "gamma.md");
+    await writeFile(f1, "ALPHA_CONTENT", "utf8");
+    await writeFile(f2, "BETA_CONTENT", "utf8");
+    await writeFile(f3, "GAMMA_CONTENT", "utf8");
+
+    const host = createMockHost();
+    const hermes = new HermesRunner(host) as unknown as {
+      inlinePromptAttachments: (
+        prompt: string,
+        files: string[],
+        cwd?: string
+      ) => string;
+    };
+    const combined = hermes.inlinePromptAttachments(
+      "MAIN_PROMPT",
+      [f1, f2, f3],
+      root
+    );
+    const i1 = combined.indexOf("ALPHA_CONTENT");
+    const i2 = combined.indexOf("BETA_CONTENT");
+    const i3 = combined.indexOf("GAMMA_CONTENT");
+    const ip = combined.indexOf("MAIN_PROMPT");
+    assert.ok(i1 >= 0 && i2 > i1 && i3 > i2 && ip > i3, "attachments must keep [1, 2, 3] order before prompt");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+
+  // AntigravityRunner ignores foreign session IDs and does not cache fallback models on failure
+  const agyHost = createMockHost();
+  const agy = new AntigravityRunner(agyHost);
+  for (const foreignId of ["ses_abc123", "hermes-123", "pi-456"]) {
+    const args = agy.buildArgs({ prompt: "hi", fileAttachments: [], sessionId: foreignId });
+    assert.equal(args.includes("--resume"), false, `Antigravity should ignore ${foreignId}`);
+  }
+
+  let agyShouldFail = true;
+  (agy as unknown as { execCli: () => Promise<string> }).execCli = async () => {
+    if (agyShouldFail) throw new Error("CLI offline");
+    return "gemini-live-test  Gemini Live\n";
+  };
+  const fallbackModels = await agy.listModels(false);
+  assert.ok(fallbackModels.length > 0);
+  agyShouldFail = false;
+  const liveModels = await agy.listModels(false);
+  assert.equal(liveModels.includes("gemini-live-test"), true, "fallback models must not stick in cache");
+
+  // HermesRunner cache key respects options.provider
+  const hermesHost = createMockHost();
+  const hermes2 = new HermesRunner(hermesHost);
+  let hermesCalls = 0;
+  (
+    hermes2 as unknown as {
+      execHermesPython: (_script: string, extraArgs?: string[]) => Promise<string | null>;
+    }
+  ).execHermesPython = async (_script, extraArgs = []) => {
+    hermesCalls++;
+    const prov = extraArgs[0] || "default";
+    return JSON.stringify({ models: [`${prov}/model-${hermesCalls}`] });
+  };
+
+  hermesHost.getEngineConfig("hermes").options = { provider: "openai" };
+  const m1 = await hermes2.listModels(false);
+  const m1Cached = await hermes2.listModels(false);
+  assert.equal(hermesCalls, 1);
+  assert.deepEqual(m1, m1Cached);
+  assert.equal(m1.includes("openai/model-1"), true);
+
+  hermesHost.getEngineConfig("hermes").options = { provider: "anthropic" };
+  const m2 = await hermes2.listModels(false);
+  assert.equal(hermesCalls, 2);
+  assert.equal(m2.includes("anthropic/model-2"), true);
+  assert.equal(m2.includes("openai/model-1"), false);
+});
+
+test("isExecutableFile rejects directories and invalidateBinaryCache clears cached resolutions", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "vault-agents-exec-"));
+  try {
+    assert.equal(isExecutableFile(dir), false);
+    assert.equal(isExecutableFile(join(dir, "does-not-exist")), false);
+    assert.equal(isExecutableFile(process.execPath), true);
+
+    const host = createMockHost();
+    const runner = new HermesRunner(host) as unknown as {
+      resolvedBinaries: Map<string, string | null>;
+      resolveBinaryPath: (bin: string) => string;
+      invalidateBinaryCache: () => void;
+    };
+    runner.resolveBinaryPath(process.execPath);
+    assert.equal(runner.resolvedBinaries.has(process.execPath), true);
+    runner.invalidateBinaryCache();
+    assert.equal(runner.resolvedBinaries.size, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("execCli enforces maxOutputBytes and convertDocument enforces timeout and UID-scoped unique temp files", async () => {
+  const host = createMockHost();
+  const runner = new HermesRunner(host) as unknown as {
+    execCli: (
+      bin: string,
+      args: string[],
+      cwd?: string,
+      env?: NodeJS.ProcessEnv,
+      timeoutMs?: number,
+      maxOutputBytes?: number
+    ) => Promise<string>;
+  };
+
+  await assert.rejects(
+    () =>
+      runner.execCli(
+        process.execPath,
+        ["-e", "process.stdout.write('A'.repeat(2048))"],
+        undefined,
+        undefined,
+        5000,
+        512
+      ),
+    /exceeded maximum buffer size/
+  );
+
+  const anydocDir = getAnydocTempDir();
+  if (typeof process.getuid === "function") {
+    assert.ok(anydocDir.endsWith(`vault-agents-anydoc-${process.getuid()}`));
+  }
+
+  const root = await mkdtemp(join(tmpdir(), "vault-agents-anydoc-test-"));
+  const createdOutputs: string[] = [];
+  try {
+    const samplePdf = join(root, "sample.pdf");
+    await writeFile(samplePdf, "dummy pdf payload", "utf8");
+
+    // 1. Hanging anydoc script must time out
+    const hangScript = join(root, "hang-anydoc.mjs");
+    await writeFile(
+      hangScript,
+      "#!/usr/bin/env node\nsetTimeout(() => {}, 10000);\n",
+      "utf8"
+    );
+    await chmod(hangScript, 0o755);
+
+    const hangHost = createMockHost({ anydocBinary: hangScript });
+    const hangRunner = new HermesRunner(hangHost);
+    await assert.rejects(
+      () => hangRunner.convertDocument(samplePdf, 150),
+      /anydoc timed out after 150ms/
+    );
+
+    // 2. Concurrent conversions of the same file must use unique temp inputs and succeed cleanly
+    const okScript = join(root, "ok-anydoc.mjs");
+    await writeFile(
+      okScript,
+      [
+        "#!/usr/bin/env node",
+        "import { readFileSync, writeFileSync } from 'node:fs';",
+        "const args = process.argv.slice(2);",
+        "const input = args[0];",
+        "const outIdx = args.indexOf('-o');",
+        "const output = args[outIdx + 1];",
+        "setTimeout(() => {",
+        "  const content = readFileSync(input, 'utf8');",
+        "  writeFileSync(output, '# Converted\\n' + content, 'utf8');",
+        "}, 40);",
+      ].join("\n"),
+      "utf8"
+    );
+    await chmod(okScript, 0o755);
+
+    const okHost = createMockHost({ anydocBinary: okScript });
+    const okRunner = new HermesRunner(okHost);
+    const [out1, out2] = await Promise.all([
+      okRunner.convertDocument(samplePdf, 5000),
+      okRunner.convertDocument(samplePdf, 5000),
+    ]);
+    createdOutputs.push(out1, out2);
+    assert.equal(out1, out2);
+    assert.match(readFileSync(out1, "utf8"), /# Converted\ndummy pdf payload/);
+
+    // Verify no leftover temp input/output artifacts remain for this conversion
+    const dirEntries = await readdir(anydocDir);
+    const leftovers = dirEntries.filter(
+      (f) => f.startsWith("in-") || f.startsWith("out-")
+    );
+    assert.equal(leftovers.length, 0, "temporary input/output files should be cleaned up");
+  } finally {
+    for (const p of new Set(createdOutputs)) {
+      await rm(p, { force: true }).catch(() => {});
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("redact and stepWidget redact new key prefixes and tool I/O details", () => {
+  const sample =
+    "keys: fc-1234567890abcdef tvly-abcdef1234567890 npm_1234567890abcdefghij pypi-1234567890abcdefghij";
+  const cleaned = redact(sample);
+  assert.equal(cleaned.includes("1234567890"), false);
+  assert.ok(cleaned.includes("fc-[REDACTED]"));
+  assert.ok(cleaned.includes("tvly-[REDACTED]"));
+  assert.ok(cleaned.includes("npm_[REDACTED]"));
+  assert.ok(cleaned.includes("pypi-[REDACTED]"));
+
+  const stepDetails = serializeStepDetails(
+    {
+      id: "step-1",
+      tool: "bash",
+      title: "curl -H 'Authorization: Bearer secret_token_999999' https://user:pass123@example.com",
+      state: "completed",
+      input: {
+        cmd: "curl https://api.example.com",
+        apiKey: "sk-proj-supersecret123456",
+      },
+      output: "Token: fc-firecrawlsecretkey12345",
+    },
+    (s) => s
+  );
+  assert.equal(stepDetails.includes("supersecret123456"), false);
+  assert.equal(stepDetails.includes("firecrawlsecretkey12345"), false);
+  assert.ok(stepDetails.includes("[REDACTED]"));
+
+  const action = formatToolAction(
+    "bash",
+    "curl -H 'Authorization: Bearer secret_token_999999' https://user:pass123@example.com",
+    (s) => s
+  );
+  assert.equal(action.target.includes("secret_token_999999"), false);
+  assert.equal(action.target.includes("pass123"), false);
+});
+
+test("neutralizeRemoteMarkdown preserves reference links while blocking image refs and remote style blocks", () => {
+  const md = [
+    "Read the [API docs][docs], [guide][], or [home].",
+    "Mixed ref: [click][both] and ![tracker][both].",
+    "Pure image ref: ![banner][imgref].",
+    "<style>@import url('https://evil.example/track.css');</style>",
+    "<style>.x { background: url(//evil.example/bg.png); }</style>",
+    "<style>.local { color: red; }</style>",
+    "",
+    "[docs]: https://example.com/docs",
+    "[guide]: https://example.com/guide",
+    "[home]: https://example.com/home",
+    "[both]: https://evil.example/both.png",
+    "[imgref]: https://evil.example/banner.png",
+  ].join("\n");
+
+  const out = neutralizeRemoteMarkdown(md);
+  assert.ok(out.includes("[docs]: https://example.com/docs"));
+  assert.ok(out.includes("[guide]: https://example.com/guide"));
+  assert.ok(out.includes("[home]: https://example.com/home"));
+  assert.ok(out.includes("<style>.local { color: red; }</style>"));
+  assert.equal(out.includes("evil.example"), false);
+  assert.equal(out.includes("track.css"), false);
+  assert.equal(out.includes("bg.png"), false);
+  assert.equal(out.includes("both.png"), false);
+  assert.equal(out.includes("banner.png"), false);
+});
+
+test("sqlEscape strips NUL bytes and OpencodeRunner backupSqliteDb handles WAL vacuum and fallback", async () => {
+  const host = createMockHost();
+  const oc = new OpencodeRunner(host);
+
+  assert.equal(oc.sqlEscape("a\0b'c\0"), "ab''c");
+
+  const root = await mkdtemp(join(tmpdir(), "vault-agents-bak-"));
+  try {
+    const dbPath = join(root, "opencode.db");
+    const bakPath = dbPath + ".bak";
+    await writeFile(dbPath, "SQLITE_DATA", "utf8");
+
+    const runner = oc as unknown as {
+      execSqlite: (db: string, sql: string) => Promise<string>;
+      backupSqliteDb: (db: string, bak: string) => Promise<void>;
+    };
+
+    // 1. WAL-safe VACUUM INTO path
+    let seenSql = "";
+    runner.execSqlite = async (_db, sql) => {
+      seenSql = sql;
+      const m = sql.match(/VACUUM INTO '([^']+)'/);
+      assert.ok(m, "expected VACUUM INTO SQL");
+      await writeFile(m[1], "VACUUMED_SNAPSHOT", "utf8");
+      return "";
+    };
+    await runner.backupSqliteDb(dbPath, bakPath);
+    assert.match(seenSql, /^VACUUM INTO '/);
+    assert.equal(readFileSync(bakPath, "utf8"), "VACUUMED_SNAPSHOT");
+
+    // 2. Fallback to copyFile when sqlite3 fails
+    runner.execSqlite = async () => {
+      throw new Error("sqlite3 not found");
+    };
+    await runner.backupSqliteDb(dbPath, bakPath);
+    assert.equal(readFileSync(bakPath, "utf8"), "SQLITE_DATA");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("i18n dictionary maintains EN/IT parity, placeholder consistency, and prototype safety", () => {
+  const entries = Object.entries(IT_TRANSLATIONS);
+  assert.ok(entries.length > 200);
+
+  for (const [en, it] of entries) {
+    assert.ok(en.trim().length > 0, "English key must be non-empty");
+    assert.ok(it.trim().length > 0, `Italian translation missing for: ${en}`);
+    const enPlaceholders = [...en.matchAll(/\$[1-9]\d*/g)].map((m) => m[0]).sort();
+    const itPlaceholders = [...it.matchAll(/\$[1-9]\d*/g)].map((m) => m[0]).sort();
+    assert.deepEqual(
+      itPlaceholders,
+      enPlaceholders,
+      `Placeholder mismatch for key "${en}" -> "${it}"`
+    );
+  }
+
+  // Prototype keys must never resolve to Object.prototype functions
+  for (const key of ["constructor", "toString", "valueOf", "__proto__"]) {
+    assert.equal(hasTranslation(key), false);
+    assert.equal(translate("it", key), key);
+  }
+
+  // All provider descriptor descriptions & option labels must have IT translations
+  const host = createMockHost();
+  const runners = [
+    new AntigravityRunner(host),
+    new OpencodeRunner(host),
+    new HermesRunner(host),
+    new PiRunner(host),
+  ];
+  for (const r of runners) {
+    const d = r.descriptor;
+    assert.equal(hasTranslation(d.binaryDesc), true, `missing binaryDesc translation for ${r.id}`);
+    assert.equal(hasTranslation(d.modelDesc), true, `missing modelDesc translation for ${r.id}`);
+    for (const opt of d.options) {
+      assert.equal(hasTranslation(opt.label), true, `missing option label translation: ${opt.label}`);
+      assert.equal(hasTranslation(opt.desc), true, `missing option desc translation: ${opt.desc}`);
+      if (opt.placeholder) {
+        assert.equal(
+          hasTranslation(opt.placeholder),
+          true,
+          `missing option placeholder translation: ${opt.placeholder}`
+        );
+      }
+      for (const ch of opt.choices ?? []) {
+        assert.equal(hasTranslation(ch.label), true, `missing choice label translation: ${ch.label}`);
+      }
+    }
+  }
+
+  // Verify every single-literal t("...") call across src/ has an IT translation
+  const walkTs = (dir: string): string[] => {
+    const res: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name);
+      if (entry.isDirectory()) res.push(...walkTs(p));
+      else if (p.endsWith(".ts")) res.push(p);
+    }
+    return res;
+  };
+  for (const file of walkTs("src")) {
+    if (file.endsWith(join("i18n", "index.ts"))) continue;
+    const src = readFileSync(file, "utf8");
+    for (const m of src.matchAll(/(?:\.|\b)t\(\s*"([^"\\\n]+)"\s*\)/g)) {
+      const key = m[1];
+      assert.equal(
+        hasTranslation(key),
+        true,
+        `Missing IT translation for literal "${key}" in ${file}`
+      );
+    }
+  }
+});
+
+test("AssistantBubble unloads previous MarkdownRenderer child components on re-render", () => {
+  type MockEl = {
+    textContent: string;
+    classes: Set<string>;
+    children: MockEl[];
+    createDiv: (opts?: { cls?: string; text?: string }) => MockEl;
+    createSpan: (opts?: { cls?: string; text?: string }) => MockEl;
+    createEl: (_tag: string, opts?: { cls?: string; text?: string }) => MockEl;
+    addClass: (c: string) => void;
+    removeClass: (c: string) => void;
+    toggleClass: (c: string, on: boolean) => void;
+    setText: (s: string) => void;
+    setAttribute: () => void;
+    addEventListener: () => void;
+    querySelector: () => null;
+    empty: () => void;
+  };
+
+  const makeEl = (text = ""): MockEl => {
+    const el: MockEl = {
+      textContent: text,
+      classes: new Set(),
+      children: [],
+      createDiv(opts) {
+        const c = makeEl(opts?.text ?? "");
+        this.children.push(c);
+        return c;
+      },
+      createSpan(opts) {
+        const c = makeEl(opts?.text ?? "");
+        this.children.push(c);
+        return c;
+      },
+      createEl(_tag, opts) {
+        const c = makeEl(opts?.text ?? "");
+        this.children.push(c);
+        return c;
+      },
+      addClass(c) { this.classes.add(c); },
+      removeClass(c) { this.classes.delete(c); },
+      toggleClass(c, on) { if (on) this.classes.add(c); else this.classes.delete(c); },
+      setText(s) { this.textContent = s; },
+      setAttribute() {},
+      addEventListener() {},
+      querySelector() { return null; },
+      empty() { this.children = []; this.textContent = ""; },
+    };
+    return el;
+  };
+
+  const prevWindow = (globalThis as Record<string, unknown>).window;
+  (globalThis as Record<string, unknown>).window = {
+    setTimeout: globalThis.setTimeout.bind(globalThis),
+    setInterval: globalThis.setInterval.bind(globalThis),
+  };
+
+  try {
+    const parent = new Component() as Component & { _children: Set<Component & { _loaded: boolean }> };
+    parent.load();
+    const mockApp = { workspace: { getActiveFile: () => null } } as unknown as App;
+    const bubble = new AssistantBubble(
+      makeEl() as unknown as HTMLElement,
+      mockApp,
+      parent,
+      "Agent",
+      (s) => s,
+      false,
+      () => {},
+      () => {},
+      () => ""
+    );
+
+    const flush = () => (bubble as unknown as { flushRender: () => void }).flushRender();
+    const seenChildren = new Set<Component & { _loaded: boolean }>();
+
+    for (let i = 1; i <= 5; i++) {
+      bubble.setText(`chunk ${i}`);
+      flush();
+      assert.equal(parent._children.size, 1, "only one active renderChild should remain attached");
+      for (const c of parent._children) seenChildren.add(c);
+    }
+
+    assert.equal(seenChildren.size, 5, "each render cycle should create a fresh child component");
+    const unloadedCount = [...seenChildren].filter((c) => !c._loaded).length;
+    assert.equal(unloadedCount, 4, "all 4 previous render children must have been unloaded");
+
+    bubble.finalize();
+    assert.equal(parent._children.size, 1);
+    const finalChild = [...parent._children][0];
+    assert.equal(finalChild._loaded, true);
+
+    parent.unload();
+    assert.equal(parent._children.size, 0);
+    assert.equal(finalChild._loaded, false, "unloading session component must unload finalized bubble child");
+    bubble.dispose();
+  } finally {
+    if (prevWindow === undefined) {
+      delete (globalThis as Record<string, unknown>).window;
+    } else {
+      (globalThis as Record<string, unknown>).window = prevWindow;
+    }
+  }
+});
+
+test("Settings tab and modals use native Obsidian setHeading/setTitle APIs", () => {
+  const settingsSrc = readFileSync(join("src", "features", "settings", "settingsTab.ts"), "utf8");
+  assert.equal(/createEl\(["']h[234]["']/.test(settingsSrc), false, "settingsTab should use Setting.setHeading()");
+  assert.ok(settingsSrc.includes(".setHeading()"));
+  assert.ok(settingsSrc.includes("hide(): void"));
+
+  const modalsSrc = readFileSync(join("src", "shared", "modals.ts"), "utf8");
+  assert.equal(/createEl\(["']h[234]["']/.test(modalsSrc), false, "modals should use Modal.setTitle() and Setting.setHeading()");
+  assert.ok(modalsSrc.includes("this.setTitle("));
 });
 
 

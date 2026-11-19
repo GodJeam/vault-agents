@@ -1,5 +1,5 @@
 import { isAbsolute, join } from "path";
-import { copyFile } from "fs/promises";
+import { copyFile, unlink } from "fs/promises";
 import { redact } from "../../core/redact";
 import type {
   AgentProvider,
@@ -18,7 +18,13 @@ import type {
 } from "../../core/types";
 import { DEFAULT_ENGINE_CONFIGS } from "../../core/types";
 import { substitute } from "../../i18n";
-import { BaseCliRunner, MAX_STREAM_LINE_BYTES, parseSqliteChanges } from "../base";
+import {
+  BaseCliRunner,
+  MAX_STREAM_LINE_BYTES,
+  parseSqliteChanges,
+  replaceFileSafely,
+  restrictFilePermissions,
+} from "../base";
 import { AGENT_ICON_IDS } from "../../shared/agentIcons";
 import type {
   OpencodeEvent,
@@ -78,6 +84,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
   private cachedModelsBin = "";
   private cachedDbPath: string | null | undefined = undefined;
   private cachedDbBin = "";
+  private cachedDbFailedAt = 0;
 
   constructor(plugin: RunnerHost) {
     super(plugin);
@@ -130,7 +137,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
             "time_updated, time_created, project_id, directory",
             `FROM ${table} ORDER BY time_updated DESC LIMIT 60`,
           ].join(" ");
-          const out = await this.execCli("sqlite3", ["-json", dbPath, jsonQuery]);
+          const out = await this.execSqliteJson(dbPath, jsonQuery);
           const rows = JSON.parse(out.trim() || "[]") as Array<{
             id?: string;
             title?: string;
@@ -463,7 +470,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
       .filter(Boolean)
       .join(" ");
     try {
-      await copyFile(dbPath, dbPath + ".bak");
+      await this.backupSqliteDb(dbPath, dbPath + ".bak");
     } catch (e) {
       console.debug(
         "[vault-agents] could not back up opencode.db:",
@@ -477,10 +484,38 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     }
   }
 
+  /**
+   * Create a WAL-safe backup using SQLite `VACUUM INTO` into a temporary file
+   * and atomically move it into place, falling back to a plain file copy if
+   * `sqlite3` is unavailable or fails.
+   */
+  private async backupSqliteDb(dbPath: string, backupPath: string): Promise<void> {
+    const tmpBackup = `${backupPath}.${process.pid}.${Date.now()}.tmp`;
+    try {
+      await this.execSqlite(
+        dbPath,
+        `VACUUM INTO '${this.sqlEscape(tmpBackup)}';`
+      );
+      await restrictFilePermissions(tmpBackup);
+      await replaceFileSafely(tmpBackup, backupPath);
+      return;
+    } catch {
+      await unlink(tmpBackup).catch(() => {});
+    }
+    await copyFile(dbPath, backupPath);
+    await restrictFilePermissions(backupPath);
+  }
+
   private async getDbPath(): Promise<string | null> {
     const bin = this.getBin();
-    if (this.cachedDbPath !== undefined && this.cachedDbBin === bin) {
-      return this.cachedDbPath;
+    if (this.cachedDbBin === bin) {
+      if (this.cachedDbPath) return this.cachedDbPath;
+      if (
+        this.cachedDbPath === null &&
+        Date.now() - this.cachedDbFailedAt < 60_000
+      ) {
+        return null;
+      }
     }
     try {
       const out = await this.execCli(bin, ["debug", "paths"]);
@@ -489,6 +524,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
         if (m) {
           this.cachedDbPath = m[1].trim();
           this.cachedDbBin = bin;
+          this.cachedDbFailedAt = 0;
           return this.cachedDbPath;
         }
       }
@@ -497,6 +533,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
     }
     this.cachedDbPath = null;
     this.cachedDbBin = bin;
+    this.cachedDbFailedAt = Date.now();
     return null;
   }
 

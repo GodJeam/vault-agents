@@ -28,8 +28,6 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
     const t = (s: string) => this.plugin.t(s);
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Vault Agents" });
-
     // Language setting
     new Setting(containerEl)
       .setName(t("Language"))
@@ -90,7 +88,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
       t("$1 settings"),
       t(activeDesc.displayName)
     );
-    containerEl.createEl("h3", { text: sectionTitle });
+    new Setting(containerEl).setName(sectionTitle).setHeading();
 
     const binSetting = new Setting(containerEl)
       .setName(t("Binary path"))
@@ -101,6 +99,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           .setValue(activeCfg.binary)
           .onChange((value) => {
             activeCfg.binary = value.trim() || activeDesc.defaultBinary;
+            activeProvider.invalidateBinaryCache?.();
             this.plugin.scheduleSaveSettings();
           })
       );
@@ -112,6 +111,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           .setTooltip(t("Reset to default"))
           .onClick(async () => {
             activeCfg.binary = activeDesc.defaultBinary;
+            activeProvider.invalidateBinaryCache?.();
             await this.plugin.saveSettings();
             this.display();
           })
@@ -215,7 +215,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         })
       );
 
-    containerEl.createEl("h3", { text: t("General settings") });
+    new Setting(containerEl).setName(t("General settings")).setHeading();
 
     new Setting(containerEl)
       .setName(t("Auto-approve permissions"))
@@ -325,7 +325,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         })
       );
 
-    containerEl.createEl("h3", { text: t("Chat history") });
+    new Setting(containerEl).setName(t("Chat history")).setHeading();
 
     new Setting(containerEl)
       .setName(t("Save chat history in the vault"))
@@ -403,7 +403,7 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         });
       });
 
-    containerEl.createEl("h3", { text: t("Document conversion") });
+    new Setting(containerEl).setName(t("Document conversion")).setHeading();
 
     new Setting(containerEl)
       .setName(t("Convert documents with anydoc"))
@@ -437,6 +437,9 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.anydocBinary)
           .onChange((value) => {
             this.plugin.settings.anydocBinary = value.trim() || "anydoc";
+            for (const p of this.plugin.registry.getAll()) {
+              p.invalidateBinaryCache?.();
+            }
             this.plugin.scheduleSaveSettings();
           })
       );
@@ -493,18 +496,18 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
       });
 
     if (activeDesc.supportsDbCleanup && activeProvider.pruneOversizedParts) {
-      containerEl.createEl("h3", { text: t("Database self-cleanup") });
-
-      containerEl.createEl("p", {
-        text: t(
-          "Automatic cleanup on startup is disabled. Use the button below " +
-            "to remove oversized file attachments from the OpenCode " +
-            "database. Only attachments older than the minimum age and " +
-            "larger than the max size are removed; conversation text is " +
-            "never touched."
-        ),
-        cls: "setting-item-description",
-      });
+      new Setting(containerEl)
+        .setName(t("Database self-cleanup"))
+        .setDesc(
+          t(
+            "Automatic cleanup on startup is disabled. Use the button below " +
+              "to remove oversized file attachments from the OpenCode " +
+              "database. Only attachments older than the minimum age and " +
+              "larger than the max size are removed; conversation text is " +
+              "never touched."
+          )
+        )
+        .setHeading();
 
       new Setting(containerEl)
         .setName(t("Max part size (MB)"))
@@ -585,14 +588,15 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         );
     }
 
-    containerEl.createEl("h3", { text: t("Prompt templates") });
-    containerEl.createEl("p", {
-      text: t(
-        "Save reusable prompt templates. In the chat, type /prompt " +
-          "to quickly insert them into the composer."
-      ),
-      cls: "setting-item-description",
-    });
+    new Setting(containerEl)
+      .setName(t("Prompt templates"))
+      .setDesc(
+        t(
+          "Save reusable prompt templates. In the chat, type /prompt " +
+            "to quickly insert them into the composer."
+        )
+      )
+      .setHeading();
 
     const prompts = this.plugin.settings.prompts ?? [];
     for (let i = 0; i < prompts.length; i++) {
@@ -622,6 +626,10 @@ export class VaultAgentsSettingTab extends PluginSettingTab {
         .setCta()
         .onClick(() => this.editPrompt(-1))
     );
+  }
+
+  hide(): void {
+    void this.plugin.flushPendingSave();
   }
 
   private editPrompt(index: number): void {

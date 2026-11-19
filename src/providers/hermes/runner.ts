@@ -80,7 +80,7 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
   readonly included = false;
 
   private cachedModels: string[] | null = null;
-  private cachedModelsBin: string | null = null;
+  private cachedModelsKey: string | null = null;
   private contextLimits = new Map<string, number>();
   private contextLimitFailedAt = new Map<string, number>();
   private resolvedPythonCache = new Map<
@@ -218,11 +218,13 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
 
   async listModels(forceRefresh = false): Promise<string[]> {
     const bin = this.getBin();
+    const requestedProvider = this.getConfig().options.provider?.trim() || "";
+    const cacheKey = `${bin}\0${requestedProvider}`;
     if (
       !forceRefresh &&
       this.cachedModels &&
       this.cachedModels.length > 0 &&
-      this.cachedModelsBin === bin
+      this.cachedModelsKey === cacheKey
     ) {
       return this.cachedModels;
     }
@@ -236,7 +238,6 @@ export class HermesRunner extends BaseCliRunner implements AgentProvider {
 
     // 1. Query Hermes' native Python model discovery (`hermes_cli.models`)
     // This works universally for ANY provider the user authenticated in Hermes.
-    const requestedProvider = this.getConfig().options.provider?.trim() || "";
     const pyScript = `
 import concurrent.futures, json, sys
 from hermes_cli.config import load_config
@@ -361,7 +362,7 @@ print(json.dumps({"models": models}))
     }
 
     this.cachedModels = Array.from(seen);
-    this.cachedModelsBin = bin;
+    this.cachedModelsKey = cacheKey;
     return this.cachedModels;
   }
 
@@ -380,7 +381,7 @@ print(json.dumps({"models": models}))
           "WHERE COALESCE(archived, 0) = 0 AND COALESCE(hidden, 0) = 0",
           "ORDER BY COALESCE(last_activity_at, started_at) DESC LIMIT 60",
         ].join(" ");
-        const out = await this.execCli("sqlite3", ["-json", dbPath, query]);
+        const out = await this.execSqliteJson(dbPath, query);
         const rows = JSON.parse(out.trim() || "[]") as Array<{
           id?: string;
           title?: string;
@@ -579,7 +580,7 @@ print(json.dumps({"models": models}))
           "COALESCE(actual_cost_usd, estimated_cost_usd, 0) AS cost",
           `FROM sessions WHERE id = '${safeId}' LIMIT 1`,
         ].join(" ");
-        const out = await this.execCli("sqlite3", ["-json", dbPath, query]);
+        const out = await this.execSqliteJson(dbPath, query);
         const rows = JSON.parse(out.trim() || "[]") as Array<{
           input_tokens?: number;
           output_tokens?: number;

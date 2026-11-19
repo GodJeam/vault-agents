@@ -31,14 +31,35 @@ try {
                 addIcon: () => {},
                 setIcon: () => {},
                 App: class App {},
-                Component: class Component {},
+                Component: class Component {
+                  constructor() { this._children = new Set(); this._loaded = false; }
+                  load() { this._loaded = true; }
+                  unload() { this._loaded = false; for (const c of [...this._children]) { this.removeChild(c); } }
+                  addChild(c) { this._children.add(c); if (this._loaded && typeof c.load === "function") c.load(); return c; }
+                  removeChild(c) { this._children.delete(c); if (typeof c.unload === "function") c.unload(); return c; }
+                },
                 MarkdownRenderer: { render: () => Promise.resolve() },
-                Modal: class Modal {},
+                Modal: class Modal {
+                  setTitle() { return this; }
+                  open() {}
+                  close() {}
+                },
                 SuggestModal: class SuggestModal {},
                 ItemView: class ItemView {},
                 Plugin: class Plugin {},
                 PluginSettingTab: class PluginSettingTab {},
-                Setting: class Setting {},
+                Setting: class Setting {
+                  setName() { return this; }
+                  setDesc() { return this; }
+                  setHeading() { return this; }
+                  setDisabled() { return this; }
+                  addText() { return this; }
+                  addTextArea() { return this; }
+                  addToggle() { return this; }
+                  addDropdown() { return this; }
+                  addButton() { return this; }
+                  addExtraButton() { return this; }
+                },
               };
             `,
             loader: "js",

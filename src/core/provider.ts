@@ -10,6 +10,7 @@ import type {
   StreamCallbacks,
   UsageStats,
 } from "./types";
+import type { TranslatableText } from "../i18n";
 
 export interface ProviderOptionDescriptor {
   key: string;
@@ -62,7 +63,7 @@ export interface RunnerHost {
   getHistory(sessionId: string): HistoryMessage[];
   getEngineConfig(engineId: string): EngineConfig;
   getVaultPath(): string | null;
-  t(text: string): string;
+  t(text: TranslatableText): string;
 }
 
 export interface AgentProvider {
@@ -89,6 +90,9 @@ export interface AgentProvider {
 
   /** Quick synchronous check whether the CLI binary appears installed */
   isAvailable?(): boolean;
+
+  /** Clear cached binary path lookups (e.g. after editing binary path in settings) */
+  invalidateBinaryCache?(): void;
 
   /** List available models */
   listModels(forceRefresh?: boolean): Promise<string[]>;
