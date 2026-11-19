@@ -10,7 +10,7 @@ An **Obsidian** desktop plugin that connects local AI CLI agents (**Antigravity*
 - **Vault integration**: `/` commands (`/agent`, `/model`, `/new`, `/note`, `/attach`, `/stats`, `/pin`, `/rename`, `/prompt`), `@` vault file attachments, `!` quick actions, saved prompt templates, and Command Palette actions (send selection, use/analyze current note).
 - **Document conversion**: Optional PDF, Word, and Excel conversion to Markdown via [anydoc](https://github.com/firecrawl/anydoc) (hosted OCR is off by default).
 - **Session & context tracking**: Independent chat tabs, local session titles, context usage bar, token/cost stats (`5h`, `week`, `month`), and optional auto-continuation by summary when context reaches 92%.
-- **Secure defaults**: Auto-approve off, hosted OCR off, remote media neutralized in replies, credential redaction on errors, and bounded local history.
+- **Secure defaults**: Auto-approve off, hosted OCR off, remote media and remote `<style>` rules neutralized in replies while preserving normal links, credential redaction on errors and tool I/O details, and bounded local history.
 
 ## Requirements
 
@@ -56,10 +56,10 @@ Copy `main.js`, `manifest.json`, and `styles.css` into `<vault>/.obsidian/plugin
 Vault Agents runs locally inside Obsidian without telemetry, analytics, or its own network client; model traffic goes exclusively through your configured CLI tools.
 
 - **Chat history**: Saved in plain text in `<vault>/.obsidian/plugins/vault-agents/data.json` (default cap: 50 sessions or 5 MB; active and pinned sessions are kept). You can disable persistence under **Settings → Vault Agents → Chat history → Save chat history in the vault** so sessions stay in memory only. Note that synced vaults will also sync `data.json`.
-- **Notes & attachments**: Sent prompts, attached files, and note context are forwarded to the active CLI and its configured AI provider. Documents are converted locally by `anydoc`; enabling **Send documents to hosted OCR** uploads scanned files to Firecrawl Parse (off by default). Cached conversions live in `$TMPDIR/vault-agents-anydoc` (`0700` directory, `0600` files) and expire after 24 hours.
+- **Notes & attachments**: Sent prompts, attached files, and note context are forwarded to the active CLI and its configured AI provider. Documents are converted locally by `anydoc` (with a 60s timeout); enabling **Send documents to hosted OCR** uploads scanned files to Firecrawl Parse (off by default). Cached conversions live in a per-user `$TMPDIR/vault-agents-anydoc-<uid>` directory on POSIX (`$TMPDIR/vault-agents-anydoc` on Windows, `0700` directory, `0600` files) and expire after 24 hours.
 - **Process environment**: Spawned CLIs inherit Obsidian's environment so existing CLI authentication and proxy settings work.
-- **Local agent databases**: Session listing, token stats, rename, and delete read or use the CLI databases for Antigravity, OpenCode, and Hermes. **Database self-cleanup** is manual-only and writes an `opencode.db.bak` backup before pruning oversized parts.
-- **Permissions & remote media**: **Auto-approve permissions** is disabled by default; enable it only in trusted vaults. Remote images and media in agent replies are converted to plain text to prevent silent third-party requests while keeping normal links clickable.
+- **Local agent databases**: Session listing, token stats, rename, and delete read or use the CLI databases for Antigravity, OpenCode, and Hermes. **Database self-cleanup** is manual-only and creates a WAL-safe `opencode.db.bak` snapshot (via SQLite `VACUUM INTO`, with file-copy fallback) before pruning oversized parts.
+- **Permissions & remote media**: **Auto-approve permissions** is disabled by default; enable it only in trusted vaults. Remote images, media, and remote CSS imports in agent replies are neutralized to prevent silent third-party requests while keeping normal and reference-style links clickable.
 
 ## Project Structure
 
@@ -83,4 +83,4 @@ Development happens on the `dev` branch. Read [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License
 
-GPL-3.0 — see [LICENSE](LICENSE).
+GPL-3.0 (see [LICENSE](LICENSE)).
