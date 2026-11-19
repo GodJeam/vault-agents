@@ -21,7 +21,7 @@ import {
 } from "./core/types";
 import { VaultAgentsSettingTab } from "./features/settings/settingsTab";
 import { registerAgentIcons } from "./shared/agentIcons";
-import { translate } from "./i18n";
+import { translate, type TranslatableText } from "./i18n";
 
 export type {
   HistoryUser,
@@ -169,7 +169,7 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
   }
 
   // Translate a UI string according to the selected language.
-  t(text: string): string {
+  t(text: TranslatableText): string {
     return translate(this.settings?.language ?? "en", text);
   }
 
