@@ -13,6 +13,7 @@ import {
   lstat,
   mkdir,
   readdir,
+  rename,
   stat,
   unlink,
 } from "fs/promises";
@@ -33,6 +34,8 @@ import type {
 } from "../core/types";
 
 export const MAX_STREAM_LINE_BYTES = 20_000_000;
+export const MAX_EXEC_OUTPUT_BYTES = 20_000_000;
+export const MAX_EXEC_STDERR_BYTES = 256 * 1024;
 
 /**
  * Maximum size (in bytes) of a text attachment to inline directly into CLI args
@@ -102,6 +105,16 @@ export function parseCmdNodeScript(
     .split(/[/\\]+/)
     .filter(Boolean);
   return join(shimDir, ...parts);
+}
+
+/**
+ * Return the per-user temp directory path used for `anydoc` conversions.
+ * Appending the POSIX UID prevents pre-creation DoS in shared `/tmp`.
+ */
+export function getAnydocTempDir(): string {
+  const suffix =
+    typeof process.getuid === "function" ? `-${process.getuid()}` : "";
+  return join(tmpdir(), `vault-agents-anydoc${suffix}`);
 }
 
 /**
@@ -431,7 +444,8 @@ export abstract class BaseCliRunner {
     args: string[],
     cwd?: string,
     extraEnv?: NodeJS.ProcessEnv,
-    timeoutMs = 30_000
+    timeoutMs = 30_000,
+    maxOutputBytes = MAX_EXEC_OUTPUT_BYTES
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = this.spawnBinary(bin, args, cwd, extraEnv);
@@ -450,16 +464,32 @@ export abstract class BaseCliRunner {
               reject(new Error(`CLI command timed out after ${timeoutMs}ms`));
             }, timeoutMs)
           : null;
+      timer?.unref?.();
 
       const cleanupTimer = () => {
         if (timer !== null) clearTimeout(timer);
       };
 
       child.stdout?.on("data", (d: string | Buffer) => {
-        out += typeof d === "string" ? d : d.toString("utf8");
+        if (settled) return;
+        const chunk = typeof d === "string" ? d : d.toString("utf8");
+        if (maxOutputBytes > 0 && out.length + chunk.length > maxOutputBytes) {
+          settled = true;
+          cleanupTimer();
+          this.killProc(child, true);
+          reject(
+            new Error(
+              `CLI output exceeded maximum buffer size (${maxOutputBytes} bytes)`
+            )
+          );
+          return;
+        }
+        out += chunk;
       });
       child.stderr?.on("data", (d: string | Buffer) => {
-        err += typeof d === "string" ? d : d.toString("utf8");
+        if (settled || err.length >= MAX_EXEC_STDERR_BYTES) return;
+        const chunk = typeof d === "string" ? d : d.toString("utf8");
+        err += chunk.slice(0, MAX_EXEC_STDERR_BYTES - err.length);
       });
       child.on("error", (e: NodeJS.ErrnoException) => {
         if (settled) return;
@@ -1038,13 +1068,13 @@ export abstract class BaseCliRunner {
   /**
    * Convert a document (PDF, Word, Excel, etc.) to Markdown using anydoc
    */
-  async convertDocument(absPath: string): Promise<string> {
+  async convertDocument(absPath: string, timeoutMs = 60_000): Promise<string> {
     const hostedOcr = this.plugin.settings.anydocHostedOcr;
     const hash = createHash("sha256")
       .update(`${absPath}\0ocr=${hostedOcr ? 1 : 0}`)
       .digest("hex")
       .slice(0, 16);
-    const dir = join(tmpdir(), "vault-agents-anydoc");
+    const dir = getAnydocTempDir();
     await ensurePrivateTempDir(dir);
     await this.cleanupTempFiles(dir);
     const outPath = join(dir, hash + ".md");
@@ -1060,29 +1090,62 @@ export abstract class BaseCliRunner {
     }
 
     const ext = extname(absPath) || ".pdf";
-    const cleanInput = join(dir, "in-" + hash + ext);
+    const uniqueTag =
+      `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const cleanInput = join(dir, `in-${hash}-${uniqueTag}${ext}`);
+    const tempOut = join(dir, `out-${hash}-${uniqueTag}.md`);
     await copyFile(absPath, cleanInput);
     await restrictFilePermissions(cleanInput);
 
     const bin = this.resolveBinaryPath(
       this.plugin.settings.anydocBinary || "anydoc"
     );
+    let committed = false;
     try {
       await new Promise<void>((resolve, reject) => {
         const child = this.spawnBinary(
           bin,
           buildAnydocArgs(
             cleanInput,
-            outPath,
+            tempOut,
             this.plugin.settings.anydocHostedOcr
           )
         );
+        child.stderr?.setEncoding("utf8");
         let err = "";
-        child.stderr?.on("data", (d: Buffer) => (err += d.toString()));
-        child.on("error", (e: NodeJS.ErrnoException) =>
-          reject(new Error(this.spawnErrorMessage(e)))
-        );
+        let settled = false;
+        const maxErrBytes = 64 * 1024;
+
+        const timer =
+          timeoutMs > 0
+            ? setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                this.killProc(child, true);
+                reject(new Error(`anydoc timed out after ${timeoutMs}ms`));
+              }, timeoutMs)
+            : null;
+        timer?.unref?.();
+
+        const cleanupTimer = () => {
+          if (timer !== null) clearTimeout(timer);
+        };
+
+        child.stderr?.on("data", (d: string | Buffer) => {
+          if (settled || err.length >= maxErrBytes) return;
+          const chunk = typeof d === "string" ? d : d.toString("utf8");
+          err += chunk.slice(0, maxErrBytes - err.length);
+        });
+        child.on("error", (e: NodeJS.ErrnoException) => {
+          if (settled) return;
+          settled = true;
+          cleanupTimer();
+          reject(new Error(this.spawnErrorMessage(e)));
+        });
         child.on("close", (code) => {
+          if (settled) return;
+          settled = true;
+          cleanupTimer();
           if (code === 0) resolve();
           else {
             const detail = redact(err.trim().slice(0, 200));
@@ -1090,11 +1153,17 @@ export abstract class BaseCliRunner {
           }
         });
       });
+
+      await restrictFilePermissions(tempOut);
+      await rename(tempOut, outPath);
+      committed = true;
     } finally {
       await unlink(cleanInput).catch(() => {});
+      if (!committed) {
+        await unlink(tempOut).catch(() => {});
+      }
     }
 
-    await restrictFilePermissions(outPath);
     return outPath;
   }
 
@@ -1111,8 +1180,8 @@ export abstract class BaseCliRunner {
       for (const f of files) {
         try {
           const p = join(dir, f);
-          const st = await stat(p);
-          if (now - st.mtimeMs > maxAgeMs) {
+          const st = await lstat(p);
+          if (st.isFile() && now - st.mtimeMs > maxAgeMs) {
             await unlink(p);
           }
         } catch {
