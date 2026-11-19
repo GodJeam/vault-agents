@@ -138,6 +138,46 @@ export async function restrictFilePermissions(path: string): Promise<void> {
   await chmod(path, 0o600).catch(() => {});
 }
 
+/**
+ * Atomically replace `dest` with `src`, retrying transient Windows NTFS
+ * `EPERM`/`EACCES`/`EBUSY` contention and falling back to copy + unlink.
+ */
+export async function replaceFileSafely(
+  src: string,
+  dest: string
+): Promise<void> {
+  const retryDelaysMs = [25, 50, 100];
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+    try {
+      await rename(src, dest);
+      return;
+    } catch (e) {
+      lastErr = e;
+      const code = (e as NodeJS.ErrnoException)?.code;
+      if (
+        code !== "EPERM" &&
+        code !== "EACCES" &&
+        code !== "EBUSY" &&
+        code !== "EXDEV"
+      ) {
+        throw e;
+      }
+      if (code === "EXDEV") break;
+      if (attempt < retryDelaysMs.length) {
+        await new Promise((r) => setTimeout(r, retryDelaysMs[attempt]));
+      }
+    }
+  }
+  try {
+    await copyFile(src, dest);
+    await restrictFilePermissions(dest);
+    await unlink(src).catch(() => {});
+  } catch {
+    throw lastErr;
+  }
+}
+
 /** Check that a path points to a regular file (and is executable on POSIX). */
 export function isExecutableFile(p: string): boolean {
   try {
@@ -1155,7 +1195,7 @@ export abstract class BaseCliRunner {
       });
 
       await restrictFilePermissions(tempOut);
-      await rename(tempOut, outPath);
+      await replaceFileSafely(tempOut, outPath);
       committed = true;
     } finally {
       await unlink(cleanInput).catch(() => {});

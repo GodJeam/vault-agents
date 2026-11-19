@@ -1,5 +1,5 @@
 import { isAbsolute, join } from "path";
-import { copyFile, rename, unlink } from "fs/promises";
+import { copyFile, unlink } from "fs/promises";
 import { redact } from "../../core/redact";
 import type {
   AgentProvider,
@@ -22,6 +22,7 @@ import {
   BaseCliRunner,
   MAX_STREAM_LINE_BYTES,
   parseSqliteChanges,
+  replaceFileSafely,
   restrictFilePermissions,
 } from "../base";
 import { AGENT_ICON_IDS } from "../../shared/agentIcons";
@@ -496,7 +497,7 @@ export class OpencodeRunner extends BaseCliRunner implements AgentProvider {
         `VACUUM INTO '${this.sqlEscape(tmpBackup)}';`
       );
       await restrictFilePermissions(tmpBackup);
-      await rename(tmpBackup, backupPath);
+      await replaceFileSafely(tmpBackup, backupPath);
       return;
     } catch {
       await unlink(tmpBackup).catch(() => {});
