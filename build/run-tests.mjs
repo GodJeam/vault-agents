@@ -39,12 +39,27 @@ try {
                   removeChild(c) { this._children.delete(c); if (typeof c.unload === "function") c.unload(); return c; }
                 },
                 MarkdownRenderer: { render: () => Promise.resolve() },
-                Modal: class Modal {},
+                Modal: class Modal {
+                  setTitle() { return this; }
+                  open() {}
+                  close() {}
+                },
                 SuggestModal: class SuggestModal {},
                 ItemView: class ItemView {},
                 Plugin: class Plugin {},
                 PluginSettingTab: class PluginSettingTab {},
-                Setting: class Setting {},
+                Setting: class Setting {
+                  setName() { return this; }
+                  setDesc() { return this; }
+                  setHeading() { return this; }
+                  setDisabled() { return this; }
+                  addText() { return this; }
+                  addTextArea() { return this; }
+                  addToggle() { return this; }
+                  addDropdown() { return this; }
+                  addButton() { return this; }
+                  addExtraButton() { return this; }
+                },
               };
             `,
             loader: "js",

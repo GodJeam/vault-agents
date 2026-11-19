@@ -343,4 +343,10 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     await this.flushSave();
     if (refreshViews) this.refreshOpenViews();
   }
+
+  async flushPendingSave(): Promise<void> {
+    if (this.saveTimer !== null) {
+      await this.flushSave();
+    }
+  }
 }

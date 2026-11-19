@@ -25,14 +25,34 @@ export class RenameModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     const t = (s: string) => this.plugin.t(s);
+    this.setTitle(t("Rename session"));
     contentEl.empty();
-    contentEl.createEl("h3", { text: t("Rename session") });
 
     let input: HTMLInputElement | undefined;
+    const submit = () => {
+      if (!input) return;
+      const v = input.value.trim();
+      if (!v) {
+        new Notice(t("The title cannot be empty."));
+        return;
+      }
+      this.onSubmit(v);
+      this.close();
+    };
+
     new Setting(contentEl).setName(t("New title")).addText((txt) => {
       input = txt.inputEl;
       txt.setValue(this.current);
-      txt.inputEl.select();
+      txt.inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submit();
+        }
+      });
+      window.setTimeout(() => {
+        txt.inputEl.focus();
+        txt.inputEl.select();
+      }, 0);
     });
 
     new Setting(contentEl)
@@ -40,16 +60,7 @@ export class RenameModal extends Modal {
         b
           .setButtonText(t("Save"))
           .setCta()
-          .onClick(() => {
-            if (!input) return;
-            const v = input.value.trim();
-            if (!v) {
-              new Notice(t("The title cannot be empty."));
-              return;
-            }
-            this.onSubmit(v);
-            this.close();
-          })
+          .onClick(() => submit())
       )
       .addButton((b) =>
         b.setButtonText(t("Cancel")).onClick(() => this.close())
@@ -76,8 +87,8 @@ export class StatsModal extends Modal {
     this.closed = false;
     const { contentEl } = this;
     const t = (s: string) => this.plugin.t(s);
+    this.setTitle(t("Token usage and costs"));
     contentEl.empty();
-    contentEl.createEl("h3", { text: t("Token usage and costs") });
     const status = contentEl.createDiv({
       cls: "opencode-stats-loading",
       text: t("Loading..."),
@@ -106,7 +117,7 @@ export class StatsModal extends Modal {
   ): void {
     const locale = this.plugin.settings.language === "it" ? "it-IT" : "en-US";
     const t = (s: string) => this.plugin.t(s);
-    container.createEl("h4", { text: label });
+    new Setting(container).setName(label).setHeading();
     new Setting(container)
       .setName(t("Input tokens"))
       .setDesc(w.input.toLocaleString(locale));
@@ -147,8 +158,8 @@ export class ConfirmModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     const t = (s: string) => this.plugin.t(s);
+    this.setTitle(this.title);
     contentEl.empty();
-    contentEl.createEl("h3", { text: this.title });
     contentEl.createDiv({
       cls: "opencode-confirm-message",
       text: this.message,
@@ -207,8 +218,8 @@ export class PromptModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     const t = (s: string) => this.plugin.t(s);
+    this.setTitle(t("Prompt"));
     contentEl.empty();
-    contentEl.createEl("h3", { text: t("Prompt") });
 
     let nameInput: HTMLInputElement | undefined;
     let textArea: HTMLTextAreaElement | undefined;

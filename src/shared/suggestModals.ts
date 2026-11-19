@@ -250,9 +250,14 @@ export class ModelSuggestModal extends Modal {
     });
 
     if (this.onRefresh) {
+      const refreshTitle = t("Refresh models from CLI");
       this.refreshBtn = searchRow.createEl("button", {
         cls: "va-model-refresh-btn",
-        attr: { type: "button", title: t("Refresh models from CLI") },
+        attr: {
+          type: "button",
+          title: refreshTitle,
+          "aria-label": refreshTitle,
+        },
       });
       const iconSpan = this.refreshBtn.createSpan({ cls: "opencode-btn-icon" });
       setIcon(iconSpan, "refresh-cw");
@@ -455,7 +460,10 @@ export class ModelSuggestModal extends Modal {
       if (showGroupHeaders && !isSpecial) {
         const header = this.listEl.createEl("button", {
           cls: "va-model-group-header",
-          attr: { type: "button" },
+          attr: {
+            type: "button",
+            "aria-expanded": String(!isCollapsed),
+          },
         });
         const chev = header.createSpan({ cls: "va-model-group-chev" });
         setIcon(chev, isCollapsed ? "chevron-right" : "chevron-down");
@@ -474,6 +482,7 @@ export class ModelSuggestModal extends Modal {
             this.collapsedGroups.add(groupKey);
           }
           this.renderList();
+          this.searchInput?.focus();
         });
       }
 

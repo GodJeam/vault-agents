@@ -346,6 +346,10 @@ export class ChatView extends ItemView {
 
     const attachBtn = this.contextBar.createEl("button", {
       cls: "opencode-add-note-btn",
+      attr: {
+        type: "button",
+        "aria-label": this.plugin.t("Attach file"),
+      },
     });
     const attachIcon = attachBtn.createSpan({ cls: "opencode-btn-icon" });
     setIcon(attachIcon, "paperclip");
@@ -499,18 +503,18 @@ export class ChatView extends ItemView {
     this.autoApproveBtn.empty();
     setIcon(this.autoApproveBtn, on ? "shield-check" : "shield-off");
     this.autoApproveBtn.toggleClass("is-active", on);
-    this.autoApproveBtn.setAttribute(
-      "title",
-      on
-        ? this.plugin.t(
-            "Auto-approve On: the agent can run tools and edit files " +
-              "without asking"
-          )
-        : this.plugin.t(
-            "Auto-approve Off: the agent may stop when a tool needs " +
-              "permission"
-          )
-    );
+    const title = on
+      ? this.plugin.t(
+          "Auto-approve On: the agent can run tools and edit files " +
+            "without asking"
+        )
+      : this.plugin.t(
+          "Auto-approve Off: the agent may stop when a tool needs " +
+            "permission"
+        );
+    this.autoApproveBtn.setAttribute("title", title);
+    this.autoApproveBtn.setAttribute("aria-label", title);
+    this.autoApproveBtn.setAttribute("aria-pressed", String(on));
   }
 
   private async setAutoApprove(value: boolean): Promise<void> {
@@ -777,11 +781,13 @@ export class ChatView extends ItemView {
 
     this.agentBtn = selectorGroup.createEl("button", {
       cls: "opencode-agent-btn",
+      attr: { type: "button" },
     });
     this.agentBtn.addEventListener("click", () => this.openAgentList());
 
     this.modelBtn = selectorGroup.createEl("button", {
       cls: "opencode-model-btn",
+      attr: { type: "button" },
     });
     this.modelBtn.addEventListener("click", () => void this.openModelList());
 
@@ -789,13 +795,19 @@ export class ChatView extends ItemView {
 
     buttons.createSpan({ cls: "opencode-buttons-spacer" });
 
-    this.sendBtn = buttons.createEl("button", { cls: "opencode-send-btn" });
+    this.sendBtn = buttons.createEl("button", {
+      cls: "opencode-send-btn",
+      attr: { type: "button", "aria-label": this.plugin.t("Send") },
+    });
     const sendIcon = this.sendBtn.createSpan({ cls: "opencode-btn-icon" });
     setIcon(sendIcon, "send");
     this.sendBtn.createSpan({ text: this.plugin.t("Send") });
     this.sendBtn.addEventListener("click", () => void this.send());
 
-    this.stopBtn = buttons.createEl("button", { cls: "opencode-stop-btn" });
+    this.stopBtn = buttons.createEl("button", {
+      cls: "opencode-stop-btn",
+      attr: { type: "button", "aria-label": this.plugin.t("Stop") },
+    });
     const stopIcon = this.stopBtn.createSpan({ cls: "opencode-btn-icon" });
     setIcon(stopIcon, "square");
     this.stopBtn.createSpan({ text: this.plugin.t("Stop") });
@@ -843,10 +855,9 @@ export class ChatView extends ItemView {
       });
       const chevEl = this.agentBtn.createSpan({ cls: "opencode-chip-chevron" });
       setIcon(chevEl, "chevron-down");
-      this.agentBtn.setAttribute(
-        "title",
-        `${this.plugin.t("AI Engine")}: ${this.engineLabel(engine)}`
-      );
+      const agentTitle = `${this.plugin.t("AI Engine")}: ${this.engineLabel(engine)}`;
+      this.agentBtn.setAttribute("title", agentTitle);
+      this.agentBtn.setAttribute("aria-label", agentTitle);
     }
 
     if (this.modelBtn) {
@@ -875,10 +886,9 @@ export class ChatView extends ItemView {
 
       const chevEl = this.modelBtn.createSpan({ cls: "opencode-chip-chevron" });
       setIcon(chevEl, "chevron-down");
-      this.modelBtn.setAttribute(
-        "title",
-        `${this.plugin.t("Model")}: ${m || this.plugin.t("(CLI default)")}`
-      );
+      const modelTitle = `${this.plugin.t("Model")}: ${m || this.plugin.t("(CLI default)")}`;
+      this.modelBtn.setAttribute("title", modelTitle);
+      this.modelBtn.setAttribute("aria-label", modelTitle);
     }
   }
 
