@@ -134,6 +134,7 @@ export class AssistantBubble {
   private renderTimer: number | null = null;
   private reasoningTimer: number | null = null;
   private elapsedTimer: number | null = null;
+  private renderChild: Component | null = null;
   private startedAtMs = Date.now();
   private isFinalized = false;
 
@@ -246,6 +247,19 @@ export class AssistantBubble {
     this.activityTimerEl.setText(formatted);
   }
 
+  private clearRenderChild(): void {
+    if (this.renderChild) {
+      this.component.removeChild(this.renderChild);
+      this.renderChild = null;
+    }
+  }
+
+  private nextRenderChild(): Component {
+    this.clearRenderChild();
+    this.renderChild = this.component.addChild(new Component());
+    return this.renderChild;
+  }
+
   setText(text: string): void {
     this.rawText = text;
     if (text.trim()) {
@@ -258,6 +272,7 @@ export class AssistantBubble {
         clearTimeout(this.renderTimer);
         this.renderTimer = null;
       }
+      this.clearRenderChild();
       this.contentEl.empty();
       this.contentEl.textContent = text;
     }
@@ -275,19 +290,23 @@ export class AssistantBubble {
       this.renderTimer = null;
     }
     if (this.rawText.length > 30000) {
+      this.clearRenderChild();
       this.contentEl.empty();
       this.contentEl.textContent = this.rawText;
       return;
     }
     this.contentEl.empty();
     if (this.rawText.trim()) {
-      MarkdownRenderer.render(
+      const child = this.nextRenderChild();
+      void MarkdownRenderer.render(
         this.app,
         neutralizeRemoteMarkdown(this.rawText),
         this.contentEl,
         this.app.workspace.getActiveFile()?.path ?? "",
-        this.component
+        child
       );
+    } else {
+      this.clearRenderChild();
     }
   }
 
@@ -398,22 +417,32 @@ export class AssistantBubble {
   finalize(): void {
     this.isFinalized = true;
     this.stopElapsedClock();
+    if (this.renderTimer !== null) {
+      clearTimeout(this.renderTimer);
+      this.renderTimer = null;
+    }
+    if (this.reasoningTimer !== null) {
+      this.flushReasoningRender();
+    }
     this.activityBarEl.addClass("hidden");
     this.contentEl.empty();
     if (this.rawText.trim()) {
       this.contentEl.removeClass("hidden");
       if (this.rawText.length <= 30000) {
-        MarkdownRenderer.render(
+        const child = this.nextRenderChild();
+        void MarkdownRenderer.render(
           this.app,
           neutralizeRemoteMarkdown(this.rawText),
           this.contentEl,
           this.app.workspace.getActiveFile()?.path ?? "",
-          this.component
+          child
         );
       } else {
+        this.clearRenderChild();
         this.contentEl.textContent = this.rawText;
       }
     } else {
+      this.clearRenderChild();
       this.contentEl.addClass("hidden");
     }
     this.stepManager.finalize();

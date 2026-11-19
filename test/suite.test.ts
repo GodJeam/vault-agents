@@ -824,9 +824,9 @@ test("formatToolAction and formatQuestionAnswers format output", () => {
   assert.match(formatted, /Here are my answers to your questions:/);
   assert.match(
     formatted,
-    /\*\*Style — Which tone should be used\?\*\*: Formal, with academic/
+    /\*\*Style: Which tone should be used\?\*\*: Formal, with academic/
   );
-  assert.match(formatted, /\*\*Language — Which language\?\*\*: English/);
+  assert.match(formatted, /\*\*Language: Which language\?\*\*: English/);
 });
 
 test("Runners compute total tokens and read history fallback", async () => {

@@ -24,8 +24,8 @@ export function formatQuestionAnswers(
     if (questions.length === 1) {
       lines.push(joined);
     } else {
-      const label = q.header ? `${q.header} — ${q.question}` : q.question;
-      lines.push(`- **${label}**: ${joined || "—"}`);
+      const label = q.header ? `${q.header}: ${q.question}` : q.question;
+      lines.push(`- **${label}**: ${joined || "-"}`);
     }
   }
 

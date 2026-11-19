@@ -1,4 +1,5 @@
 import {
+  Component,
   ItemView,
   Notice,
   WorkspaceLeaf,
@@ -86,6 +87,8 @@ export class ChatView extends ItemView {
   private contextRunInput = 0;
   private activityTimer: number | null = null;
   private activeBubble: AssistantBubble | null = null;
+  private sessionRenderComponent: Component | null = null;
+  private autoScrollEnabled = true;
   private autoApproveBtn!: HTMLButtonElement;
   private autoApproveHintShown = false;
   private lastRun: { prompt: string; fileAttachments: string[] } | null = null;
@@ -153,6 +156,10 @@ export class ChatView extends ItemView {
     container.addClass("opencode-chat");
 
     this.messagesEl = container.createDiv({ cls: "opencode-messages" });
+    this.autoScrollEnabled = true;
+    this.messagesEl.addEventListener("scroll", () => {
+      this.autoScrollEnabled = this.isNearBottom();
+    });
     this.buildContextBar(container);
     this.attachmentManager = new AttachmentManager(
       container,
@@ -197,6 +204,10 @@ export class ChatView extends ItemView {
     }
     this.activeBubble?.dispose();
     this.activeBubble = null;
+    if (this.sessionRenderComponent) {
+      this.removeChild(this.sessionRenderComponent);
+      this.sessionRenderComponent = null;
+    }
     return super.onClose();
   }
 
@@ -1408,14 +1419,25 @@ export class ChatView extends ItemView {
     this.scrollToBottom();
   }
 
+  private resetSessionRenderComponent(): Component {
+    if (this.sessionRenderComponent) {
+      this.removeChild(this.sessionRenderComponent);
+      this.sessionRenderComponent = null;
+    }
+    this.sessionRenderComponent = this.addChild(new Component());
+    return this.sessionRenderComponent;
+  }
+
   private addAssistantMessage(): AssistantBubble {
     const row = this.messagesEl.createDiv({
       cls: "opencode-message opencode-message--assistant",
     });
+    const renderParent =
+      this.sessionRenderComponent ?? this.resetSessionRenderComponent();
     const bubble = new AssistantBubble(
       row,
       this.app,
-      this,
+      renderParent,
       this.assistantLabel(),
       (s) => this.plugin.t(s),
       this.plugin.settings.showToolIO,
@@ -1455,8 +1477,16 @@ export class ChatView extends ItemView {
   }
 
   copyText(text: string): void {
-    void navigator.clipboard.writeText(text);
-    new Notice(this.plugin.t("Text copied."));
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        new Notice(this.plugin.t("Text copied."));
+      })
+      .catch((e) => {
+        new Notice(
+          `${this.plugin.t("Error:")} ${redact((e as Error)?.message || String(e))}`
+        );
+      });
   }
 
   private handleStreamError(err: string): void {
@@ -1517,7 +1547,11 @@ export class ChatView extends ItemView {
   }
 
   loadHistoryForSession(sessionId: string): void {
+    this.activeBubble?.dispose();
+    this.activeBubble = null;
+    const renderComp = this.resetSessionRenderComponent();
     this.messagesEl.empty();
+    this.autoScrollEnabled = true;
     this.resetStats();
     this.contextSeq++;
     this.contextUsed = 0;
@@ -1548,7 +1582,7 @@ export class ChatView extends ItemView {
         renderHistoryAssistantRow(
           this.messagesEl,
           this.app,
-          this,
+          renderComp,
           rec,
           this.assistantLabel(),
           this.assistantIcon(),
@@ -1606,12 +1640,27 @@ export class ChatView extends ItemView {
     if (this.inputEl) this.inputEl.disabled = running;
   }
 
-  scrollToBottom(): void {
+  private isNearBottom(thresholdPx = 80): boolean {
+    if (!this.messagesEl) return true;
+    const distance =
+      this.messagesEl.scrollHeight -
+      this.messagesEl.scrollTop -
+      this.messagesEl.clientHeight;
+    return distance <= thresholdPx;
+  }
+
+  scrollToBottom(force = true): void {
+    if (!this.messagesEl) return;
+    if (force) this.autoScrollEnabled = true;
     this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
   }
 
   scheduleScroll(): void {
+    if (!this.autoScrollEnabled) return;
     if (this.renderTimer !== null) clearTimeout(this.renderTimer);
-    this.renderTimer = window.setTimeout(() => this.scrollToBottom(), 150);
+    this.renderTimer = window.setTimeout(() => {
+      this.renderTimer = null;
+      if (this.autoScrollEnabled) this.scrollToBottom(false);
+    }, 150);
   }
 }

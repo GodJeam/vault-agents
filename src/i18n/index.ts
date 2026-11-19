@@ -346,8 +346,8 @@ const IT: Record<string, string> = {
   "Prompt": "Prompt",
   "Prompt name": "Nome prompt",
   "Prompt text": "Testo prompt",
-  "No saved prompts — add them in Settings":
-    "Nessun prompt salvato — aggiungili nelle impostazioni",
+  "No saved prompts - add them in Settings":
+    "Nessun prompt salvato - aggiungili nelle impostazioni",
   "The prompt cannot be empty.": "Il prompt non può essere vuoto.",
   "(untitled)": "(senza titolo)",
   "Attached": "Allegato",
