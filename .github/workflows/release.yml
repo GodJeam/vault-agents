@@ -33,6 +33,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify release tag matches manifest and versions
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const tag = process.env.RELEASE_TAG;
+            const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const versions = JSON.parse(fs.readFileSync("versions.json", "utf8"));
+            if (manifest.version !== tag) {
+              throw new Error(`manifest.json version (${manifest.version}) !== tag (${tag})`);
+            }
+            if (pkg.version !== tag) {
+              throw new Error(`package.json version (${pkg.version}) !== tag (${tag})`);
+            }
+            if (versions[tag] !== manifest.minAppVersion) {
+              throw new Error(`versions.json[${tag}] (${versions[tag]}) !== minAppVersion (${manifest.minAppVersion})`);
+            }
+            console.log(`Verified release metadata for ${tag} (minAppVersion ${manifest.minAppVersion})`);
+          '
+
       - name: Run test suite
         run: npm test
 
