@@ -36,7 +36,7 @@ import { AntigravityRunner } from "../src/providers/antigravity/runner";
 import { OpencodeRunner } from "../src/providers/opencode/runner";
 import { HermesRunner } from "../src/providers/hermes/runner";
 import { PiRunner } from "../src/providers/pi/runner";
-import { formatToolAction } from "../src/features/chat/stepWidget";
+import { formatToolAction, serializeStepDetails } from "../src/features/chat/stepWidget";
 import { formatQuestionAnswers } from "../src/features/chat/questionCard";
 import {
   AGENT_ICON_IDS,
@@ -1636,6 +1636,112 @@ test("execCli enforces maxOutputBytes and convertDocument enforces timeout and U
     for (const p of new Set(createdOutputs)) {
       await rm(p, { force: true }).catch(() => {});
     }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("redact and stepWidget redact new key prefixes and tool I/O details", () => {
+  const sample =
+    "keys: fc-1234567890abcdef tvly-abcdef1234567890 npm_1234567890abcdefghij pypi-1234567890abcdefghij";
+  const cleaned = redact(sample);
+  assert.equal(cleaned.includes("1234567890"), false);
+  assert.ok(cleaned.includes("fc-[REDACTED]"));
+  assert.ok(cleaned.includes("tvly-[REDACTED]"));
+  assert.ok(cleaned.includes("npm_[REDACTED]"));
+  assert.ok(cleaned.includes("pypi-[REDACTED]"));
+
+  const stepDetails = serializeStepDetails(
+    {
+      id: "step-1",
+      tool: "bash",
+      title: "curl -H 'Authorization: Bearer secret_token_999999' https://user:pass123@example.com",
+      state: "completed",
+      input: {
+        cmd: "curl https://api.example.com",
+        apiKey: "sk-proj-supersecret123456",
+      },
+      output: "Token: fc-firecrawlsecretkey12345",
+    },
+    (s) => s
+  );
+  assert.equal(stepDetails.includes("supersecret123456"), false);
+  assert.equal(stepDetails.includes("firecrawlsecretkey12345"), false);
+  assert.ok(stepDetails.includes("[REDACTED]"));
+
+  const action = formatToolAction(
+    "bash",
+    "curl -H 'Authorization: Bearer secret_token_999999' https://user:pass123@example.com",
+    (s) => s
+  );
+  assert.equal(action.target.includes("secret_token_999999"), false);
+  assert.equal(action.target.includes("pass123"), false);
+});
+
+test("neutralizeRemoteMarkdown preserves reference links while blocking image refs and remote style blocks", () => {
+  const md = [
+    "Read the [API docs][docs], [guide][], or [home].",
+    "Mixed ref: [click][both] and ![tracker][both].",
+    "Pure image ref: ![banner][imgref].",
+    "<style>@import url('https://evil.example/track.css');</style>",
+    "<style>.x { background: url(//evil.example/bg.png); }</style>",
+    "<style>.local { color: red; }</style>",
+    "",
+    "[docs]: https://example.com/docs",
+    "[guide]: https://example.com/guide",
+    "[home]: https://example.com/home",
+    "[both]: https://evil.example/both.png",
+    "[imgref]: https://evil.example/banner.png",
+  ].join("\n");
+
+  const out = neutralizeRemoteMarkdown(md);
+  assert.ok(out.includes("[docs]: https://example.com/docs"));
+  assert.ok(out.includes("[guide]: https://example.com/guide"));
+  assert.ok(out.includes("[home]: https://example.com/home"));
+  assert.ok(out.includes("<style>.local { color: red; }</style>"));
+  assert.equal(out.includes("evil.example"), false);
+  assert.equal(out.includes("track.css"), false);
+  assert.equal(out.includes("bg.png"), false);
+  assert.equal(out.includes("both.png"), false);
+  assert.equal(out.includes("banner.png"), false);
+});
+
+test("sqlEscape strips NUL bytes and OpencodeRunner backupSqliteDb handles WAL vacuum and fallback", async () => {
+  const host = createMockHost();
+  const oc = new OpencodeRunner(host);
+
+  assert.equal(oc.sqlEscape("a\0b'c\0"), "ab''c");
+
+  const root = await mkdtemp(join(tmpdir(), "vault-agents-bak-"));
+  try {
+    const dbPath = join(root, "opencode.db");
+    const bakPath = dbPath + ".bak";
+    await writeFile(dbPath, "SQLITE_DATA", "utf8");
+
+    const runner = oc as unknown as {
+      execSqlite: (db: string, sql: string) => Promise<string>;
+      backupSqliteDb: (db: string, bak: string) => Promise<void>;
+    };
+
+    // 1. WAL-safe VACUUM INTO path
+    let seenSql = "";
+    runner.execSqlite = async (_db, sql) => {
+      seenSql = sql;
+      const m = sql.match(/VACUUM INTO '([^']+)'/);
+      assert.ok(m, "expected VACUUM INTO SQL");
+      await writeFile(m[1], "VACUUMED_SNAPSHOT", "utf8");
+      return "";
+    };
+    await runner.backupSqliteDb(dbPath, bakPath);
+    assert.match(seenSql, /^VACUUM INTO '/);
+    assert.equal(readFileSync(bakPath, "utf8"), "VACUUMED_SNAPSHOT");
+
+    // 2. Fallback to copyFile when sqlite3 fails
+    runner.execSqlite = async () => {
+      throw new Error("sqlite3 not found");
+    };
+    await runner.backupSqliteDb(dbPath, bakPath);
+    assert.equal(readFileSync(bakPath, "utf8"), "SQLITE_DATA");
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
