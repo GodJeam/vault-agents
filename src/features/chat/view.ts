@@ -476,6 +476,8 @@ export class ChatView extends ItemView {
       this.contextLimit = 0;
       if (this.viewSession) {
         void this.refreshContext();
+      } else if (this.isShowingWelcomeOnly()) {
+        this.loadHistoryForSession("");
       }
     }
   }
@@ -894,15 +896,18 @@ export class ChatView extends ItemView {
     new AgentSuggestModal(this.app, this.plugin, items, (item) => {
       const engineChanged = item.id !== activeEngine;
       this.plugin.settings.engine = item.id;
-      if (this.viewSession && engineChanged) {
-        this.viewSession = "";
-        this.plugin.settings.sessionId = "";
+      if (engineChanged) {
+        if (this.viewSession) {
+          this.viewSession = "";
+          this.plugin.settings.sessionId = "";
+          if (this.sessionSelect) this.sessionSelect.value = "";
+          this.updateSessionBtnStates();
+        }
+        this.loadHistoryForSession("");
         void this.plugin.saveSettings();
         void this.populateSessionSelect();
-        this.loadHistoryForSession("");
       } else {
         void this.plugin.saveSettings();
-        if (engineChanged) void this.populateSessionSelect();
         this.updateModelBtn();
         this.updateStatsBar();
         this.contextLimit = 0;
@@ -1087,9 +1092,21 @@ export class ChatView extends ItemView {
     );
   }
 
+  private isShowingWelcomeOnly(): boolean {
+    return (
+      Boolean(this.messagesEl) &&
+      this.messagesEl.children.length === 1 &&
+      Boolean(
+        this.messagesEl.firstElementChild?.classList.contains(
+          "opencode-welcome"
+        )
+      )
+    );
+  }
+
   private addWelcome(): void {
     const row = this.messagesEl.createDiv({
-      cls: "opencode-message opencode-message--assistant",
+      cls: "opencode-message opencode-message--assistant opencode-welcome",
     });
     const text = this.plugin.t(
       "Hi! I am Vault Agents, connecting AI agents directly to your " +
