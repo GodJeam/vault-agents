@@ -66,6 +66,10 @@ export class ChatView extends ItemView {
   private pendingUser: { text: string; contextLabel?: string } | null = null;
   private currentProc: RunHandle | null = null;
   private runSeq = 0;
+  private populateSeq = 0;
+  private contextSeq = 0;
+  private closed = false;
+  private lastEngineModelKey = "";
   private running = false;
   private dispatching = false;
   private pendingQueuedAnswer: string | null = null;
@@ -143,6 +147,7 @@ export class ChatView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    this.closed = false;
     const container = this.contentEl;
     container.empty();
     container.addClass("opencode-chat");
@@ -164,12 +169,17 @@ export class ChatView extends ItemView {
     this.registerEvent(this.app.vault.on("rename", inv));
 
     void this.populateSessionSelect().then(() => {
-      this.loadHistoryForSession(this.viewSession);
+      if (!this.closed) {
+        this.loadHistoryForSession(this.viewSession);
+      }
     });
   }
 
   onClose(): Promise<void> {
+    this.closed = true;
     this.runSeq++;
+    this.populateSeq++;
+    this.contextSeq++;
     this.pendingQueuedAnswer = null;
     this.currentProc?.abort();
     this.currentProc = null;
@@ -211,7 +221,7 @@ export class ChatView extends ItemView {
     this.viewSession = "";
     this.plugin.settings.sessionId = "";
     this.attachmentManager?.clear();
-    if (persist) void this.plugin.saveSettings();
+    if (persist) void this.plugin.saveSettings(false);
     void this.populateSessionSelect();
     this.loadHistoryForSession("");
     if (!silent) {
@@ -258,7 +268,7 @@ export class ChatView extends ItemView {
         this.viewSession = v;
         this.plugin.settings.sessionId = v;
         this.attachmentManager?.clear();
-        void this.plugin.saveSettings();
+        void this.plugin.saveSettings(false);
         this.loadHistoryForSession(v);
       }
       this.updateSessionBtnStates();
@@ -355,7 +365,7 @@ export class ChatView extends ItemView {
     if (idx >= 0) pinned.splice(idx, 1);
     else pinned.push(id);
     this.plugin.settings.pinned = pinned;
-    void this.plugin.saveSettings();
+    void this.plugin.saveSettings(false);
     void this.populateSessionSelect();
     const msg =
       idx >= 0
@@ -382,7 +392,7 @@ export class ChatView extends ItemView {
         } catch (e) {
           console.debug("[vault-agents] remote renameSession failed:", redact(e));
         }
-        await this.plugin.saveSettings();
+        await this.plugin.saveSettings(false);
         void this.populateSessionSelect();
         new Notice(this.plugin.t("Session renamed."));
       })();
@@ -431,7 +441,7 @@ export class ChatView extends ItemView {
             this.viewSession = "";
             this.plugin.settings.sessionId = "";
           }
-          await this.plugin.saveSettings();
+          await this.plugin.saveSettings(false);
           await this.populateSessionSelect();
           this.loadHistoryForSession(this.viewSession);
           new Notice(this.plugin.t("Session deleted."));
@@ -459,8 +469,15 @@ export class ChatView extends ItemView {
     this.updateModelBtn();
     this.updateStatsBar();
     this.activeBubble?.setShowThinking(this.plugin.settings.showThinking);
-    this.contextLimit = 0;
-    void this.refreshContext();
+    const engine = this.sessionEngine();
+    const key = `${engine}\0${this.activeModelFor(engine)}`;
+    if (key !== this.lastEngineModelKey) {
+      this.lastEngineModelKey = key;
+      this.contextLimit = 0;
+      if (this.viewSession) {
+        void this.refreshContext();
+      }
+    }
   }
 
   private updateAutoApproveBtn(): void {
@@ -532,32 +549,37 @@ export class ChatView extends ItemView {
   }
 
   private async populateSessionSelect(): Promise<void> {
-    if (!this.sessionSelect) return;
+    if (!this.sessionSelect || this.closed) return;
+    const seq = ++this.populateSeq;
+    let displayed: Awaited<ReturnType<typeof fetchDisplayedSessions>> = [];
+    try {
+      displayed = await fetchDisplayedSessions(
+        this.plugin,
+        this.viewSession,
+        this.sessionEngine()
+      );
+    } catch {
+      // Keep only "New session"
+    }
+    if (seq !== this.populateSeq || this.closed || !this.sessionSelect) return;
+
     const sel = this.sessionSelect;
     sel.empty();
     const newOpt = sel.createEl("option");
     newOpt.value = "";
     newOpt.textContent = "＋ " + this.plugin.t("New session");
-    try {
-      const displayed = await fetchDisplayedSessions(
-        this.plugin,
-        this.viewSession,
-        this.sessionEngine()
-      );
-      const pinnedSet = new Set(this.plugin.settings.pinned ?? []);
 
-      for (const s of displayed) {
-        const o = sel.createEl("option");
-        o.value = s.id;
-        const title = s.title || s.id;
-        const mark = pinnedSet.has(s.id) ? "● " : "";
-        const short = title.length > 40 ? title.slice(0, 37) + "…" : title;
-        o.textContent = mark + short;
-        o.title = title;
-      }
-    } catch {
-      // Keep only "New session"
+    const pinnedSet = new Set(this.plugin.settings.pinned ?? []);
+    for (const s of displayed) {
+      const o = sel.createEl("option");
+      o.value = s.id;
+      const title = s.title || s.id;
+      const mark = pinnedSet.has(s.id) ? "● " : "";
+      const short = title.length > 40 ? title.slice(0, 37) + "…" : title;
+      o.textContent = mark + short;
+      o.title = title;
     }
+
     sel.value = this.viewSession || "";
     this.updateSessionBtnStates();
   }
@@ -605,7 +627,7 @@ export class ChatView extends ItemView {
     const used = this.contextUsed;
     const limit = this.contextLimit;
     if (!limit) {
-      this.contextEl.setText(this.plugin.t("Context:") + " —");
+      this.contextEl.setText(this.plugin.t("Context:") + " -");
       this.contextFillEl.style.width = "0%";
       return;
     }
@@ -620,6 +642,9 @@ export class ChatView extends ItemView {
 
   private async refreshContext(): Promise<void> {
     const sid = this.viewSession;
+    const seq = ++this.contextSeq;
+    const isStale = () =>
+      seq !== this.contextSeq || this.closed || this.viewSession !== sid;
     if (!sid) {
       this.contextUsed = 0;
       this.contextLimit = 0;
@@ -629,6 +654,7 @@ export class ChatView extends ItemView {
     try {
       const runner = this.getRunner();
       const tokens = await runner.getSessionTokens(sid);
+      if (isStale()) return;
       this.contextBaseInput = tokens.input;
       this.contextUsed = tokens.input;
       if (
@@ -645,12 +671,14 @@ export class ChatView extends ItemView {
       }
       if (!this.contextLimit) {
         const activeMod = this.activeModelFor(runner.id);
-        this.contextLimit = await runner.getModelContextLimit(activeMod);
+        const limit = await runner.getModelContextLimit(activeMod);
+        if (isStale()) return;
+        this.contextLimit = limit;
       }
     } catch (e) {
       console.error("[vault-agents] refreshContext error:", redact(e));
     }
-    this.updateContextUsage();
+    if (!isStale()) this.updateContextUsage();
   }
 
   private addStats(info: FinishInfo): void {
@@ -870,9 +898,11 @@ export class ChatView extends ItemView {
         this.viewSession = "";
         this.plugin.settings.sessionId = "";
         void this.plugin.saveSettings();
+        void this.populateSessionSelect();
         this.loadHistoryForSession("");
       } else {
         void this.plugin.saveSettings();
+        if (engineChanged) void this.populateSessionSelect();
         this.updateModelBtn();
         this.updateStatsBar();
         this.contextLimit = 0;
@@ -951,7 +981,7 @@ export class ChatView extends ItemView {
             this.plugin.settings.sessionEngines = {};
           }
           this.plugin.settings.sessionEngines[id] = runner.id;
-          void this.plugin.saveSettings();
+          void this.plugin.saveSettings(false);
         },
         onActivity: (activity) => {
           if (isCurrent()) bubble.setActivity(activity);
@@ -1040,7 +1070,7 @@ export class ChatView extends ItemView {
   private finishContinuation(prompt: string, notice: string): void {
     this.viewSession = "";
     this.plugin.settings.sessionId = "";
-    void this.plugin.saveSettings();
+    void this.plugin.saveSettings(false);
     void this.populateSessionSelect();
     this.loadHistoryForSession("");
     this.inputEl.value = prompt;
@@ -1123,15 +1153,24 @@ export class ChatView extends ItemView {
     }
 
     this.dispatching = true;
+    if (this.sendBtn) this.sendBtn.disabled = true;
+    if (this.inputEl) this.inputEl.disabled = true;
     try {
       const filePaths = await this.attachmentManager.prepareAttachments(
         this.getRunner()
       );
+      if (this.closed) {
+        this.dispatching = false;
+        return;
+      }
       this.attachmentManager.clear();
       this.dispatching = false;
+      if (this.sendBtn) this.sendBtn.disabled = false;
       this.doRun(prompt, filePaths);
     } catch (e) {
       this.dispatching = false;
+      if (this.sendBtn) this.sendBtn.disabled = false;
+      if (this.inputEl && !this.running) this.inputEl.disabled = false;
       new Notice(`${this.plugin.t("Error:")} ${redact((e as Error).message)}`);
     }
   }
@@ -1194,7 +1233,7 @@ export class ChatView extends ItemView {
               this.plugin.settings.sessionEngines = {};
             }
             this.plugin.settings.sessionEngines[id] = runner.id;
-            void this.plugin.saveSettings();
+            void this.plugin.saveSettings(false);
             void this.populateSessionSelect();
           }
           if (this.pendingUser) {
@@ -1438,7 +1477,7 @@ export class ChatView extends ItemView {
       }
       this.viewSession = "";
       this.plugin.settings.sessionId = "";
-      void this.plugin.saveSettings();
+      void this.plugin.saveSettings(false);
       void this.populateSessionSelect();
       return;
     }
@@ -1463,10 +1502,13 @@ export class ChatView extends ItemView {
   loadHistoryForSession(sessionId: string): void {
     this.messagesEl.empty();
     this.resetStats();
+    this.contextSeq++;
     this.contextUsed = 0;
     this.contextBaseInput = 0;
     this.contextRunInput = 0;
     this.contextLimit = 0;
+    const engine = this.sessionEngine();
+    this.lastEngineModelKey = `${engine}\0${this.activeModelFor(engine)}`;
     this.updateContextUsage();
     this.updateModelBtn();
 

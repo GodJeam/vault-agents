@@ -204,13 +204,18 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     return view;
   }
 
-  async onunload(): Promise<void> {
-    await this.flushSave();
+  onunload(): void {
+    // Kill running CLI subprocesses synchronously first: Obsidian does not
+    // await an async onunload(), so deferring killAll behind flushSave could
+    // leave orphaned processes on shutdown.
     if (this.registry) {
       for (const provider of this.registry.getAll()) {
         provider.killAll();
       }
     }
+    void this.flushSave().catch((e) => {
+      console.debug("[vault-agents] flushSave on unload failed:", e);
+    });
   }
 
   private collectKeepIds(): string[] {
@@ -329,13 +334,13 @@ export default class VaultAgentsPlugin extends Plugin implements RunnerHost {
     }
   }
 
-  scheduleSaveSettings(): void {
+  scheduleSaveSettings(refreshViews = true): void {
     this.scheduleSave();
-    this.refreshOpenViews();
+    if (refreshViews) this.refreshOpenViews();
   }
 
-  async saveSettings(): Promise<void> {
+  async saveSettings(refreshViews = true): Promise<void> {
     await this.flushSave();
-    this.refreshOpenViews();
+    if (refreshViews) this.refreshOpenViews();
   }
 }

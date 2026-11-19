@@ -62,6 +62,8 @@ export class RenameModal extends Modal {
 }
 
 export class StatsModal extends Modal {
+  private closed = false;
+
   constructor(
     app: App,
     private plugin: VaultAgentsPlugin,
@@ -71,6 +73,7 @@ export class StatsModal extends Modal {
   }
 
   onOpen(): void {
+    this.closed = false;
     const { contentEl } = this;
     const t = (s: string) => this.plugin.t(s);
     contentEl.empty();
@@ -84,12 +87,14 @@ export class StatsModal extends Modal {
       .resolveProvider(this.engine)
       .getUsageStats()
       .then((s) => {
+        if (this.closed) return;
         status.remove();
         this.renderWindow(contentEl, t("Last 5 hours"), s.h5);
         this.renderWindow(contentEl, t("Last week"), s.week);
         this.renderWindow(contentEl, t("Last month"), s.month);
       })
       .catch((e) => {
+        if (this.closed) return;
         status.setText(`${t("Error:")} ${redact((e as Error).message)}`);
       });
   }
@@ -122,6 +127,7 @@ export class StatsModal extends Modal {
   }
 
   onClose(): void {
+    this.closed = true;
     this.contentEl.empty();
   }
 }
