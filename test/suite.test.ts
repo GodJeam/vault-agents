@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { chmod, mkdtemp, mkdir, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Component, type App } from "obsidian";
 import {
   DEFAULT_SETTINGS,
   getEngineConfig,
@@ -38,13 +39,19 @@ import { HermesRunner } from "../src/providers/hermes/runner";
 import { PiRunner } from "../src/providers/pi/runner";
 import { formatToolAction, serializeStepDetails } from "../src/features/chat/stepWidget";
 import { formatQuestionAnswers } from "../src/features/chat/questionCard";
+import { AssistantBubble } from "../src/features/chat/messageBubble";
 import {
   AGENT_ICON_IDS,
   AGENT_ICON_SVGS,
   buildAgentSvgMarkup,
 } from "../src/shared/agentIcons";
 import { fuzzyMatchScore } from "../src/shared/suggestModals";
-import { substitute, translate } from "../src/i18n";
+import {
+  IT_TRANSLATIONS,
+  hasTranslation,
+  substitute,
+  translate,
+} from "../src/i18n";
 
 function createMockHost(
   customSettings?: Partial<PluginSettings> & Record<string, unknown>,
@@ -1744,6 +1751,195 @@ test("sqlEscape strips NUL bytes and OpencodeRunner backupSqliteDb handles WAL v
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("i18n dictionary maintains EN/IT parity, placeholder consistency, and prototype safety", () => {
+  const entries = Object.entries(IT_TRANSLATIONS);
+  assert.ok(entries.length > 200);
+
+  for (const [en, it] of entries) {
+    assert.ok(en.trim().length > 0, "English key must be non-empty");
+    assert.ok(it.trim().length > 0, `Italian translation missing for: ${en}`);
+    const enPlaceholders = [...en.matchAll(/\$[1-9]\d*/g)].map((m) => m[0]).sort();
+    const itPlaceholders = [...it.matchAll(/\$[1-9]\d*/g)].map((m) => m[0]).sort();
+    assert.deepEqual(
+      itPlaceholders,
+      enPlaceholders,
+      `Placeholder mismatch for key "${en}" -> "${it}"`
+    );
+  }
+
+  // Prototype keys must never resolve to Object.prototype functions
+  for (const key of ["constructor", "toString", "valueOf", "__proto__"]) {
+    assert.equal(hasTranslation(key), false);
+    assert.equal(translate("it", key), key);
+  }
+
+  // All provider descriptor descriptions & option labels must have IT translations
+  const host = createMockHost();
+  const runners = [
+    new AntigravityRunner(host),
+    new OpencodeRunner(host),
+    new HermesRunner(host),
+    new PiRunner(host),
+  ];
+  for (const r of runners) {
+    const d = r.descriptor;
+    assert.equal(hasTranslation(d.binaryDesc), true, `missing binaryDesc translation for ${r.id}`);
+    assert.equal(hasTranslation(d.modelDesc), true, `missing modelDesc translation for ${r.id}`);
+    for (const opt of d.options) {
+      assert.equal(hasTranslation(opt.label), true, `missing option label translation: ${opt.label}`);
+      assert.equal(hasTranslation(opt.desc), true, `missing option desc translation: ${opt.desc}`);
+      if (opt.placeholder) {
+        assert.equal(
+          hasTranslation(opt.placeholder),
+          true,
+          `missing option placeholder translation: ${opt.placeholder}`
+        );
+      }
+      for (const ch of opt.choices ?? []) {
+        assert.equal(hasTranslation(ch.label), true, `missing choice label translation: ${ch.label}`);
+      }
+    }
+  }
+
+  // Verify every single-literal t("...") call across src/ has an IT translation
+  const walkTs = (dir: string): string[] => {
+    const res: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name);
+      if (entry.isDirectory()) res.push(...walkTs(p));
+      else if (p.endsWith(".ts")) res.push(p);
+    }
+    return res;
+  };
+  for (const file of walkTs("src")) {
+    if (file.endsWith(join("i18n", "index.ts"))) continue;
+    const src = readFileSync(file, "utf8");
+    for (const m of src.matchAll(/(?:\.|\b)t\(\s*"([^"\\\n]+)"\s*\)/g)) {
+      const key = m[1];
+      assert.equal(
+        hasTranslation(key),
+        true,
+        `Missing IT translation for literal "${key}" in ${file}`
+      );
+    }
+  }
+});
+
+test("AssistantBubble unloads previous MarkdownRenderer child components on re-render", () => {
+  type MockEl = {
+    textContent: string;
+    classes: Set<string>;
+    children: MockEl[];
+    createDiv: (opts?: { cls?: string; text?: string }) => MockEl;
+    createSpan: (opts?: { cls?: string; text?: string }) => MockEl;
+    createEl: (_tag: string, opts?: { cls?: string; text?: string }) => MockEl;
+    addClass: (c: string) => void;
+    removeClass: (c: string) => void;
+    toggleClass: (c: string, on: boolean) => void;
+    setText: (s: string) => void;
+    setAttribute: () => void;
+    addEventListener: () => void;
+    querySelector: () => null;
+    empty: () => void;
+  };
+
+  const makeEl = (text = ""): MockEl => {
+    const el: MockEl = {
+      textContent: text,
+      classes: new Set(),
+      children: [],
+      createDiv(opts) {
+        const c = makeEl(opts?.text ?? "");
+        this.children.push(c);
+        return c;
+      },
+      createSpan(opts) {
+        const c = makeEl(opts?.text ?? "");
+        this.children.push(c);
+        return c;
+      },
+      createEl(_tag, opts) {
+        const c = makeEl(opts?.text ?? "");
+        this.children.push(c);
+        return c;
+      },
+      addClass(c) { this.classes.add(c); },
+      removeClass(c) { this.classes.delete(c); },
+      toggleClass(c, on) { if (on) this.classes.add(c); else this.classes.delete(c); },
+      setText(s) { this.textContent = s; },
+      setAttribute() {},
+      addEventListener() {},
+      querySelector() { return null; },
+      empty() { this.children = []; this.textContent = ""; },
+    };
+    return el;
+  };
+
+  const prevWindow = (globalThis as Record<string, unknown>).window;
+  (globalThis as Record<string, unknown>).window = {
+    setTimeout: globalThis.setTimeout.bind(globalThis),
+    setInterval: globalThis.setInterval.bind(globalThis),
+  };
+
+  try {
+    const parent = new Component() as Component & { _children: Set<Component & { _loaded: boolean }> };
+    parent.load();
+    const mockApp = { workspace: { getActiveFile: () => null } } as unknown as App;
+    const bubble = new AssistantBubble(
+      makeEl() as unknown as HTMLElement,
+      mockApp,
+      parent,
+      "Agent",
+      (s) => s,
+      false,
+      () => {},
+      () => {},
+      () => ""
+    );
+
+    const flush = () => (bubble as unknown as { flushRender: () => void }).flushRender();
+    const seenChildren = new Set<Component & { _loaded: boolean }>();
+
+    for (let i = 1; i <= 5; i++) {
+      bubble.setText(`chunk ${i}`);
+      flush();
+      assert.equal(parent._children.size, 1, "only one active renderChild should remain attached");
+      for (const c of parent._children) seenChildren.add(c);
+    }
+
+    assert.equal(seenChildren.size, 5, "each render cycle should create a fresh child component");
+    const unloadedCount = [...seenChildren].filter((c) => !c._loaded).length;
+    assert.equal(unloadedCount, 4, "all 4 previous render children must have been unloaded");
+
+    bubble.finalize();
+    assert.equal(parent._children.size, 1);
+    const finalChild = [...parent._children][0];
+    assert.equal(finalChild._loaded, true);
+
+    parent.unload();
+    assert.equal(parent._children.size, 0);
+    assert.equal(finalChild._loaded, false, "unloading session component must unload finalized bubble child");
+    bubble.dispose();
+  } finally {
+    if (prevWindow === undefined) {
+      delete (globalThis as Record<string, unknown>).window;
+    } else {
+      (globalThis as Record<string, unknown>).window = prevWindow;
+    }
+  }
+});
+
+test("Settings tab and modals use native Obsidian setHeading/setTitle APIs", () => {
+  const settingsSrc = readFileSync(join("src", "features", "settings", "settingsTab.ts"), "utf8");
+  assert.equal(/createEl\(["']h[234]["']/.test(settingsSrc), false, "settingsTab should use Setting.setHeading()");
+  assert.ok(settingsSrc.includes(".setHeading()"));
+  assert.ok(settingsSrc.includes("hide(): void"));
+
+  const modalsSrc = readFileSync(join("src", "shared", "modals.ts"), "utf8");
+  assert.equal(/createEl\(["']h[234]["']/.test(modalsSrc), false, "modals should use Modal.setTitle() and Setting.setHeading()");
+  assert.ok(modalsSrc.includes("this.setTitle("));
 });
 
 
